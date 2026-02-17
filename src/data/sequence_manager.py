@@ -9,7 +9,9 @@ from pathlib import Path
 # import sys
 # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
-from src.utils.paths import PROCESSED_DATA_DIR
+import gzip
+from Bio import SeqIO
+from src.utils.paths import PROCESSED_DATA_DIR, STRING_SEQUENCES_FILE
 
 class SequenceManager:
     def __init__(self, cache_file: str = "sequences_cache.json"):
@@ -50,9 +52,51 @@ class SequenceManager:
         if not missing_ids:
             return results
 
+        # 1.5 Try Local File
+        local_seqs = self._load_from_local_file(missing_ids)
+        if local_seqs:
+             print(f"Found {len(local_seqs)} sequences in local file.")
+             self.sequences.update(local_seqs)
+             self._save_cache()
+             results.update(local_seqs)
+             
+             # Recalculate missing
+             missing_ids = [pid for pid in missing_ids if pid not in results]
+             
+        if not missing_ids:
+            return results
+
         # 2. Fetch Missing
         print(f"Fetching {len(missing_ids)} missing sequences from UniProt...")
         fetched_seqs = self._fetch_from_uniprot(missing_ids)
+
+    def _load_from_local_file(self, missing_ids: List[str]) -> Dict[str, str]:
+        found = {}
+        if not STRING_SEQUENCES_FILE.exists():
+            return found
+            
+        print(f"Searching local file {STRING_SEQUENCES_FILE} for {len(missing_ids)} sequences...")
+        missing_set = set(missing_ids)
+        
+        try:
+            with gzip.open(STRING_SEQUENCES_FILE, "rt") as handle:
+                for record in SeqIO.parse(handle, "fasta"):
+                    # ID format: 9606.ENSP...
+                    full_id = record.id
+                    if full_id.startswith("9606."):
+                        pid = full_id[5:]
+                    else:
+                        pid = full_id
+                        
+                    if pid in missing_set:
+                        found[pid] = str(record.seq)
+                        missing_set.remove(pid)
+                        if not missing_set:
+                            break
+        except Exception as e:
+            print(f"Error reading local sequences file: {e}")
+            
+        return found
         
         # 3. Update Cache & Results
         if fetched_seqs:

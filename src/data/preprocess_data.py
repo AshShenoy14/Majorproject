@@ -45,7 +45,13 @@ def load_sequences(fasta_file: str) -> dict:
         print(f"Warning: Sequence file {fasta_file} not found.")
         return {}
 
-    for record in SeqIO.parse(fasta_file, "fasta"):
+    if str(fasta_file).endswith(".gz"):
+        import gzip
+        handle = gzip.open(fasta_file, "rt")
+    else:
+        handle = open(fasta_file, "r")
+
+    for record in SeqIO.parse(handle, "fasta"):
         # We need to extract the ID that matches the interaction file.
         # This is highly dependent on the source file headers.
         seq_id = record.id.split("|")[1] if "|" in record.id else record.id

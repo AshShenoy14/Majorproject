@@ -15,19 +15,18 @@ def download_string_db():
     
     if STRING_FILE.exists():
         print(f"STRING file already exists at {STRING_FILE}")
-        return
-
-    print(f"Downloading STRING DB from {url}...")
-    try:
-        response = requests.get(url, stream=True)
-        response.raise_for_status()
-        
-        with open(STRING_FILE, 'wb') as f:
-            for chunk in response.iter_content(chunk_size=8192):
-                f.write(chunk)
-        print("Interactions download complete.")
-    except Exception as e:
-        print(f"Failed to download STRING DB interactions: {e}")
+    else:
+        print(f"Downloading STRING DB from {url}...")
+        try:
+            response = requests.get(url, stream=True)
+            response.raise_for_status()
+            
+            with open(STRING_FILE, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+            print("Interactions download complete.")
+        except Exception as e:
+            print(f"Failed to download STRING DB interactions: {e}")
 
     # Download Sequences
     seq_url = "https://stringdb-static.org/download/protein.sequences.v12.0/9606.protein.sequences.v12.0.fa.gz"

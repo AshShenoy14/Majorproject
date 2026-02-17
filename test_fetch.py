@@ -1,10 +1,12 @@
 
-from src.data.collect_sequences import get_sequences
+from src.data.sequence_manager import SequenceManager
+
 
 # Test ENSP ID
 test_id = "ENSP00000327694"
 print(f"Fetching sequence for {test_id}...")
-results = get_sequences([test_id])
+manager = SequenceManager()
+results = manager.get_sequences([test_id])
 print(results)
 
 if not results:
