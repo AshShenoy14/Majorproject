@@ -45,19 +45,39 @@ def run_pipeline(limit_data: int = None):
         print(f"Warning: {missing} proteins missing sequences.")
         
     # 3. Extract Embeddings
+    # 3. Extract Embeddings
     print("--- Extracting Embeddings ---")
     # Check if embeddings already exist?
     emb_path = PROCESSED_DATA_DIR / "embeddings.pt"
+    requires_extraction = True
+    embeddings = {}
+
     if emb_path.exists() and not limit_data:
-        print("Embeddings file exists. Skipping extraction (delete 'embeddings.pt' to force regenerate).")
-        embeddings = torch.load(emb_path, weights_only=False)
-    else:
+        print("Embeddings file exists. Checking coverage...")
+        try:
+            loaded_embeddings = torch.load(emb_path, weights_only=False)
+            loaded_keys = set(loaded_embeddings.keys())
+            missing_count = len(proteins - loaded_keys)
+            
+            if missing_count > len(proteins) * 0.1: # If more than 10% missing
+                print(f"Embedding coverage low. Missing {missing_count} proteins. Regenerating...")
+                requires_extraction = True
+            else:
+                 print(f"Embedding coverage sufficient. Skipping extraction.")
+                 embeddings = loaded_embeddings
+                 requires_extraction = False
+        except Exception as e:
+            print(f"Error loading embeddings: {e}. Regenerating...")
+            requires_extraction = True
+            
+    if requires_extraction:
         # Filter sequences to only those we have
         valid_sequences = {k: v for k, v in sequences.items() if v}
         
         device = "cuda" if torch.cuda.is_available() else "cpu"
+        # Increased batch size for speed
         extractor = ESMFeatureExtractor(device=device)
-        embeddings = extractor.get_embeddings(valid_sequences, batch_size=4)
+        embeddings = extractor.get_embeddings(valid_sequences, batch_size=32)
         
         if not limit_data:
             torch.save(embeddings, emb_path)
