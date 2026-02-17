@@ -1,0 +1,151 @@
+import sys
+import os
+import torch
+import pandas as pd
+import argparse
+from tqdm import tqdm
+
+# Add project root
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
+
+from src.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT
+from src.data.sequence_manager import SequenceManager
+from src.data.feature_extraction import ESMFeatureExtractor
+from src.training.train_sequence_model import train as train_seq
+from src.training.train_graph_model import train as train_graph
+from src.training.train_ensemble import train_ensemble
+from torch_geometric.data import Data
+
+def run_pipeline(limit_data: int = None):
+    print("=== Starting Real Data Pipeline ===")
+    
+    # 1. Load Data
+    print("Loading train.csv...")
+    train_path = PROCESSED_DATA_DIR / "train.csv"
+    if not train_path.exists():
+        print("Error: train.csv not found.")
+        return
+        
+    df = pd.read_csv(train_path)
+    if limit_data:
+        print(f"Limiting to first {limit_data} interactions for quick setup...")
+        df = df.head(limit_data)
+        
+    # Get Unique Proteins
+    proteins = set(df["protein1"].unique()) | set(df["protein2"].unique())
+    print(f"Found {len(proteins)} unique proteins.")
+    
+    # 2. Fetch Sequences
+    print("--- Fetching Sequences ---")
+    seq_manager = SequenceManager()
+    sequences = seq_manager.get_sequences(list(proteins))
+    
+    missing = len(proteins) - len(sequences)
+    if missing > 0:
+        print(f"Warning: {missing} proteins missing sequences.")
+        
+    # 3. Extract Embeddings
+    print("--- Extracting Embeddings ---")
+    # Check if embeddings already exist?
+    emb_path = PROCESSED_DATA_DIR / "embeddings.pt"
+    if emb_path.exists() and not limit_data:
+        print("Embeddings file exists. Skipping extraction (delete 'embeddings.pt' to force regenerate).")
+        embeddings = torch.load(emb_path, weights_only=False)
+    else:
+        # Filter sequences to only those we have
+        valid_sequences = {k: v for k, v in sequences.items() if v}
+        
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        extractor = ESMFeatureExtractor(device=device)
+        embeddings = extractor.get_embeddings(valid_sequences, batch_size=4)
+        
+        if not limit_data:
+            torch.save(embeddings, emb_path)
+    
+    # 4. Build Graph
+    print("--- Building PPI Graph ---")
+    # Map proteins to indices
+    valid_proteins = sorted(list(embeddings.keys()))
+    node_mapping = {p: i for i, p in enumerate(valid_proteins)}
+    
+    # Edges
+    src = []
+    dst = []
+    for _, row in df.iterrows():
+        if row["protein1"] in node_mapping and row["protein2"] in node_mapping:
+            # Undirected graph usually? Or strictly from dataset
+            # PPI is usually undirected.
+            u, v = node_mapping[row["protein1"]], node_mapping[row["protein2"]]
+            src.append(u)
+            dst.append(v)
+            # Add reverse for undirected message passing
+            src.append(v)
+            dst.append(u)
+            
+    edge_index = torch.tensor([src, dst], dtype=torch.long)
+    
+    # Node Features
+    x = torch.stack([embeddings[p] for p in valid_proteins])
+    
+    data = Data(x=x, edge_index=edge_index)
+    
+    graph_path = PROCESSED_DATA_DIR / "ppi_graph.pt"
+    mapping_path = PROCESSED_DATA_DIR / "ppi_graph_mapping.pt"
+    
+    if not limit_data:
+        torch.save(data, graph_path)
+        torch.save(node_mapping, mapping_path)
+        
+    # 5. Train Models
+    print("--- Training Models ---")
+    
+    # Paths
+    seq_model_path = PROJECT_ROOT / "models" / "sequence_model_best.pth"
+    graph_model_path = PROJECT_ROOT / "models" / "graph_model_best.pth"
+    
+    # Train Sequence Model
+    if limit_data:
+        # Don't overwrite main models if running limited test
+        seq_model_path = PROJECT_ROOT / "models" / "sequence_model_test.pth"
+        graph_model_path = PROJECT_ROOT / "models" / "graph_model_test.pth"
+        
+    print("Training Sequence Model...")
+    # We need to ensure we pass the embeddings we just generated
+    # The training script loads embeddings from file usually, but we can Modify it or 
+    # Just save it temporarily if limit_data
+    if limit_data:
+        temp_emb_path = PROCESSED_DATA_DIR / "temp_embeddings.pt"
+        torch.save(embeddings, temp_emb_path)
+        train_seq(epochs=2, embedding_path=str(temp_emb_path))
+    else:
+        train_seq(epochs=5, embedding_path=str(emb_path))
+        
+    # Train Graph Model
+    print("Training Graph Model...")
+    if limit_data:
+        temp_graph_path = PROCESSED_DATA_DIR / "temp_graph.pt"
+        torch.save(data, temp_graph_path)
+        # We need mapping for graph training logic?
+        # Graph training script expects mapping file
+        torch.save(node_mapping, str(temp_graph_path).replace(".pt", "_mapping.pt"))
+        train_graph(epochs=10, graph_path=str(temp_graph_path))
+    else:
+        train_graph(epochs=20, graph_path=str(graph_path))
+        
+    # Train Ensemble
+    print("Training Ensemble...")
+    # The ensemble script expects validation data.
+    # It loads models from paths.
+    if not limit_data:
+        train_ensemble(str(seq_model_path), str(graph_model_path), str(graph_path))
+    else:
+        print("Skipping full ensemble training in limited mode (needs validation data alignment).")
+
+    print("=== Pipeline Complete ===")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--limit", type=int, default=None, help="Limit number of interactions for testing")
+    args = parser.parse_args()
+    
+    run_pipeline(args.limit)

@@ -1,0 +1,233 @@
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+import uvicorn
+import torch
+import numpy as np
+import sys
+import os
+import pandas as pd
+import joblib
+
+# Add project root
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
+
+from src.models.sequence_model import SequencePPIModel
+from src.models.graph_model import GATLinkPredictor
+from src.models.ensemble_model import PPIEnsemble
+from src.data.feature_extraction import ESMFeatureExtractor
+from src.data.sequence_manager import SequenceManager
+from src.data.target_manager import TargetManager
+from src.analysis.explainability import PPIExplainer
+from app.backend.schemas import ProteinPair, PredictionResponse, NetworkResponse
+
+from src.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT
+
+app = FastAPI(title="TransGraph-PPI API", description="Hybrid Ensemble PPI Prediction System with Real Data")
+
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # Allow all for dev
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Global State
+models = {}
+managers = {}
+data_cache = {}
+
+@app.on_event("startup")
+async def load_system():
+    print("Loading TransGraph-PPI System...")
+    
+    # 1. Managers
+    managers["sequence"] = SequenceManager()
+    managers["target"] = TargetManager()
+    
+    # 2. Base Models
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"Using device: {device}")
+    
+    # Feature Extractor
+    models["esm"] = ESMFeatureExtractor(device=device)
+    
+    # Sequence Model
+    seq_path = PROJECT_ROOT / "models" / "sequence_model_best.pth"
+    # Infer input dim from model or config? using 320 standard
+    models["seq_model"] = SequencePPIModel(input_dim=320).to(device)
+    if seq_path.exists():
+        models["seq_model"].load_state_dict(torch.load(seq_path, map_location=device))
+        models["seq_model"].eval()
+        print("Sequence Model loaded.")
+    else:
+        print("Warning: Sequence Model weights not found.")
+
+    # Graph Model
+    graph_path = PROJECT_ROOT / "models" / "graph_model_best.pth"
+    # Need graph data to init model dimensions
+    graph_data_path = PROCESSED_DATA_DIR / "ppi_graph.pt"
+    if graph_data_path.exists():
+        data_cache["graph"] = torch.load(graph_data_path, weights_only=False).to(device)
+        in_channels = data_cache["graph"].x.shape[1]
+        models["graph_model"] = GATLinkPredictor(in_channels=in_channels, hidden_channels=64).to(device)
+        if graph_path.exists():
+            models["graph_model"].load_state_dict(torch.load(graph_path, map_location=device))
+            models["graph_model"].eval()
+            print("Graph Model loaded.")
+        else:
+            print("Warning: Graph Model weights not found.")
+            
+        # Load Mapping
+        map_path = PROCESSED_DATA_DIR / "ppi_graph_mapping.pt"
+        if map_path.exists():
+             data_cache["mapping"] = torch.load(map_path, weights_only=False)
+    else:
+        print("Warning: PPI Graph data not found.")
+
+    # Ensemble
+    ensemble_path = PROJECT_ROOT / "models" / "ensemble_model.pkl"
+    models["ensemble"] = PPIEnsemble(meta_model_path=str(ensemble_path) if ensemble_path.exists() else None)
+    
+    # Explainer
+    if models["ensemble"].meta_model:
+        models["explainer"] = PPIExplainer(meta_model_path=str(ensemble_path))
+
+    print("System Loaded.")
+
+@app.post("/predict", response_model=PredictionResponse)
+async def predict_interaction(pair: ProteinPair):
+    try:
+        p1, p2 = pair.protein1_id, pair.protein2_id
+        
+        # 1. Get Sequences
+        # If sequences provided in request, use them. Else fetch.
+        sequences = {}
+        to_fetch = []
+        
+        if not pair.protein1_seq: to_fetch.append(p1)
+        else: sequences[p1] = pair.protein1_seq
+            
+        if not pair.protein2_seq: to_fetch.append(p2)
+        else: sequences[p2] = pair.protein2_seq
+        
+        if to_fetch:
+            fetched = managers["sequence"].get_sequences(to_fetch)
+            sequences.update(fetched)
+            
+        # Check if we have both
+        if p1 not in sequences or p2 not in sequences:
+             raise HTTPException(status_code=404, detail="Could not find sequences for one or both proteins.")
+
+        # 2. Get Embeddings
+        embs = models["esm"].get_embeddings(sequences, batch_size=2)
+        e1 = embs[p1].unsqueeze(0).to(models["esm"].device)
+        e2 = embs[p2].unsqueeze(0).to(models["esm"].device)
+        
+        # 3. Sequence Prediction
+        with torch.no_grad():
+            seq_prob = models["seq_model"](e1, e2).item()
+            
+        # 4. Graph Prediction
+        # Check if nodes exist in graph
+        graph_prob = 0.5 # Default probability if unknown
+        if "mapping" in data_cache and p1 in data_cache["mapping"] and p2 in data_cache["mapping"]:
+            idx1 = data_cache["mapping"][p1]
+            idx2 = data_cache["mapping"][p2]
+            
+            # Prepare edge index for query
+            edge_label_index = torch.tensor([[idx1], [idx2]], dtype=torch.long).to(models["esm"].device)
+            
+            with torch.no_grad():
+                # Transductive: Use whole graph structure + features
+                g_out = models["graph_model"](data_cache["graph"].x, data_cache["graph"].edge_index, edge_label_index)
+                graph_prob = g_out.item()
+        
+        # 5. Ensemble Prediction
+        # If meta-learner exists, use it. Else soft voting.
+        final_prob = models["ensemble"].predict(np.array([seq_prob]), np.array([graph_prob]), method="stacking" if models["ensemble"].meta_model else "soft_voting")[0]
+        
+        # 6. Explanation
+        explanation = {
+            "Sequence_Model_Contribution": seq_prob,
+            "Graph_Model_Contribution": graph_prob,
+        }
+        
+        if "explainer" in models:
+            shap_vals = models["explainer"].explain_prediction(seq_prob, graph_prob)
+            # shap_vals is usually list of arrays or array. For binary XGBoost, it's array.
+            # SHAP values sum to margin.
+            # Just simplify for UI
+            explanation["SHAP_Sequence"] = float(shap_vals[0][0])
+            explanation["SHAP_Graph"] = float(shap_vals[0][1])
+
+        return {
+            "interaction_probability": float(final_prob),
+            "confidence_score": abs(float(final_prob) - 0.5) * 2,
+            "explanation": explanation
+        }
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/network")
+async def get_network(limit: int = 100):
+    """
+    Returns the REAL protein interaction network.
+    """
+    # Slice the real graph for visualization
+    # We can read from train.csv to get edges with labels
+    try:
+        train_path = PROCESSED_DATA_DIR / "train.csv"
+        if not train_path.exists():
+             return {"nodes": [], "edges": []}
+             
+        # Read a subset of interactions
+        df = pd.read_csv(train_path)
+        # Filter for positive interactions
+        df = df[df["label"] == 1].head(limit)
+        
+        nodes = set()
+        edges = []
+        
+        for _, row in df.iterrows():
+            p1, p2 = row["protein1"], row["protein2"]
+            nodes.add(p1)
+            nodes.add(p2)
+            edges.append({"source": p1, "target": p2, "weight": 1.0, "type": "verified"})
+            
+        node_list = [{"id": n, "label": n} for n in nodes]
+        
+        return {"nodes": node_list, "edges": edges}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/drug_targets")
+async def get_drug_targets(proteins: str = None):
+    """
+    Get drug targets for specific proteins or top network nodes.
+    proteins: comma separated string of IDs
+    """
+    try:
+        if proteins:
+            p_list = proteins.split(",")
+        else:
+            # Default to some existing ones
+            p_list = ["ENSP00000327694", "ENSP00000373627"] # Example from head of train.csv
+            
+        df = managers["target"].get_targets(p_list)
+        
+        if df.empty:
+            return []
+            
+        return df.to_dict(orient="records")
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+if __name__ == "__main__":
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
