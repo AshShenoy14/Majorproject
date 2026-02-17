@@ -80,7 +80,9 @@ def run_pipeline(limit_data: int = None):
         embeddings = extractor.get_embeddings(valid_sequences, batch_size=32)
         
         if not limit_data:
+            print("Saving embeddings to file...")
             torch.save(embeddings, emb_path)
+            print("Embeddings saved.")
     
     # 4. Build Graph
     print("--- Building PPI Graph ---")
