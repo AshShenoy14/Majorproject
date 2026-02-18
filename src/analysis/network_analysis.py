@@ -1,51 +1,85 @@
 import networkx as nx
 import pandas as pd
-from typing import List, Tuple
+from typing import List, Tuple, Dict, Any
 
-def build_network_from_predictions(interactions_df: pd.DataFrame, threshold: float = 0.5) -> nx.Graph:
-    """
-    Builds a NetworkX graph from predicted interactions.
-    Args:
-        interactions_df: DataFrame with 'protein1', 'protein2', 'score'.
-        threshold: Minimum score to consider an edge.
-    """
-    G = nx.Graph()
-    for _, row in interactions_df.iterrows():
-        if row["score"] >= threshold:
-            G.add_edge(row["protein1"], row["protein2"], weight=row["score"])
-    return G
+class NetworkAnalyzer:
+    def __init__(self, graph: nx.Graph = None):
+        """
+        Initialize the analyzer with a NetworkX graph.
+        """
+        self.graph = graph
 
-def calculate_centralities(G: nx.Graph) -> pd.DataFrame:
-    """
-    Calculates Degree, Betweenness, and Closeness centrality.
-    Returns a DataFrame sorted by Degree Centrality.
-    """
-    print("Calculating Degree Centrality...")
-    deg = nx.degree_centrality(G)
-    
-    print("Calculating Betweenness Centrality (this may take time)...")
-    # For large graphs, k should be used for approximation
-    bet = nx.betweenness_centrality(G, k=100 if len(G) > 1000 else None)
-    
-    print("Calculating Closeness Centrality...")
-    clo = nx.closeness_centrality(G)
-    
-    data = []
-    for node in G.nodes():
-        data.append({
-            "Protein": node,
-            "Degree": deg[node],
-            "Betweenness": bet[node],
-            "Closeness": clo[node]
-        })
+    def build_from_dataframe(self, df: pd.DataFrame, source_col: str = 'protein1', target_col: str = 'protein2', weight_col: str = None):
+        """
+        Builds graph from a pandas DataFrame.
+        """
+        self.graph = nx.from_pandas_edgelist(df, source=source_col, target=target_col, edge_attr=weight_col)
+        print(f"Graph built with {self.graph.number_of_nodes()} nodes and {self.graph.number_of_edges()} edges.")
+
+    def calculate_centralities(self) -> pd.DataFrame:
+        """
+        Calculates Degree, Betweenness, and Closeness centrality.
+        Returns a DataFrame sorted by Degree Centrality.
+        """
+        if self.graph is None or len(self.graph) == 0:
+            return pd.DataFrame()
+
+        print("Calculating Degree Centrality...")
+        deg = nx.degree_centrality(self.graph)
         
-    df = pd.DataFrame(data)
-    df = df.sort_values("Degree", ascending=False)
-    return df
+        print("Calculating Betweenness Centrality...")
+        # Approximation for large graphs
+        k = 100 if len(self.graph) > 1000 else None
+        bet = nx.betweenness_centrality(self.graph, k=k)
+        
+        print("Calculating Closeness Centrality...")
+        clo = nx.closeness_centrality(self.graph)
 
-if __name__ == "__main__":
-    # Example
-    # G = nx.erdos_renyi_graph(100, 0.05)
-    # df = calculate_centralities(G)
-    # print(df.head())
-    pass
+        print("Calculating Eigenvector Centrality...")
+        try:
+            eig = nx.eigenvector_centrality(self.graph, max_iter=500)
+        except:
+            eig = {n: 0.0 for n in self.graph.nodes()} # Fallback if convergence fails
+        
+        data = []
+        for node in self.graph.nodes():
+            data.append({
+                "protein_id": node,
+                "degree_centrality": deg[node],
+                "betweenness_centrality": bet[node],
+                "closeness_centrality": clo[node],
+                "eigenvector_centrality": eig[node]
+            })
+            
+        df = pd.DataFrame(data)
+        return df.sort_values("degree_centrality", ascending=False)
+
+    def identify_hubs(self, top_k: int = 10) -> List[Dict[str, Any]]:
+        """
+        Identifies 'Hub' proteins based on high degree centrality.
+        """
+        if self.graph is None:
+            return []
+            
+        deg = nx.degree_centrality(self.graph)
+        sorted_nodes = sorted(deg.items(), key=lambda x: x[1], reverse=True)
+        
+        hubs = []
+        for node, score in sorted_nodes[:top_k]:
+            hubs.append({"id": node, "score": score, "type": "hub"})
+            
+        return hubs
+
+    def get_graph_stats(self) -> Dict[str, Any]:
+        """
+        Returns basic graph statistics.
+        """
+        if self.graph is None:
+            return {}
+            
+        return {
+            "num_nodes": self.graph.number_of_nodes(),
+            "num_edges": self.graph.number_of_edges(),
+            "density": nx.density(self.graph),
+            "is_connected": nx.is_connected(self.graph) if self.graph.number_of_nodes() < 2000 else "Skipped (Large Graph)"
+        }

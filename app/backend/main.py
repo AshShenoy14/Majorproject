@@ -18,6 +18,7 @@ from src.data.feature_extraction import ESMFeatureExtractor
 from src.data.sequence_manager import SequenceManager
 from src.data.target_manager import TargetManager
 from src.analysis.explainability import PPIExplainer
+from src.analysis.network_analysis import NetworkAnalyzer
 from app.backend.schemas import ProteinPair, PredictionResponse, NetworkResponse
 
 from src.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT
@@ -37,6 +38,7 @@ app.add_middleware(
 models = {}
 managers = {}
 data_cache = {}
+analyzers = {}
 
 @app.on_event("startup")
 async def load_system():
@@ -55,7 +57,6 @@ async def load_system():
     
     # Sequence Model
     seq_path = PROJECT_ROOT / "models" / "sequence_model_best.pth"
-    # Infer input dim from model or config? using 320 standard
     models["seq_model"] = SequencePPIModel(input_dim=320).to(device)
     if seq_path.exists():
         models["seq_model"].load_state_dict(torch.load(seq_path, map_location=device))
@@ -66,7 +67,6 @@ async def load_system():
 
     # Graph Model
     graph_path = PROJECT_ROOT / "models" / "graph_model_best.pth"
-    # Need graph data to init model dimensions
     graph_data_path = PROCESSED_DATA_DIR / "ppi_graph.pt"
     if graph_data_path.exists():
         data_cache["graph"] = torch.load(graph_data_path, weights_only=False).to(device)
@@ -76,10 +76,7 @@ async def load_system():
             models["graph_model"].load_state_dict(torch.load(graph_path, map_location=device))
             models["graph_model"].eval()
             print("Graph Model loaded.")
-        else:
-            print("Warning: Graph Model weights not found.")
-            
-        # Load Mapping
+        
         map_path = PROCESSED_DATA_DIR / "ppi_graph_mapping.pt"
         if map_path.exists():
              data_cache["mapping"] = torch.load(map_path, weights_only=False)
@@ -94,6 +91,17 @@ async def load_system():
     if models["ensemble"].meta_model:
         models["explainer"] = PPIExplainer(meta_model_path=str(ensemble_path))
 
+    # Network Analyzer
+    train_path = PROCESSED_DATA_DIR / "train.csv"
+    if train_path.exists():
+        print("Initializing Network Analyzer...")
+        df = pd.read_csv(train_path)
+        # Filter only positive interactions for analysis graph
+        df_pos = df[df['label'] == 1]
+        analyzers["network"] = NetworkAnalyzer()
+        analyzers["network"].build_from_dataframe(df_pos)
+        print("Network Analyzer Ready.")
+
     print("System Loaded.")
 
 @app.post("/predict", response_model=PredictionResponse)
@@ -102,7 +110,6 @@ async def predict_interaction(pair: ProteinPair):
         p1, p2 = pair.protein1_id, pair.protein2_id
         
         # 1. Get Sequences
-        # If sequences provided in request, use them. Else fetch.
         sequences = {}
         to_fetch = []
         
@@ -116,7 +123,6 @@ async def predict_interaction(pair: ProteinPair):
             fetched = managers["sequence"].get_sequences(to_fetch)
             sequences.update(fetched)
             
-        # Check if we have both
         if p1 not in sequences or p2 not in sequences:
              raise HTTPException(status_code=404, detail="Could not find sequences for one or both proteins.")
 
@@ -130,22 +136,18 @@ async def predict_interaction(pair: ProteinPair):
             seq_prob = models["seq_model"](e1, e2).item()
             
         # 4. Graph Prediction
-        # Check if nodes exist in graph
-        graph_prob = 0.5 # Default probability if unknown
+        graph_prob = 0.5 
         if "mapping" in data_cache and p1 in data_cache["mapping"] and p2 in data_cache["mapping"]:
             idx1 = data_cache["mapping"][p1]
             idx2 = data_cache["mapping"][p2]
             
-            # Prepare edge index for query
             edge_label_index = torch.tensor([[idx1], [idx2]], dtype=torch.long).to(models["esm"].device)
             
             with torch.no_grad():
-                # Transductive: Use whole graph structure + features
                 g_out = models["graph_model"](data_cache["graph"].x, data_cache["graph"].edge_index, edge_label_index)
                 graph_prob = g_out.item()
         
         # 5. Ensemble Prediction
-        # If meta-learner exists, use it. Else soft voting.
         final_prob = models["ensemble"].predict(np.array([seq_prob]), np.array([graph_prob]), method="stacking" if models["ensemble"].meta_model else "soft_voting")[0]
         
         # 6. Explanation
@@ -156,9 +158,6 @@ async def predict_interaction(pair: ProteinPair):
         
         if "explainer" in models:
             shap_vals = models["explainer"].explain_prediction(seq_prob, graph_prob)
-            # shap_vals is usually list of arrays or array. For binary XGBoost, it's array.
-            # SHAP values sum to margin.
-            # Just simplify for UI
             explanation["SHAP_Sequence"] = float(shap_vals[0][0])
             explanation["SHAP_Graph"] = float(shap_vals[0][1])
 
@@ -175,19 +174,12 @@ async def predict_interaction(pair: ProteinPair):
 
 @app.get("/network")
 async def get_network(limit: int = 100):
-    """
-    Returns the REAL protein interaction network.
-    """
-    # Slice the real graph for visualization
-    # We can read from train.csv to get edges with labels
     try:
         train_path = PROCESSED_DATA_DIR / "train.csv"
         if not train_path.exists():
              return {"nodes": [], "edges": []}
              
-        # Read a subset of interactions
         df = pd.read_csv(train_path)
-        # Filter for positive interactions
         df = df[df["label"] == 1].head(limit)
         
         nodes = set()
@@ -208,16 +200,11 @@ async def get_network(limit: int = 100):
 
 @app.get("/drug_targets")
 async def get_drug_targets(proteins: str = None):
-    """
-    Get drug targets for specific proteins or top network nodes.
-    proteins: comma separated string of IDs
-    """
     try:
         if proteins:
             p_list = proteins.split(",")
         else:
-            # Default to some existing ones
-            p_list = ["ENSP00000327694", "ENSP00000373627"] # Example from head of train.csv
+            p_list = ["ENSP00000327694", "ENSP00000373627"] 
             
         df = managers["target"].get_targets(p_list)
         
@@ -228,6 +215,32 @@ async def get_drug_targets(proteins: str = None):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/analysis/centrality")
+async def get_centrality(top_k: int = 10):
+    """
+    Get top centrality metrics for nodes in the network.
+    """
+    if "network" not in analyzers:
+        raise HTTPException(status_code=503, detail="Network Analysis not running (Check train.csv)")
+    
+    try:
+        df = analyzers["network"].calculate_centralities()
+        if df.empty:
+            return []
+        # Return top K nodes by Degree
+        return df.head(top_k).to_dict(orient="records")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/analysis/stats")
+async def get_network_stats():
+    """
+    Get global network statistics.
+    """
+    if "network" not in analyzers:
+        return {}
+    return analyzers["network"].get_graph_stats()
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

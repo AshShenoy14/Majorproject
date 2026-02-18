@@ -6,19 +6,28 @@ import {
     Typography,
     Paper,
     CircularProgress,
-    Card,
-    CardContent,
     Grid,
     Chip,
     Divider,
     List,
     ListItem,
-    ListItemText
+    ListItemText,
+    Card,
+    CardActionArea,
+    CardContent,
+    TextField,
+    InputAdornment,
+    Collapse,
+    IconButton
 } from '@mui/material';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
+// Icons would ideally be imported from @mui/icons-material, but avoiding new deps for now if not installed.
+// Assuming we can use text or basic shapes if icons are missing, or basic SVG.
 
 const RealDataVerifier = () => {
     const [networkNodes, setNetworkNodes] = useState([]);
+    const [filteredNodes, setFilteredNodes] = useState([]);
+    const [searchTerm, setSearchTerm] = useState('');
     const [selectedProtein, setSelectedProtein] = useState(null);
     const [targets, setTargets] = useState([]);
     const [loadingNetwork, setLoadingNetwork] = useState(false);
@@ -29,10 +38,18 @@ const RealDataVerifier = () => {
         fetchNetwork();
     }, []);
 
+    useEffect(() => {
+        if (!searchTerm) {
+            setFilteredNodes(networkNodes);
+        } else {
+            setFilteredNodes(networkNodes.filter(n => n.id.toLowerCase().includes(searchTerm.toLowerCase())));
+        }
+    }, [searchTerm, networkNodes]);
+
     const fetchNetwork = async () => {
         setLoadingNetwork(true);
         try {
-            const res = await axios.get('http://localhost:8000/network?limit=20');
+            const res = await axios.get('http://localhost:8000/network?limit=50'); // Increased limit
             setNetworkNodes(res.data.nodes || []);
         } catch (e) {
             console.error("Failed to fetch network", e);
@@ -42,6 +59,7 @@ const RealDataVerifier = () => {
     };
 
     const handleNodeClick = async (nodeId) => {
+        if (selectedProtein === nodeId) return; // Don't refetch if already selected
         setSelectedProtein(nodeId);
         setLoadingTargets(true);
         try {
@@ -56,60 +74,173 @@ const RealDataVerifier = () => {
     };
 
     return (
-        <Box sx={{ mt: 4 }}>
-            <Typography variant="h5" gutterBottom>Real Data Verification</Typography>
-            <Divider sx={{ mb: 2 }} />
+        <Paper
+            elevation={3}
+            component={motion.div}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            sx={{ p: 4, borderRadius: 3, overflow: 'hidden' }}
+        >
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Box>
+                    <Typography variant="h5" color="primary" sx={{ fontWeight: 600 }}>
+                        Real Data Verification
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                        Explore protein interaction networks and drug targets from the graph.
+                    </Typography>
+                </Box>
+                <Button variant="outlined" onClick={fetchNetwork} disabled={loadingNetwork}>
+                    Refresh Data
+                </Button>
+            </Box>
 
-            <Grid container spacing={3}>
+            <Divider sx={{ mb: 4 }} />
+
+            <Grid container spacing={4}>
                 {/* Network List */}
-                <Grid item xs={12} md={6}>
-                    <Paper sx={{ p: 2, height: '400px', overflow: 'auto' }}>
-                        <Typography variant="h6">Real Network Nodes (from train.csv)</Typography>
-                        <Button size="small" onClick={fetchNetwork} disabled={loadingNetwork}>Refresh</Button>
+                <Grid item xs={12} md={5}>
+                    <Box sx={{ mb: 2 }}>
+                        <TextField
+                            fullWidth
+                            placeholder="Search Protein ID..."
+                            variant="outlined"
+                            size="small"
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            sx={{ bgcolor: 'white' }}
+                        />
+                    </Box>
 
-                        {loadingNetwork ? <CircularProgress /> : (
-                            <Box sx={{ mt: 2, display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                                {networkNodes.length === 0 ? <Typography>No nodes found. Did you run the pipeline?</Typography> :
-                                    networkNodes.map(n => (
+                    <Paper
+                        variant="outlined"
+                        sx={{
+                            height: '500px',
+                            overflow: 'auto',
+                            p: 2,
+                            bgcolor: '#fafafa',
+                            borderColor: '#eee'
+                        }}
+                    >
+                        {loadingNetwork ? (
+                            <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+                                <CircularProgress />
+                            </Box>
+                        ) : (
+                            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 1 }}>
+                                {filteredNodes.length === 0 ? (
+                                    <Typography color="text.secondary" align="center" sx={{ gridColumn: '1/-1', mt: 4 }}>
+                                        No proteins found.
+                                    </Typography>
+                                ) : (
+                                    filteredNodes.map(n => (
                                         <Chip
                                             key={n.id}
                                             label={n.id}
                                             onClick={() => handleNodeClick(n.id)}
                                             color={selectedProtein === n.id ? "primary" : "default"}
+                                            variant={selectedProtein === n.id ? "filled" : "outlined"}
                                             clickable
+                                            sx={{
+                                                fontWeight: selectedProtein === n.id ? 'bold' : 'normal',
+                                                transition: 'all 0.2s'
+                                            }}
                                         />
                                     ))
-                                }
+                                )}
                             </Box>
                         )}
                     </Paper>
                 </Grid>
 
-                {/* Drug Targets */}
-                <Grid item xs={12} md={6}>
-                    <Paper sx={{ p: 2, height: '400px', overflow: 'auto' }}>
-                        <Typography variant="h6">
-                            Drug Targets (ChEMBL) {selectedProtein && `for ${selectedProtein}`}
-                        </Typography>
+                {/* Drug Targets Details */}
+                <Grid item xs={12} md={7}>
+                    <Paper
+                        variant="outlined"
+                        sx={{
+                            height: '548px', // Match Search + List height approx
+                            overflow: 'hidden',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            borderColor: '#eee'
+                        }}
+                    >
+                        <Box sx={{ p: 2, bgcolor: '#f5f5f5', borderBottom: '1px solid #eee' }}>
+                            <Typography variant="h6" color="text.primary">
+                                {selectedProtein ? `Targets for ${selectedProtein}` : "Select a Protein"}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                                {selectedProtein ? "Source: ChEMBL Database" : "Click on a protein node to view known drug targets."}
+                            </Typography>
+                        </Box>
 
-                        {loadingTargets ? <CircularProgress /> : (
-                            <List>
-                                {targets.length === 0 ? <Typography sx={{ mt: 2 }}>Select a protein to view targets.</Typography> :
-                                    targets.map((t, i) => (
-                                        <ListItem key={i} divider>
-                                            <ListItemText
-                                                primary={t.target_name}
-                                                secondary={`ChEMBL ID: ${t.chembl_id} | Type: ${t.target_type}`}
-                                            />
-                                        </ListItem>
-                                    ))
-                                }
-                            </List>
-                        )}
+                        <Box sx={{ flexGrow: 1, overflow: 'auto', p: 2 }}>
+                            {loadingTargets ? (
+                                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mt: 8 }}>
+                                    <CircularProgress size={30} sx={{ mb: 2 }} />
+                                    <Typography color="text.secondary">Fetching targets...</Typography>
+                                </Box>
+                            ) : (
+                                <AnimatePresence mode="wait">
+                                    {selectedProtein ? (
+                                        targets.length === 0 ? (
+                                            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                                                <Box sx={{ textAlign: 'center', mt: 8, px: 4 }}>
+                                                    <Typography variant="body1" color="text.secondary" paragraph>
+                                                        No known drug targets found for this protein in the current dataset.
+                                                    </Typography>
+                                                    <Chip label="Try another node" size="small" />
+                                                </Box>
+                                            </motion.div>
+                                        ) : (
+                                            <List>
+                                                {targets.map((t, i) => (
+                                                    <Paper
+                                                        key={i}
+                                                        elevation={0}
+                                                        component={motion.div}
+                                                        initial={{ opacity: 0, x: 10 }}
+                                                        animate={{ opacity: 1, x: 0 }}
+                                                        transition={{ delay: i * 0.05 }}
+                                                        sx={{ mb: 1.5, border: '1px solid #eee', p: 1, borderRadius: 2 }}
+                                                    >
+                                                        <ListItem disablePadding>
+                                                            <ListItemText
+                                                                primary={
+                                                                    <Typography variant="subtitle1" color="primary" sx={{ fontWeight: 500 }}>
+                                                                        {t.target_name}
+                                                                    </Typography>
+                                                                }
+                                                                secondary={
+                                                                    <Box component="span" sx={{ display: 'block', mt: 0.5 }}>
+                                                                        <Chip label={`ChEMBL: ${t.chembl_id}`} size="small" sx={{ mr: 1, fontSize: '0.7em', height: 20 }} />
+                                                                        <Chip label={t.target_type} size="small" color="secondary" variant="outlined" sx={{ fontSize: '0.7em', height: 20 }} />
+                                                                    </Box>
+                                                                }
+                                                            />
+                                                        </ListItem>
+                                                    </Paper>
+                                                ))}
+                                            </List>
+                                        )
+                                    ) : (
+                                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                                            <Box sx={{ textAlign: 'center', mt: 10, opacity: 0.5 }}>
+                                                <Typography variant="h3" color="text.secondary" gutterBottom>
+                                                    🔬
+                                                </Typography>
+                                                <Typography>Select a protein from the network list to begin analysis.</Typography>
+                                            </Box>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            )}
+                        </Box>
                     </Paper>
                 </Grid>
             </Grid>
-        </Box>
+        </Paper>
     );
 };
 

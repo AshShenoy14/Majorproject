@@ -7,10 +7,14 @@ import {
   Typography,
   Paper,
   CircularProgress,
-  Card,
-  CardContent
+  Grid,
+  Divider,
+  Fade,
+  Stack,
+  Alert
 } from '@mui/material';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
 const PredictionForm = () => {
   const [id1, setId1] = useState('');
@@ -44,117 +48,192 @@ const PredictionForm = () => {
     }
   };
 
-  return (
-    <Box component={motion.div} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
-      <Typography variant="h4" gutterBottom sx={{ fontWeight: 'bold', color: '#1976d2' }}>
-        TransGraph-PPI Predictor
-      </Typography>
+  const probData = result ? [
+    { name: 'Interaction', value: result.interaction_probability },
+    { name: 'No Interaction', value: 1 - result.interaction_probability }
+  ] : [];
 
-      <Paper elevation={3} sx={{ p: 4, mb: 4, borderRadius: 2 }}>
-        <form onSubmit={handleSubmit}>
-          <Box sx={{ display: 'flex', gap: 2 }}>
-            <TextField
-              label="Protein ID 1 (e.g., ENSP...)"
-              fullWidth
-              value={id1}
-              onChange={(e) => setId1(e.target.value)}
-              margin="normal"
-              variant="outlined"
-            />
-            <TextField
-              label="Protein ID 2 (e.g., ENSP...)"
-              fullWidth
-              value={id2}
-              onChange={(e) => setId2(e.target.value)}
-              margin="normal"
-              variant="outlined"
-            />
-          </Box>
-          <Typography variant="caption" color="text.secondary">
-            Enter valid IDs (UniProt/Ensembl) to use real graph data. Leave sequences empty to auto-fetch.
+  const COLORS = ['#00695c', '#e0e0e0'];
+
+  return (
+    <Paper
+      elevation={3}
+      component={motion.div}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      sx={{ p: 4, borderRadius: 3, overflow: 'hidden' }}
+    >
+      <Grid container spacing={4}>
+        {/* Input Section */}
+        <Grid item xs={12} md={6}>
+          <Typography variant="h5" color="primary" gutterBottom sx={{ fontWeight: 600 }}>
+            Analyze Interaction
+          </Typography>
+          <Typography variant="body2" color="text.secondary" paragraph>
+            Enter protein IDs (UniProt/Ensembl) or sequences to predict interaction probability.
           </Typography>
 
-          <TextField
-            label="Protein Sequence 1 (Optional)"
-            multiline
-            rows={2}
-            fullWidth
-            value={seq1}
-            onChange={(e) => setSeq1(e.target.value)}
-            margin="normal"
-            variant="outlined"
-          />
-          <TextField
-            label="Protein Sequence 2 (Optional)"
-            multiline
-            rows={2}
-            fullWidth
-            value={seq2}
-            onChange={(e) => setSeq2(e.target.value)}
-            margin="normal"
-            variant="outlined"
-          />
+          <form onSubmit={handleSubmit}>
+            <Stack spacing={2}>
+              <Box>
+                <Typography variant="caption" fontWeight="bold" color="secondary">PROTEIN 1</Typography>
+                <TextField
+                  label="ID (e.g., P12345)"
+                  fullWidth
+                  value={id1}
+                  onChange={(e) => setId1(e.target.value)}
+                  margin="dense"
+                  size="small"
+                />
+                <TextField
+                  label="Sequence (Optional)"
+                  fullWidth
+                  multiline
+                  rows={2}
+                  value={seq1}
+                  onChange={(e) => setSeq1(e.target.value)}
+                  margin="dense"
+                  size="small"
+                  placeholder="MVLSPADKTN..."
+                />
+              </Box>
 
-          <Box sx={{ mt: 2, display: 'flex', justifyContent: 'center' }}>
-            <Button
-              type="submit"
-              variant="contained"
-              size="large"
-              disabled={loading}
-              sx={{ px: 5, py: 1.5, fontSize: '1.1rem' }}
-            >
-              {loading ? <CircularProgress size={24} /> : 'Predict Interaction'}
-            </Button>
+              <Box>
+                <Typography variant="caption" fontWeight="bold" color="secondary">PROTEIN 2</Typography>
+                <TextField
+                  label="ID (e.g., Q98765)"
+                  fullWidth
+                  value={id2}
+                  onChange={(e) => setId2(e.target.value)}
+                  margin="dense"
+                  size="small"
+                />
+                <TextField
+                  label="Sequence (Optional)"
+                  fullWidth
+                  multiline
+                  rows={2}
+                  value={seq2}
+                  onChange={(e) => setSeq2(e.target.value)}
+                  margin="dense"
+                  size="small"
+                />
+              </Box>
+
+              <Button
+                type="submit"
+                variant="contained"
+                size="large"
+                fullWidth
+                disabled={loading}
+                sx={{ mt: 2, height: 48 }}
+              >
+                {loading ? <CircularProgress size={24} color="inherit" /> : 'Run Prediction'}
+              </Button>
+            </Stack>
+          </form>
+
+          {error && (
+            <Fade in>
+              <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>
+            </Fade>
+          )}
+        </Grid>
+
+        {/* Results Section */}
+        <Grid item xs={12} md={6} sx={{ borderLeft: { md: '1px solid #eee' }, pl: { md: 4 } }}>
+          <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <AnimatePresence mode="wait">
+              {!result && !loading && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                >
+                  <Box sx={{ textAlign: 'center', opacity: 0.5, py: 8 }}>
+                    <Typography variant="h6">Ready to Analyze</Typography>
+                    <Typography variant="body2">Enter protein details to view prediction results.</Typography>
+                  </Box>
+                </motion.div>
+              )}
+
+              {loading && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                >
+                  <Box sx={{ textAlign: 'center', py: 8 }}>
+                    <Typography variant="h6" color="primary">Analyzing Sequences...</Typography>
+                    <Typography variant="caption">Calculating embeddings and graph attention</Typography>
+                  </Box>
+                </motion.div>
+              )}
+
+              {result && (
+                <Stack
+                  spacing={3}
+                  component={motion.div}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Box>
+                      <Typography variant="h6">Probability</Typography>
+                      <Typography variant="h3" color="primary" fontWeight="bold">
+                        {(result.interaction_probability * 100).toFixed(1)}%
+                      </Typography>
+                    </Box>
+                    <Box sx={{ width: 100, height: 100 }}>
+                      <ResponsiveContainer>
+                        <PieChart>
+                          <Pie
+                            data={probData}
+                            innerRadius={35}
+                            outerRadius={45}
+                            paddingAngle={5}
+                            dataKey="value"
+                          >
+                            {probData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </Box>
+                  </Box>
+
+                  <Divider />
+
+                  <Box>
+                    <Typography variant="subtitle2" gutterBottom>Explainability (SHAP)</Typography>
+                    <Stack spacing={1}>
+                      {Object.entries(result.explanation).map(([key, value]) => (
+                        <Box key={key} sx={{ display: 'flex', justifyContent: 'space-between', bgcolor: '#f5f5f5', p: 1, borderRadius: 1 }}>
+                          <Typography variant="caption" sx={{ textTransform: 'capitalize' }}>
+                            {key.replace('_', ' ')}
+                          </Typography>
+                          <Typography variant="caption" fontWeight="bold" color="secondary">
+                            {typeof value === 'number' ? value.toFixed(4) : value}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Stack>
+                  </Box>
+
+                  <Box sx={{ textAlign: 'right' }}>
+                    <Typography variant="caption" color="text.secondary">
+                      Confidence Score: {(result.confidence_score * 100).toFixed(1)}%
+                    </Typography>
+                  </Box>
+                </Stack>
+              )}
+            </AnimatePresence>
           </Box>
-        </form>
-      </Paper>
-
-      {error && (
-        <Typography color="error" align="center" sx={{ mb: 2 }}>
-          {error}
-        </Typography>
-      )}
-
-      {result && (
-        <Card component={motion.div} initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
-          <CardContent>
-            <Typography variant="h5" gutterBottom>
-              Prediction Result
-            </Typography>
-
-            <Box sx={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', my: 2 }}>
-              <Box textAlign="center">
-                <Typography variant="subtitle1" color="text.secondary">Probability</Typography>
-                <Typography variant="h3" color="primary">
-                  {(result.interaction_probability * 100).toFixed(1)}%
-                </Typography>
-              </Box>
-
-              <Box textAlign="center">
-                <Typography variant="subtitle1" color="text.secondary">Confidence</Typography>
-                <Typography variant="h4" color={result.confidence_score > 0.8 ? "success.main" : "warning.main"}>
-                  {(result.confidence_score * 100).toFixed(1)}%
-                </Typography>
-              </Box>
-            </Box>
-
-            <Typography variant="subtitle1" sx={{ mt: 2 }}>Explainability (SHAP):</Typography>
-            <Box sx={{ bgcolor: '#f5f5f5', p: 2, borderRadius: 1 }}>
-              {Object.entries(result.explanation).map(([key, value]) => (
-                <Box key={key} sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                  <Typography variant="body1" sx={{ fontWeight: 'medium' }}>
-                    {key.replace('_', ' ')}:
-                  </Typography>
-                  <Typography variant="body1" color="primary">
-                    {typeof value === 'number' ? value.toFixed(4) : value}
-                  </Typography>
-                </Box>
-              ))}
-            </Box>
-          </CardContent>
-        </Card>
-      )}
-    </Box>
+        </Grid>
+      </Grid>
+    </Paper>
   );
 };
 
