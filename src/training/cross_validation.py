@@ -6,7 +6,9 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, Subset
 from sklearn.model_selection import KFold
-from sklearn.metrics import accuracy_score, roc_auc_score, f1_score
+from sklearn.metrics import accuracy_score, roc_auc_score, f1_score, precision_score, recall_score, average_precision_score, confusion_matrix, roc_curve, precision_recall_curve
+import matplotlib.pyplot as plt
+import seaborn as sns
 from tqdm import tqdm
 import os
 import sys
@@ -66,7 +68,15 @@ def evaluate(model, loader, device):
             y_prob.extend(probs)
             y_pred.extend((probs > 0.5).astype(int))
             
-    return accuracy_score(y_true, y_pred), roc_auc_score(y_true, y_prob), f1_score(y_true, y_pred)
+    acc = accuracy_score(y_true, y_pred)
+    auc = roc_auc_score(y_true, y_prob)
+    f1 = f1_score(y_true, y_pred)
+    prec = precision_score(y_true, y_pred, zero_division=0)
+    rec = recall_score(y_true, y_pred, zero_division=0)
+    pr_auc = average_precision_score(y_true, y_prob)
+    cm = confusion_matrix(y_true, y_pred)
+    
+    return acc, auc, f1, prec, rec, pr_auc, cm, y_true, y_prob
 
 def run_cv(data_path, embedding_path, k_folds=5, epochs=5, batch_size=32):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -82,7 +92,10 @@ def run_cv(data_path, embedding_path, k_folds=5, epochs=5, batch_size=32):
     results = {
         "accuracy": [],
         "auc": [],
-        "f1": []
+        "f1": [],
+        "precision": [],
+        "recall": [],
+        "pr_auc": []
     }
     
     # Determine Input Dim
@@ -110,21 +123,69 @@ def run_cv(data_path, embedding_path, k_folds=5, epochs=5, batch_size=32):
             # print(f"  Epoch {epoch+1} Loss: {loss:.4f}")
             
         # Eval
-        acc, auc, f1 = evaluate(model, val_loader, device)
-        print(f"  Result: Acc={acc:.4f}, AUC={auc:.4f}, F1={f1:.4f}")
+        acc, auc, f1, prec, rec, pr_auc, cm, y_t, y_p = evaluate(model, val_loader, device)
+        print(f"  Result: Acc={acc:.4f}, AUC={auc:.4f}, F1={f1:.4f}, Prec={prec:.4f}, Rec={rec:.4f}, PR-AUC={pr_auc:.4f}")
         
         results["accuracy"].append(acc)
         results["auc"].append(auc)
         results["f1"].append(f1)
+        results["precision"].append(prec)
+        results["recall"].append(rec)
+        results["pr_auc"].append(pr_auc)
         
     # Aggregate
     print("\n" + "="*30)
     print("Cross-Validation Results")
     print("="*30)
     print(f"Accuracy: {np.mean(results['accuracy']):.4f} ± {np.std(results['accuracy']):.4f}")
-    print(f"ROC-AUC:  {np.mean(results['auc']):.4f} ± {np.std(results['auc']):.4f}")
+    print(f"Precision: {np.mean(results['precision']):.4f} ± {np.std(results['precision']):.4f}")
+    print(f"Recall:   {np.mean(results['recall']):.4f} ± {np.std(results['recall']):.4f}")
     print(f"F1 Score: {np.mean(results['f1']):.4f} ± {np.std(results['f1']):.4f}")
+    print(f"ROC-AUC:  {np.mean(results['auc']):.4f} ± {np.std(results['auc']):.4f}")
+    print(f"PR-AUC:   {np.mean(results['pr_auc']):.4f} ± {np.std(results['pr_auc']):.4f}")
     print("="*30)
+    
+    # Save a set of plots for the last fold
+    save_plots(y_t, y_p, y_pred=(np.array(y_p)>0.5).astype(int))
+
+def save_plots(y_true, y_prob, y_pred):
+    output_dir = os.path.join(os.path.dirname(__file__), '../../data/processed/plots')
+    os.makedirs(output_dir, exist_ok=True)
+    
+    # Confusion Matrix
+    cm = confusion_matrix(y_true, y_pred)
+    plt.figure(figsize=(6,5))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
+    plt.title('Confusion Matrix')
+    plt.ylabel('True Label')
+    plt.xlabel('Predicted Label')
+    plt.savefig(os.path.join(output_dir, 'cv_confusion_matrix.png'), bbox_inches='tight')
+    plt.close()
+
+    # ROC Curve
+    fpr, tpr, _ = roc_curve(y_true, y_prob)
+    auc_score = roc_auc_score(y_true, y_prob)
+    plt.figure(figsize=(6,5))
+    plt.plot(fpr, tpr, color='darkorange', lw=2, label=f'ROC curve (area = {auc_score:.3f})')
+    plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Receiver Operating Characteristic')
+    plt.legend(loc="lower right")
+    plt.savefig(os.path.join(output_dir, 'cv_roc_curve.png'), bbox_inches='tight')
+    plt.close()
+
+    # PR Curve
+    precision_vals, recall_vals, _ = precision_recall_curve(y_true, y_prob)
+    pr_auc = average_precision_score(y_true, y_prob)
+    plt.figure(figsize=(6,5))
+    plt.plot(recall_vals, precision_vals, color='green', lw=2, label=f'PR curve (area = {pr_auc:.3f})')
+    plt.xlabel('Recall')
+    plt.ylabel('Precision')
+    plt.title('Precision-Recall Curve')
+    plt.legend(loc="lower left")
+    plt.savefig(os.path.join(output_dir, 'cv_pr_curve.png'), bbox_inches='tight')
+    plt.close()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
