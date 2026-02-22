@@ -163,6 +163,8 @@ async def predict_interaction(pair: ProteinPair):
 
         return {
             "interaction_probability": float(final_prob),
+            "esm_probability": float(seq_prob),
+            "gat_probability": float(graph_prob),
             "confidence_score": abs(float(final_prob) - 0.5) * 2,
             "explanation": explanation
         }

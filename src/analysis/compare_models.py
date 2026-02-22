@@ -36,9 +36,9 @@ def evaluate_models():
         print("Required processed data (embeddings, mapping, graph) missing.")
         return
         
-    embeddings = torch.load(emb_path, map_location=device)
-    node_mapping = torch.load(map_path, map_location=device)
-    graph_data = torch.load(graph_data_path, map_location=device)
+    embeddings = torch.load(emb_path, map_location=device, weights_only=False)
+    node_mapping = torch.load(map_path, map_location=device, weights_only=False)
+    graph_data = torch.load(graph_data_path, map_location=device, weights_only=False)
 
     # Filter test_df to valid entries
     filtered_df = test_df[

@@ -9,6 +9,8 @@ class ProteinPair(BaseModel):
 
 class PredictionResponse(BaseModel):
     interaction_probability: float
+    esm_probability: float
+    gat_probability: float
     confidence_score: float
     explanation: Dict[str, float] # SHAP values or similar
     

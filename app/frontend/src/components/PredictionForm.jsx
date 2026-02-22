@@ -207,6 +207,32 @@ const PredictionForm = () => {
 
                   <Divider />
 
+                  {result.esm_probability !== undefined && result.gat_probability !== undefined && (
+                    <Box>
+                      <Typography variant="subtitle2" gutterBottom>Model Predictions</Typography>
+                      <Stack spacing={1}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', bgcolor: '#e3f2fd', p: 1, borderRadius: 1 }}>
+                          <Typography variant="caption">ESM-MLP</Typography>
+                          <Typography variant="caption" fontWeight="bold" color="primary">
+                            {(result.esm_probability * 100).toFixed(1)}%
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', bgcolor: '#e3f2fd', p: 1, borderRadius: 1 }}>
+                          <Typography variant="caption">Graph Attention (GAT)</Typography>
+                          <Typography variant="caption" fontWeight="bold" color="primary">
+                            {(result.gat_probability * 100).toFixed(1)}%
+                          </Typography>
+                        </Box>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', bgcolor: '#e8f5e9', p: 1, borderRadius: 1 }}>
+                          <Typography variant="caption">Ensemble (Meta-learner)</Typography>
+                          <Typography variant="caption" fontWeight="bold" color="success.main">
+                            {(result.interaction_probability * 100).toFixed(1)}%
+                          </Typography>
+                        </Box>
+                      </Stack>
+                    </Box>
+                  )}
+
                   <Box>
                     <Typography variant="subtitle2" gutterBottom>Explainability (SHAP)</Typography>
                     <Stack spacing={1}>

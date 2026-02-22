@@ -1,5 +1,7 @@
 import networkx as nx
 import pandas as pd
+import matplotlib.pyplot as plt
+import os
 from typing import List, Tuple, Dict, Any
 
 class NetworkAnalyzer:
@@ -69,6 +71,33 @@ class NetworkAnalyzer:
             hubs.append({"id": node, "score": score, "type": "hub"})
             
         return hubs
+
+    def visualize_top_hubs(self, top_k: int = 10, output_path: str = "top_hubs.png"):
+        """
+        Visualizes the subgraph of the top K hub proteins.
+        """
+        hubs = self.identify_hubs(top_k)
+        if not hubs:
+             print("No hubs to visualize.")
+             return
+             
+        hub_ids = [h['id'] for h in hubs]
+        subgraph = self.graph.subgraph(hub_ids)
+        
+        plt.figure(figsize=(10, 8))
+        pos = nx.spring_layout(subgraph, seed=42)
+        
+        nx.draw_networkx_nodes(subgraph, pos, node_color='#ff9999', node_size=1200, edgecolors='black')
+        nx.draw_networkx_edges(subgraph, pos, alpha=0.6, width=1.5)
+        nx.draw_networkx_labels(subgraph, pos, font_size=9, font_weight="bold", font_family="sans-serif")
+        
+        plt.title(f"Protein Interaction Subgraph: Top {top_k} Hubs", fontsize=14, fontweight='bold')
+        plt.axis('off')
+        
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        plt.savefig(output_path, bbox_inches='tight', dpi=300)
+        plt.close()
+        print(f"Hub visualization saved to {output_path}")
 
     def get_graph_stats(self) -> Dict[str, Any]:
         """
