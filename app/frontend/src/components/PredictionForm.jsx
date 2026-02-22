@@ -15,6 +15,7 @@ import {
 } from '@mui/material';
 import { motion, AnimatePresence } from 'framer-motion';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import InteractionVisualizer from './InteractionVisualizer';
 
 const PredictionForm = () => {
   const [id1, setId1] = useState('');
@@ -227,6 +228,9 @@ const PredictionForm = () => {
                       Confidence Score: {(result.confidence_score * 100).toFixed(1)}%
                     </Typography>
                   </Box>
+
+                  {/* Accessible Visualizer */}
+                  <InteractionVisualizer result={result} id1={id1} id2={id2} />
                 </Stack>
               )}
             </AnimatePresence>
