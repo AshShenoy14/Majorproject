@@ -37,6 +37,8 @@ def evaluate_models():
         return
         
     embeddings = torch.load(emb_path, map_location=device, weights_only=False)
+    # Convert float16 embeddings to float32 for model compatibility
+    embeddings = {k: v.float() if v.dtype == torch.float16 else v for k, v in embeddings.items()}
     node_mapping = torch.load(map_path, map_location=device, weights_only=False)
     graph_data = torch.load(graph_data_path, map_location=device, weights_only=False)
 

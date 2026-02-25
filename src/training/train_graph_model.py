@@ -14,7 +14,7 @@ from src.models.graph_model import GATLinkPredictor
 from src.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT
 
 def train(epochs: int = 10, lr: float = 1e-3, graph_path: str = None):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(f"Training Graph Model on {device}...")
     
     if graph_path and os.path.exists(graph_path):

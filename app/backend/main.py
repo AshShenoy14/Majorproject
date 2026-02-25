@@ -49,7 +49,7 @@ async def load_system():
     managers["target"] = TargetManager()
     
     # 2. Base Models
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = "cuda:0" if torch.cuda.is_available() else "cpu"
     print(f"Using device: {device}")
     
     # Feature Extractor

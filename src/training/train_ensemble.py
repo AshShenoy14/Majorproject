@@ -14,7 +14,7 @@ from src.models.ensemble_model import PPIEnsemble
 from src.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT
 
 def train_ensemble(seq_model_path, graph_model_path, graph_data_path):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(f"Training using {device}...")
     
     # 1. Load Base Models
@@ -74,6 +74,8 @@ def train_ensemble(seq_model_path, graph_model_path, graph_data_path):
         return
         
     embeddings = torch.load(emb_path, weights_only=False)
+    # Convert float16 embeddings to float32 for model compatibility
+    embeddings = {k: v.float() if v.dtype == torch.float16 else v for k, v in embeddings.items()}
     node_mapping = torch.load(map_path, weights_only=False)
     
     seq_preds = []

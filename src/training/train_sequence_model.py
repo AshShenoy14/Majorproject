@@ -14,8 +14,8 @@ from src.models.sequence_model import SequencePPIModel
 from src.utils.dataset import PPIDataset
 from src.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT
 
-def train(epochs: int = 10, batch_size: int = 32, lr: float = 1e-3, embedding_path: str = None):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+def train(epochs: int = 10, batch_size: int = 64, lr: float = 1e-3, embedding_path: str = None):
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(f"Training Sequence Model on {device}...")
     
     # Load embeddings (Mocking for now if file logic not fully ready)
@@ -25,6 +25,8 @@ def train(epochs: int = 10, batch_size: int = 32, lr: float = 1e-3, embedding_pa
     
     if embedding_path and os.path.exists(embedding_path):
         embeddings = torch.load(embedding_path, weights_only=False)
+        # Convert float16 embeddings to float32 for model compatibility
+        embeddings = {k: v.float() if v.dtype == torch.float16 else v for k, v in embeddings.items()}
     else:
         print("No embedding file provided/found. Cannot proceed without embeddings.")
         # For demonstration context, we might generate random embeddings if needed, but better to fail.
@@ -34,7 +36,13 @@ def train(epochs: int = 10, batch_size: int = 32, lr: float = 1e-3, embedding_pa
     train_dataset = PPIDataset(PROCESSED_DATA_DIR / "train.csv", embeddings)
     val_dataset = PPIDataset(PROCESSED_DATA_DIR / "val.csv", embeddings)
     
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=4,
+        pin_memory=True
+    )
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
     
     # Model
