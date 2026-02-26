@@ -1,0 +1,84 @@
+PPI Model Training Guide
+=========================
+
+Project supports checkpoint-based training.
+
+-----------------------------------------
+1. Running Full Training
+-----------------------------------------
+
+To run full dataset training:
+
+    python scripts/run_pipeline.py
+
+-----------------------------------------
+2. Running Test Mode (Small Subset)
+-----------------------------------------
+
+To run quick test with limited interactions:
+
+    python scripts/run_pipeline.py --limit 100
+
+-----------------------------------------
+3. Checkpoint Behavior
+-----------------------------------------
+
+- Checkpoints are saved in: checkpoints/
+- File names:
+    sequence_checkpoint.pt
+    graph_checkpoint.pt
+
+- Each checkpoint contains:
+    epoch number
+    model_state_dict
+    optimizer_state_dict
+    training loss
+    best_val_loss
+
+- Checkpoint is overwritten after every epoch (single file per model).
+- Training automatically resumes if checkpoint exists.
+- Best model is saved separately in:
+    models/sequence_model_best.pth
+    models/graph_model_best.pth
+
+  Best model is saved when validation loss improves.
+
+-----------------------------------------
+4. If Training Stops Unexpectedly
+-----------------------------------------
+
+Simply rerun the same command.
+Training will resume from the last saved epoch.
+
+-----------------------------------------
+5. Progress Reporting
+-----------------------------------------
+
+During training you will see:
+- tqdm progress bars for each epoch
+- Per-epoch summary with train loss, val loss, val accuracy
+- Percentage of epochs completed and how many remain
+- Dataset size info (number of train/val samples or edges)
+
+-----------------------------------------
+6. Important Notes
+-----------------------------------------
+
+- Do NOT delete checkpoint files unless restarting training from scratch.
+- Model weight files are NOT pushed to GitHub.
+- Batch sizes are tuned for NVIDIA GeForce RTX 3050 (4 GB VRAM):
+    ESM embedding extraction : batch_size = 8
+    Sequence model training  : batch_size = 32
+    Ensemble inference       : batch_size = 16
+- GPU monitoring:
+    nvidia-smi -l 1
+
+-----------------------------------------
+7. To Restart From Scratch
+-----------------------------------------
+
+Delete:
+    checkpoints/
+    models/*.pth
+
+Then run training again.

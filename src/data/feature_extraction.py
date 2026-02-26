@@ -21,7 +21,7 @@ class ESMFeatureExtractor:
         self.model = AutoModel.from_pretrained(model_name).to(device)
         self.model.eval()
 
-    def get_embeddings(self, sequences: Dict[str, str], batch_size: int = 16) -> Dict[str, torch.Tensor]:
+    def get_embeddings(self, sequences: Dict[str, str], batch_size: int = 8) -> Dict[str, torch.Tensor]:
         """
         Generates embeddings for a dictionary of sequences.
         Returns a dictionary mapping ProteinID -> Embedding Tensor.

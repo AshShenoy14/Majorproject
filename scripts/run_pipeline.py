@@ -85,7 +85,7 @@ def run_pipeline(limit_data: int = None):
         device = "cuda" if torch.cuda.is_available() else "cpu"
         # Increased batch size for speed
         extractor = ESMFeatureExtractor(device=device)
-        embeddings = extractor.get_embeddings(valid_sequences, batch_size=32)
+        embeddings = extractor.get_embeddings(valid_sequences, batch_size=8)
         
         if not limit_data:
             print("Saving embeddings to file...")
@@ -160,7 +160,7 @@ def run_pipeline(limit_data: int = None):
         temp_emb_path = PROCESSED_DATA_DIR / "temp_embeddings.pt"
         train_seq(epochs=2, embedding_path=str(temp_emb_path))
     else:
-        train_seq(epochs=5, embedding_path=str(emb_path))
+        train_seq(epochs=10, embedding_path=str(emb_path))
         
     # Train Graph Model
     print("Training Graph Model...")

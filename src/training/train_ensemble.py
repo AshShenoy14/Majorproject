@@ -83,7 +83,7 @@ def train_ensemble(seq_model_path, graph_model_path, graph_data_path):
     
     # Sequence Model Inference Loop
     print("Running Sequence Model Inference...")
-    batch_size = 32
+    batch_size = 16
     with torch.no_grad():
         for i in tqdm(range(0, len(val_df), batch_size)):
             batch = val_df.iloc[i:i+batch_size]
