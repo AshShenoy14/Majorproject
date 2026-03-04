@@ -21,8 +21,6 @@ def train_ensemble(seq_model_path, graph_model_path, graph_data_path):
     print("Loading base models...")
     
     # Sequence Model
-    # We need to know input_dim. Let's assume 320 for ESM-2 t6_8M
-    # Ideally this should be saved with the model or config
     input_dim = 320 
     seq_model = SequencePPIModel(input_dim=input_dim).to(device)
     try:
@@ -37,13 +35,13 @@ def train_ensemble(seq_model_path, graph_model_path, graph_data_path):
         return
     seq_model.eval()
 
-    # Graph Model
+    # Graph Model — updated to match new architecture (hidden=128)
     if not os.path.exists(graph_data_path):
         print(f"Graph data not found at {graph_data_path}")
         return
     
     graph_data = torch.load(graph_data_path, weights_only=False).to(device)
-    graph_model = GATLinkPredictor(in_channels=graph_data.x.shape[1], hidden_channels=64).to(device)
+    graph_model = GATLinkPredictor(in_channels=graph_data.x.shape[1], hidden_channels=128).to(device)
     try:
         if os.path.exists(graph_model_path):
             graph_model.load_state_dict(torch.load(graph_model_path, map_location=device))
@@ -76,48 +74,7 @@ def train_ensemble(seq_model_path, graph_model_path, graph_data_path):
     embeddings = torch.load(emb_path, weights_only=False)
     node_mapping = torch.load(map_path, weights_only=False)
     
-    seq_preds = []
-    labels = []
-    
-    # Sequence Model Inference Loop
-    print("Running Sequence Model Inference...")
-    batch_size = 32
-    with torch.no_grad():
-        for i in tqdm(range(0, len(val_df), batch_size)):
-            batch = val_df.iloc[i:i+batch_size]
-            b_emb1 = []
-            b_emb2 = []
-            b_labels = []
-            valid_indices = []
-
-            for idx, row in batch.iterrows():
-                p1, p2, label = row["protein1"], row["protein2"], row["label"]
-                if p1 in embeddings and p2 in embeddings:
-                    b_emb1.append(embeddings[p1])
-                    b_emb2.append(embeddings[p2])
-                    b_labels.append(label)
-                    valid_indices.append(idx) # Track which rows we actually used
-
-            if not b_emb1:
-                continue
-
-            b_emb1 = torch.stack(b_emb1).to(device)
-            b_emb2 = torch.stack(b_emb2).to(device)
-            
-            outputs = seq_model(b_emb1, b_emb2)
-            seq_preds.extend(outputs.cpu().numpy().flatten().tolist())
-            labels.extend(b_labels)
-            
-    # Graph Model Inference
-    print("Running Graph Model Inference...")
-    # We need to construct edge_label_index for the validation set
-    # STRICTLY matching the sequence model's predictions (same order/subset)
-    # The sequence model loop filtered out pairs missing embeddings.
-    # We should ensure we use the SAME filtered set.
-    
-    # Actually, simpler approach: Filter val_df to only rows where both proteins are in embeddings & mapping
-    # This ensures alignment.
-    
+    # Filter val_df to valid entries
     filtered_df = val_df[
         val_df["protein1"].isin(embeddings) & 
         val_df["protein2"].isin(embeddings) &
@@ -125,11 +82,6 @@ def train_ensemble(seq_model_path, graph_model_path, graph_data_path):
         val_df["protein2"].isin(node_mapping)
     ].copy()
     
-    # Re-run sequence inference on filtered_df to be sure (or just use the list if it matches)
-    # Let's re-collect properly aligned data.
-    
-    final_seq_preds = []
-    final_graph_preds = []
     final_labels = []
     
     # Prepare batch data for Sequence Model
@@ -155,9 +107,9 @@ def train_ensemble(seq_model_path, graph_model_path, graph_data_path):
 
     # Run Sequence Model
     print("Predicting with Sequence Model...")
-    # Process in batches to avoid OOM
     batch_emb1 = torch.stack(batch_emb1)
     batch_emb2 = torch.stack(batch_emb2)
+    batch_size = 32
     
     final_seq_preds = []
     with torch.no_grad():
@@ -167,23 +119,19 @@ def train_ensemble(seq_model_path, graph_model_path, graph_data_path):
             out = seq_model(e1, e2)
             final_seq_preds.extend(out.cpu().numpy().flatten())
             
-    # Run Graph Model
+    # Run Graph Model — apply sigmoid to raw logits
     print("Predicting with Graph Model...")
-    # Process in batches? GAT supports full edge_label_index.
-    # If too large, split.
-    
     g_edge_label_index = torch.tensor([g_src, g_dst], dtype=torch.long).to(device)
     
     final_graph_preds = []
     with torch.no_grad():
-        # Depending on implementation, g_edge_label_index can be passed whole or chunked
-        # For validation set of ~size of train/5, it might fit.
-        # But let's chunk to be safe.
         chunk_size = 10000
         for i in range(0, g_edge_label_index.size(1), chunk_size):
             chunk = g_edge_label_index[:, i:i+chunk_size]
             out = graph_model(graph_data.x, graph_data.edge_index, chunk)
-            final_graph_preds.extend(out.cpu().numpy().flatten())
+            # Apply sigmoid to raw logits
+            probs = torch.sigmoid(out)
+            final_graph_preds.extend(probs.cpu().numpy().flatten())
 
     val_labels_np = np.array(final_labels)
     seq_preds_np = np.array(final_seq_preds)
@@ -193,7 +141,7 @@ def train_ensemble(seq_model_path, graph_model_path, graph_data_path):
         print("No valid validation samples found.")
         return
 
-    # 3. Train Ensemble
+    # 3. Train Ensemble with enhanced features
     ensemble = PPIEnsemble()
     ensemble.train_stacking(seq_preds_np, graph_preds_np, val_labels_np)
     
@@ -204,7 +152,6 @@ def train_ensemble(seq_model_path, graph_model_path, graph_data_path):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    # Optional args
     args = parser.parse_args()
     
     # Define default paths

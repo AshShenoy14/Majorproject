@@ -42,9 +42,15 @@ const InteractionVisualizer = ({ result, id1, id2 }) => {
     };
 
     return (
-        <Paper elevation={0} sx={{ p: 4, bgcolor: '#f8f9fa', borderRadius: 3, mt: 4 }}>
-            <Typography variant="h6" color="primary" gutterBottom sx={{ fontWeight: 600, textAlign: 'center', mb: 4 }}>
-                What Does This Mean?
+        <Paper elevation={0} sx={{
+            p: 4,
+            background: 'rgba(255, 255, 255, 0.02)',
+            border: '1px solid rgba(255, 255, 255, 0.05)',
+            borderRadius: 3,
+            mt: 4
+        }}>
+            <Typography variant="h5" color="secondary" gutterBottom sx={{ fontWeight: 700, textAlign: 'center', mb: 4, textShadow: '0 0 10px rgba(213, 0, 249, 0.3)' }}>
+                Explainability Insights
             </Typography>
 
             <Stack direction={{ xs: 'column', md: 'row' }} spacing={4} alignItems="center">
@@ -58,7 +64,8 @@ const InteractionVisualizer = ({ result, id1, id2 }) => {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        bgcolor: '#ffffff',
+                        background: 'rgba(0, 0, 0, 0.2)',
+                        border: '1px solid rgba(255, 255, 255, 0.05)',
                         borderRadius: 4,
                         boxShadow: `0 8px 32px ${glowColor}`,
                         overflow: 'hidden'
@@ -144,21 +151,23 @@ const InteractionVisualizer = ({ result, id1, id2 }) => {
                     <Chip
                         label={statusText}
                         sx={{
-                            bgcolor: mainColor,
-                            color: 'white',
+                            bgcolor: isInteracting ? 'rgba(0, 255, 136, 0.2)' : 'rgba(255, 75, 75, 0.2)',
+                            color: isInteracting ? '#00ff88' : '#ff4b4b',
+                            border: `1px solid ${isInteracting ? 'rgba(0, 255, 136, 0.5)' : 'rgba(255, 75, 75, 0.5)'}`,
                             fontWeight: 'bold',
-                            mb: 2
+                            mb: 2,
+                            boxShadow: `0 0 10px ${isInteracting ? 'rgba(0, 255, 136, 0.2)' : 'rgba(255, 75, 75, 0.2)'}`
                         }}
                     />
-                    <Typography variant="body1" paragraph sx={{ fontSize: '1.1rem', color: '#333' }}>
+                    <Typography variant="body1" paragraph sx={{ fontSize: '1.1rem', color: '#e6f1ff', lineHeight: 1.7 }}>
                         {getExplanation()}
                     </Typography>
 
-                    <Box sx={{ mt: 3, p: 2, bgcolor: '#e3f2fd', borderRadius: 2, borderLeft: '4px solid #1976d2' }}>
-                        <Typography variant="subtitle2" color="primary" gutterBottom>
+                    <Box sx={{ mt: 3, p: 3, bgcolor: 'rgba(0, 229, 255, 0.05)', borderRadius: 3, borderLeft: '4px solid #00e5ff' }}>
+                        <Typography variant="subtitle2" color="primary" gutterBottom sx={{ fontWeight: 600 }}>
                             🧠 How the AI knows this:
                         </Typography>
-                        <Typography variant="body2" color="text.secondary">
+                        <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6 }}>
                             {getModelInsight()}
                         </Typography>
                     </Box>

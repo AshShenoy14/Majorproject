@@ -14,6 +14,33 @@ from src.models.graph_model import GATLinkPredictor
 from src.analysis.explainability import PPIExplainer
 from src.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT
 
+def find_optimal_threshold(y_true, y_prob, method="f1"):
+    """
+    Sweep thresholds from 0.1 to 0.9 and find the optimal one.
+    method: 'f1' (maximize F1) or 'youden' (maximize Youden's index = TPR - FPR)
+    """
+    best_thresh = 0.5
+    best_score = -1
+    
+    for thresh in np.arange(0.1, 0.91, 0.01):
+        y_pred = (y_prob > thresh).astype(int)
+        if method == "f1":
+            score = f1_score(y_true, y_pred, zero_division=0)
+        elif method == "youden":
+            tp = np.sum((y_pred == 1) & (y_true == 1))
+            tn = np.sum((y_pred == 0) & (y_true == 0))
+            fp = np.sum((y_pred == 1) & (y_true == 0))
+            fn = np.sum((y_pred == 0) & (y_true == 1))
+            tpr = tp / (tp + fn) if (tp + fn) > 0 else 0
+            fpr = fp / (fp + tn) if (fp + tn) > 0 else 0
+            score = tpr - fpr  # Youden's J
+        
+        if score > best_score:
+            best_score = score
+            best_thresh = thresh
+    
+    return best_thresh, best_score
+
 def evaluate_models():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Evaluating models on {device}...")
@@ -59,7 +86,8 @@ def evaluate_models():
          seq_model.load_state_dict(torch.load(seq_path, map_location=device))
     seq_model.eval()
 
-    graph_model = GATLinkPredictor(in_channels=graph_data.x.shape[1], hidden_channels=64).to(device)
+    # Updated GAT: hidden_channels=128
+    graph_model = GATLinkPredictor(in_channels=graph_data.x.shape[1], hidden_channels=128).to(device)
     if graph_model_path.exists():
          graph_model.load_state_dict(torch.load(graph_model_path, map_location=device))
     graph_model.eval()
@@ -97,7 +125,7 @@ def evaluate_models():
             seq_preds.extend(out.cpu().numpy().flatten())
     seq_preds = np.array(seq_preds)
 
-    # Predict Graph
+    # Predict Graph — apply sigmoid to raw logits
     g_edge_label_index = torch.tensor([g_src, g_dst], dtype=torch.long).to(device)
     graph_preds = []
     with torch.no_grad():
@@ -105,18 +133,23 @@ def evaluate_models():
         for i in range(0, g_edge_label_index.size(1), batch_size):
             chunk = g_edge_label_index[:, i:i+batch_size]
             out = graph_model(graph_data.x, graph_data.edge_index, chunk)
-            graph_preds.extend(out.cpu().numpy().flatten())
+            # Apply sigmoid to raw logits
+            probs = torch.sigmoid(out)
+            graph_preds.extend(probs.cpu().numpy().flatten())
     graph_preds = np.array(graph_preds)
 
-    # Predict Ensemble
+    # Predict Ensemble — with enhanced features
     ens_preds = None
     if ensemble_model:
-         X = np.column_stack((seq_preds, graph_preds))
-         ens_preds = ensemble_model.predict_proba(X)[:, 1]
+        # Enhanced features: [seq, gat, |seq-0.5|, |gat-0.5|]
+        conf_seq = np.abs(seq_preds - 0.5)
+        conf_gat = np.abs(graph_preds - 0.5)
+        X = np.column_stack((seq_preds, graph_preds, conf_seq, conf_gat))
+        ens_preds = ensemble_model.predict_proba(X)[:, 1]
 
-    # Calculate Metrics
-    def calc_metrics(y_true, y_prob):
-        y_pred = (y_prob > 0.5).astype(int)
+    # Calculate Metrics (default threshold 0.5)
+    def calc_metrics(y_true, y_prob, threshold=0.5):
+        y_pred = (y_prob > threshold).astype(int)
         return [
             accuracy_score(y_true, y_pred),
             precision_score(y_true, y_pred, zero_division=0),
@@ -126,6 +159,7 @@ def evaluate_models():
             average_precision_score(y_true, y_prob)
         ]
 
+    # === Standard Results (threshold=0.5) ===
     results = []
     results.append(["ESM-MLP"] + calc_metrics(labels, seq_preds))
     results.append(["GAT"] + calc_metrics(labels, graph_preds))
@@ -133,13 +167,49 @@ def evaluate_models():
          results.append(["Ensemble"] + calc_metrics(labels, ens_preds))
 
     headers = ["Model", "Accuracy", "Precision", "Recall", "F1", "ROC-AUC", "PR-AUC"]
-    print("\n" + tabulate(results, headers=headers, floatfmt=".4f", tablefmt="grid"))
+    print("\n=== Results (threshold=0.5) ===")
+    print(tabulate(results, headers=headers, floatfmt=".4f", tablefmt="grid"))
+
+    # === Threshold Tuning ===
+    print("\n=== Optimal Threshold Tuning (F1-maximizing) ===")
+    tuning_results = []
+    
+    for name, preds in [("ESM-MLP", seq_preds), ("GAT", graph_preds)]:
+        best_t, best_f1 = find_optimal_threshold(labels, preds, method="f1")
+        tuned_metrics = calc_metrics(labels, preds, threshold=best_t)
+        tuning_results.append([name, best_t] + tuned_metrics)
+    
+    if ens_preds is not None:
+        best_t, best_f1 = find_optimal_threshold(labels, ens_preds, method="f1")
+        tuned_metrics = calc_metrics(labels, ens_preds, threshold=best_t)
+        tuning_results.append(["Ensemble", best_t] + tuned_metrics)
+    
+    tuning_headers = ["Model", "Best Thresh", "Accuracy", "Precision", "Recall", "F1", "ROC-AUC", "PR-AUC"]
+    print(tabulate(tuning_results, headers=tuning_headers, floatfmt=".4f", tablefmt="grid"))
+
+    # === Youden's Index ===
+    print("\n=== Optimal Threshold (Youden's J) ===")
+    youden_results = []
+    for name, preds in [("ESM-MLP", seq_preds), ("GAT", graph_preds)]:
+        best_t, best_j = find_optimal_threshold(labels, preds, method="youden")
+        tuned_metrics = calc_metrics(labels, preds, threshold=best_t)
+        youden_results.append([name, best_t, best_j] + tuned_metrics)
+    
+    if ens_preds is not None:
+        best_t, best_j = find_optimal_threshold(labels, ens_preds, method="youden")
+        tuned_metrics = calc_metrics(labels, ens_preds, threshold=best_t)
+        youden_results.append(["Ensemble", best_t, best_j] + tuned_metrics)
+    
+    youden_headers = ["Model", "Best Thresh", "Youden J", "Accuracy", "Precision", "Recall", "F1", "ROC-AUC", "PR-AUC"]
+    print(tabulate(youden_results, headers=youden_headers, floatfmt=".4f", tablefmt="grid"))
 
     # Generate SHAP summary plot
     if ensemble_model:
         print("\nGenerating SHAP Summary Plot...")
         explainer = PPIExplainer(str(ensemble_path))
-        X_shap = np.column_stack((seq_preds, graph_preds))
+        conf_seq = np.abs(seq_preds - 0.5)
+        conf_gat = np.abs(graph_preds - 0.5)
+        X_shap = np.column_stack((seq_preds, graph_preds, conf_seq, conf_gat))
         explainer.save_summary_plot(X_shap, output_path=str(PROJECT_ROOT / "data" / "processed" / "plots" / "shap_summary.png"))
 
 if __name__ == "__main__":

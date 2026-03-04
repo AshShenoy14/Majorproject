@@ -75,12 +75,20 @@ const RealDataVerifier = () => {
 
     return (
         <Paper
-            elevation={3}
+            elevation={0}
             component={motion.div}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            sx={{ p: 4, borderRadius: 3, overflow: 'hidden' }}
+            sx={{
+                p: 4,
+                borderRadius: 4,
+                overflow: 'hidden',
+                background: 'rgba(16, 33, 65, 0.6)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                boxShadow: '0 20px 40px rgba(0,0,0,0.2)'
+            }}
         >
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Box>
@@ -109,7 +117,11 @@ const RealDataVerifier = () => {
                             size="small"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            sx={{ bgcolor: 'white' }}
+                            sx={{
+                                '& .MuiOutlinedInput-root': {
+                                    backgroundColor: 'rgba(255, 255, 255, 0.03)'
+                                }
+                            }}
                         />
                     </Box>
 
@@ -119,8 +131,9 @@ const RealDataVerifier = () => {
                             height: '500px',
                             overflow: 'auto',
                             p: 2,
-                            bgcolor: '#fafafa',
-                            borderColor: '#eee'
+                            bgcolor: 'rgba(0, 0, 0, 0.2)',
+                            borderColor: 'rgba(255, 255, 255, 0.05)',
+                            borderRadius: 2
                         }}
                     >
                         {loadingNetwork ? (
@@ -163,11 +176,13 @@ const RealDataVerifier = () => {
                             overflow: 'hidden',
                             display: 'flex',
                             flexDirection: 'column',
-                            borderColor: '#eee'
+                            bgcolor: 'rgba(0, 0, 0, 0.2)',
+                            borderColor: 'rgba(255, 255, 255, 0.05)',
+                            borderRadius: 2
                         }}
                     >
-                        <Box sx={{ p: 2, bgcolor: '#f5f5f5', borderBottom: '1px solid #eee' }}>
-                            <Typography variant="h6" color="text.primary">
+                        <Box sx={{ p: 2, bgcolor: 'rgba(0, 229, 255, 0.05)', borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                            <Typography variant="h6" color="primary" sx={{ fontWeight: 600 }}>
                                 {selectedProtein ? `Targets for ${selectedProtein}` : "Select a Protein"}
                             </Typography>
                             <Typography variant="caption" color="text.secondary">
@@ -203,7 +218,18 @@ const RealDataVerifier = () => {
                                                         initial={{ opacity: 0, x: 10 }}
                                                         animate={{ opacity: 1, x: 0 }}
                                                         transition={{ delay: i * 0.05 }}
-                                                        sx={{ mb: 1.5, border: '1px solid #eee', p: 1, borderRadius: 2 }}
+                                                        sx={{
+                                                            mb: 1.5,
+                                                            border: '1px solid rgba(255, 255, 255, 0.05)',
+                                                            bgcolor: 'rgba(255, 255, 255, 0.02)',
+                                                            p: 2,
+                                                            borderRadius: 2,
+                                                            transition: 'all 0.2s',
+                                                            '&:hover': {
+                                                                bgcolor: 'rgba(255, 255, 255, 0.05)',
+                                                                borderColor: 'rgba(0, 229, 255, 0.3)'
+                                                            }
+                                                        }}
                                                     >
                                                         <ListItem disablePadding>
                                                             <ListItemText
