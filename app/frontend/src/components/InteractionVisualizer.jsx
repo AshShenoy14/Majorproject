@@ -1,8 +1,10 @@
-import React from 'react';
-import { Box, Typography, Stack, Paper, Chip } from '@mui/material';
+import { Box, Typography, Stack, Paper, Chip, useTheme } from '@mui/material';
 import { motion } from 'framer-motion';
+import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip } from 'recharts';
 
 const InteractionVisualizer = ({ result, id1, id2 }) => {
+    const theme = useTheme();
+    const isDark = theme.palette.mode === 'dark';
     if (!result) return null;
 
     const { interaction_probability, explanation } = result;
@@ -41,15 +43,27 @@ const InteractionVisualizer = ({ result, id1, id2 }) => {
         }
     };
 
+    const radarData = [
+        { subject: 'Sequence Match', A: explanation.Sequence_Model_Contribution * 100, fullMark: 100 },
+        { subject: 'Network Proximity', A: explanation.Graph_Model_Contribution * 100, fullMark: 100 }
+    ];
+    if (explanation.SHAP_Sequence !== undefined) {
+        // Normalize SHAP to 0-100 range roughly for visual purposes (absolute magnitude of influence)
+        const seqShap = Math.min(Math.abs(explanation.SHAP_Sequence) * 200, 100);
+        const graphShap = Math.min(Math.abs(explanation.SHAP_Graph) * 200, 100);
+        radarData.push({ subject: 'Seq SHAP Impact', A: seqShap, fullMark: 100 });
+        radarData.push({ subject: 'Graph SHAP Impact', A: graphShap, fullMark: 100 });
+    }
+
     return (
         <Paper elevation={0} sx={{
             p: 4,
-            background: 'rgba(255, 255, 255, 0.02)',
-            border: '1px solid rgba(255, 255, 255, 0.05)',
+            background: isDark ? 'rgba(255, 255, 255, 0.02)' : 'rgba(0, 0, 0, 0.02)',
+            border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'}`,
             borderRadius: 3,
             mt: 4
         }}>
-            <Typography variant="h5" color="secondary" gutterBottom sx={{ fontWeight: 700, textAlign: 'center', mb: 4, textShadow: '0 0 10px rgba(213, 0, 249, 0.3)' }}>
+            <Typography variant="h5" color="secondary" gutterBottom sx={{ fontWeight: 700, textAlign: 'center', mb: 4, textShadow: isDark ? '0 0 10px rgba(213, 0, 249, 0.3)' : 'none' }}>
                 Explainability Insights
             </Typography>
 
@@ -64,8 +78,8 @@ const InteractionVisualizer = ({ result, id1, id2 }) => {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        background: 'rgba(0, 0, 0, 0.2)',
-                        border: '1px solid rgba(255, 255, 255, 0.05)',
+                        background: isDark ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.02)',
+                        border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'}`,
                         borderRadius: 4,
                         boxShadow: `0 8px 32px ${glowColor}`,
                         overflow: 'hidden'
@@ -151,19 +165,19 @@ const InteractionVisualizer = ({ result, id1, id2 }) => {
                     <Chip
                         label={statusText}
                         sx={{
-                            bgcolor: isInteracting ? 'rgba(0, 255, 136, 0.2)' : 'rgba(255, 75, 75, 0.2)',
-                            color: isInteracting ? '#00ff88' : '#ff4b4b',
-                            border: `1px solid ${isInteracting ? 'rgba(0, 255, 136, 0.5)' : 'rgba(255, 75, 75, 0.5)'}`,
+                            bgcolor: isInteracting ? (isDark ? 'rgba(0, 255, 136, 0.2)' : 'rgba(46, 125, 50, 0.1)') : (isDark ? 'rgba(255, 75, 75, 0.2)' : 'rgba(211, 47, 47, 0.1)'),
+                            color: isInteracting ? (isDark ? '#00ff88' : '#2e7d32') : (isDark ? '#ff4b4b' : '#d32f2f'),
+                            border: `1px solid ${isInteracting ? (isDark ? 'rgba(0, 255, 136, 0.5)' : 'rgba(46, 125, 50, 0.5)') : (isDark ? 'rgba(255, 75, 75, 0.5)' : 'rgba(211, 47, 47, 0.5)')}`,
                             fontWeight: 'bold',
                             mb: 2,
-                            boxShadow: `0 0 10px ${isInteracting ? 'rgba(0, 255, 136, 0.2)' : 'rgba(255, 75, 75, 0.2)'}`
+                            boxShadow: `0 0 10px ${isInteracting ? (isDark ? 'rgba(0, 255, 136, 0.2)' : 'rgba(46, 125, 50, 0.1)') : (isDark ? 'rgba(255, 75, 75, 0.2)' : 'rgba(211, 47, 47, 0.1)')}`
                         }}
                     />
-                    <Typography variant="body1" paragraph sx={{ fontSize: '1.1rem', color: '#e6f1ff', lineHeight: 1.7 }}>
+                    <Typography variant="body1" paragraph sx={{ fontSize: '1.1rem', color: isDark ? '#e6f1ff' : 'text.primary', lineHeight: 1.7 }}>
                         {getExplanation()}
                     </Typography>
 
-                    <Box sx={{ mt: 3, p: 3, bgcolor: 'rgba(0, 229, 255, 0.05)', borderRadius: 3, borderLeft: '4px solid #00e5ff' }}>
+                    <Box sx={{ mt: 3, p: 3, bgcolor: isDark ? 'rgba(0, 229, 255, 0.05)' : 'rgba(0, 105, 92, 0.05)', borderRadius: 3, borderLeft: `4px solid ${isDark ? '#00e5ff' : '#00695c'}` }}>
                         <Typography variant="subtitle2" color="primary" gutterBottom sx={{ fontWeight: 600 }}>
                             🧠 How the AI knows this:
                         </Typography>
@@ -171,6 +185,21 @@ const InteractionVisualizer = ({ result, id1, id2 }) => {
                             {getModelInsight()}
                         </Typography>
                     </Box>
+
+                    {radarData.length > 2 && (
+                        <Box sx={{ mt: 3, height: 250, width: '100%', bgcolor: isDark ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.02)', borderRadius: 3, p: 2, border: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}` }}>
+                            <Typography variant="caption" color="text.secondary" align="center" display="block">Model Weighting (Radar)</Typography>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarData}>
+                                    <PolarGrid stroke={isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.2)'} />
+                                    <PolarAngleAxis dataKey="subject" tick={{ fill: isDark ? '#aaa' : '#555', fontSize: 10 }} />
+                                    <PolarRadiusAxis angle={30} domain={[0, 100]} tick={false} axisLine={false} />
+                                    <Radar name="Weights" dataKey="A" stroke={mainColor} fill={glowColor} fillOpacity={0.5} />
+                                    <Tooltip contentStyle={{ backgroundColor: isDark ? '#102141' : '#fff', color: isDark ? '#fff' : '#000', borderRadius: '8px' }} />
+                                </RadarChart>
+                            </ResponsiveContainer>
+                        </Box>
+                    )}
                 </Box>
 
             </Stack>

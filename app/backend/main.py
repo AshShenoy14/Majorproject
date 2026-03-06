@@ -7,6 +7,7 @@ import sys
 import os
 import pandas as pd
 import joblib
+from typing import List
 
 # Add project root
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
@@ -19,7 +20,7 @@ from src.data.sequence_manager import SequenceManager
 from src.data.target_manager import TargetManager
 from src.analysis.explainability import PPIExplainer
 from src.analysis.network_analysis import NetworkAnalyzer
-from app.backend.schemas import ProteinPair, PredictionResponse, NetworkResponse
+from app.backend.schemas import ProteinPair, PredictionResponse, NetworkResponse, BatchPredictionRequest
 
 from src.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT
 
@@ -173,6 +174,19 @@ async def predict_interaction(pair: ProteinPair):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/predict_batch", response_model=List[PredictionResponse])
+async def predict_batch(request: BatchPredictionRequest):
+    results = []
+    for pair in request.pairs:
+        try:
+             res = await predict_interaction(pair)
+             results.append(res)
+        except Exception as e:
+             # Log the error but continue or fail? We'll fail the batch if one severely errors for now, or just raise.
+             # Ideally we return a partial result, but for simplicity we raise 500
+             raise HTTPException(status_code=500, detail=f"Error processing pair {pair.protein1_id}-{pair.protein2_id}: {str(e)}")
+    return results
 
 @app.get("/network")
 async def get_network(limit: int = 100):

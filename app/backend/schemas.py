@@ -20,3 +20,6 @@ class NetworkRequest(BaseModel):
 class NetworkResponse(BaseModel):
     nodes: List[Dict]
     edges: List[Dict]
+
+class BatchPredictionRequest(BaseModel):
+    pairs: List[ProteinPair]
