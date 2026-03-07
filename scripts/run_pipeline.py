@@ -57,8 +57,7 @@ def run_pipeline(limit_data: int = None):
         print("Embeddings file exists. Checking coverage...")
         try:
             loaded_embeddings = torch.load(emb_path, weights_only=False)
-            # Convert float16 embeddings to float32 for processing
-            loaded_embeddings = {k: v.float() if v.dtype == torch.float16 else v for k, v in loaded_embeddings.items()}
+            # Keep embeddings in float16 to save RAM — conversion done per-sample during training
             loaded_keys = set(loaded_embeddings.keys())
             missing_count = len(proteins - loaded_keys)
             
@@ -160,7 +159,7 @@ def run_pipeline(limit_data: int = None):
         temp_emb_path = PROCESSED_DATA_DIR / "temp_embeddings.pt"
         train_seq(epochs=2, embedding_path=str(temp_emb_path))
     else:
-        train_seq(epochs=10, embedding_path=str(emb_path))
+        train_seq(epochs=50, embedding_path=str(emb_path))
         
     # Train Graph Model
     print("Training Graph Model...")
@@ -169,7 +168,7 @@ def run_pipeline(limit_data: int = None):
         # Graph training script expects mapping file next to graph
         train_graph(epochs=10, graph_path=str(temp_graph_path))
     else:
-        train_graph(epochs=20, graph_path=str(graph_path))
+        train_graph(epochs=100, graph_path=str(graph_path))
         
     # Train Ensemble
     print("Training Ensemble...")
