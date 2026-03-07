@@ -72,7 +72,7 @@ async def load_system():
     if graph_data_path.exists():
         data_cache["graph"] = torch.load(graph_data_path, weights_only=False).to(device)
         in_channels = data_cache["graph"].x.shape[1]
-        models["graph_model"] = GATLinkPredictor(in_channels=in_channels, hidden_channels=128).to(device)
+        models["graph_model"] = GATLinkPredictor(in_channels=in_channels, hidden_channels=64).to(device)
         if graph_path.exists():
             models["graph_model"].load_state_dict(torch.load(graph_path, map_location=device))
             models["graph_model"].eval()
@@ -146,10 +146,13 @@ async def predict_interaction(pair: ProteinPair):
             
             with torch.no_grad():
                 g_out = models["graph_model"](data_cache["graph"].x, data_cache["graph"].edge_index, edge_label_index)
-                graph_prob = torch.sigmoid(g_out).item()
+                graph_prob = g_out.item()
         
         # 5. Ensemble Prediction
-        final_prob = models["ensemble"].predict(np.array([seq_prob]), np.array([graph_prob]), method="stacking" if models["ensemble"].meta_model else "soft_voting")[0]
+        if models["ensemble"].meta_model:
+            final_prob = models["ensemble"].meta_model.predict_proba(np.array([[seq_prob, graph_prob]]))[0, 1]
+        else:
+            final_prob = (seq_prob + graph_prob) / 2
         
         # 6. Explanation
         explanation = {
