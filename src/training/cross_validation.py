@@ -9,6 +9,7 @@ from sklearn.model_selection import KFold
 from sklearn.metrics import accuracy_score, roc_auc_score, f1_score, precision_score, recall_score, average_precision_score, confusion_matrix, roc_curve, precision_recall_curve
 import matplotlib.pyplot as plt
 import seaborn as sns
+from tabulate import tabulate
 from tqdm import tqdm
 import os
 import sys
@@ -21,34 +22,20 @@ from src.models.graph_model import GATLinkPredictor
 from src.utils.dataset import PPIDataset
 from src.utils.paths import PROCESSED_DATA_DIR
 
-def train_one_epoch(model, loader, criterion, optimizer, device, is_graph=False, graph_data=None):
+def train_one_epoch(model, loader, criterion, optimizer, device):
     model.train()
     total_loss = 0.0
     
     for batch in loader:
-        if is_graph:
-            # For GAT, dataset returns indices usually, but PPIDataset returns embeddings. 
-            # We need a different approach for GAT CV if we want to be strict (using indices).
-            # But graph structure is fixed. Link prediction usually splits edges.
-            # Simplified GAT CV: We'll skip dynamic graph splitting for now and just train classifier on fixed graph features 
-            # OR we pass edge indices. 
-            # Let's stick to Sequence Model CV first if GAT is complex, 
-            # BUT the user asked for GAT too.
-            # For GAT link prediction, we usually mask edges. Doing proper K-Fold on graph is hard.
-            # Pivot: We will do CV on the Sequence Model primarily, and for GAT we will just evaluate on folds 
-            # (Assuming graph structure doesn't leak too much info - which it does).
-            # *Better approach*: Just train Sequence Model for CV as it's the main learnable component on new data.
-            pass
-        else:
-            emb1, emb2, labels = batch
-            emb1, emb2, labels = emb1.to(device), emb2.to(device), labels.to(device).unsqueeze(1)
-            
-            optimizer.zero_grad()
-            outputs = model(emb1, emb2)
-            loss = criterion(outputs, labels)
-            loss.backward()
-            optimizer.step()
-            total_loss += loss.item()
+        emb1, emb2, labels = batch
+        emb1, emb2, labels = emb1.to(device), emb2.to(device), labels.to(device).unsqueeze(1)
+        
+        optimizer.zero_grad()
+        outputs = model(emb1, emb2)
+        loss = criterion(outputs, labels)
+        loss.backward()
+        optimizer.step()
+        total_loss += loss.item()
             
     return total_loss / len(loader)
 
@@ -84,7 +71,6 @@ def run_cv(data_path, embedding_path, k_folds=5, epochs=5, batch_size=32):
     
     # Load Data
     embeddings = torch.load(embedding_path, weights_only=False)
-    # Combined dataset? Or just Train? Usually Train+Val merged.
     full_dataset = PPIDataset(data_path, embeddings)
     
     kfold = KFold(n_splits=k_folds, shuffle=True, random_state=42)
@@ -120,7 +106,6 @@ def run_cv(data_path, embedding_path, k_folds=5, epochs=5, batch_size=32):
         # Train
         for epoch in range(epochs):
             loss = train_one_epoch(model, train_loader, criterion, optimizer, device)
-            # print(f"  Epoch {epoch+1} Loss: {loss:.4f}")
             
         # Eval
         acc, auc, f1, prec, rec, pr_auc, cm, y_t, y_p = evaluate(model, val_loader, device)
@@ -133,17 +118,31 @@ def run_cv(data_path, embedding_path, k_folds=5, epochs=5, batch_size=32):
         results["recall"].append(rec)
         results["pr_auc"].append(pr_auc)
         
-    # Aggregate
-    print("\n" + "="*30)
-    print("Cross-Validation Results")
-    print("="*30)
-    print(f"Accuracy: {np.mean(results['accuracy']):.4f} ± {np.std(results['accuracy']):.4f}")
-    print(f"Precision: {np.mean(results['precision']):.4f} ± {np.std(results['precision']):.4f}")
-    print(f"Recall:   {np.mean(results['recall']):.4f} ± {np.std(results['recall']):.4f}")
-    print(f"F1 Score: {np.mean(results['f1']):.4f} ± {np.std(results['f1']):.4f}")
-    print(f"ROC-AUC:  {np.mean(results['auc']):.4f} ± {np.std(results['auc']):.4f}")
-    print(f"PR-AUC:   {np.mean(results['pr_auc']):.4f} ± {np.std(results['pr_auc']):.4f}")
-    print("="*30)
+    # === Research-Grade Summary Table ===
+    print("\n" + "="*60)
+    print("  5-Fold Cross-Validation Results (ESM-MLP Sequence Model)")
+    print("="*60)
+    
+    summary_data = []
+    for metric in ["accuracy", "precision", "recall", "f1", "auc", "pr_auc"]:
+        vals = results[metric]
+        display_name = {
+            "accuracy": "Accuracy",
+            "precision": "Precision",
+            "recall": "Recall",
+            "f1": "F1 Score",
+            "auc": "ROC-AUC",
+            "pr_auc": "PR-AUC"
+        }[metric]
+        summary_data.append([
+            display_name,
+            f"{np.mean(vals):.4f} ± {np.std(vals):.4f}",
+            f"{np.min(vals):.4f}",
+            f"{np.max(vals):.4f}"
+        ])
+    
+    print(tabulate(summary_data, headers=["Metric", "Mean ± Std", "Min", "Max"], tablefmt="grid"))
+    print("="*60)
     
     # Save a set of plots for the last fold
     save_plots(y_t, y_p, y_pred=(np.array(y_p)>0.5).astype(int))
@@ -186,6 +185,8 @@ def save_plots(y_true, y_prob, y_pred):
     plt.legend(loc="lower left")
     plt.savefig(os.path.join(output_dir, 'cv_pr_curve.png'), bbox_inches='tight')
     plt.close()
+    
+    print(f"\nPlots saved to {output_dir}/")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

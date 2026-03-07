@@ -7,6 +7,7 @@ import sys
 import os
 import pandas as pd
 import joblib
+from typing import List
 
 # Add project root
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
@@ -19,7 +20,7 @@ from src.data.sequence_manager import SequenceManager
 from src.data.target_manager import TargetManager
 from src.analysis.explainability import PPIExplainer
 from src.analysis.network_analysis import NetworkAnalyzer
-from app.backend.schemas import ProteinPair, PredictionResponse, NetworkResponse
+from app.backend.schemas import ProteinPair, PredictionResponse, NetworkResponse, BatchPredictionRequest
 
 from src.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT
 
@@ -71,7 +72,7 @@ async def load_system():
     if graph_data_path.exists():
         data_cache["graph"] = torch.load(graph_data_path, weights_only=False).to(device)
         in_channels = data_cache["graph"].x.shape[1]
-        models["graph_model"] = GATLinkPredictor(in_channels=in_channels, hidden_channels=64).to(device)
+        models["graph_model"] = GATLinkPredictor(in_channels=in_channels, hidden_channels=128).to(device)
         if graph_path.exists():
             models["graph_model"].load_state_dict(torch.load(graph_path, map_location=device))
             models["graph_model"].eval()
@@ -145,7 +146,7 @@ async def predict_interaction(pair: ProteinPair):
             
             with torch.no_grad():
                 g_out = models["graph_model"](data_cache["graph"].x, data_cache["graph"].edge_index, edge_label_index)
-                graph_prob = g_out.item()
+                graph_prob = torch.sigmoid(g_out).item()
         
         # 5. Ensemble Prediction
         final_prob = models["ensemble"].predict(np.array([seq_prob]), np.array([graph_prob]), method="stacking" if models["ensemble"].meta_model else "soft_voting")[0]
@@ -173,6 +174,19 @@ async def predict_interaction(pair: ProteinPair):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/predict_batch", response_model=List[PredictionResponse])
+async def predict_batch(request: BatchPredictionRequest):
+    results = []
+    for pair in request.pairs:
+        try:
+             res = await predict_interaction(pair)
+             results.append(res)
+        except Exception as e:
+             # Log the error but continue or fail? We'll fail the batch if one severely errors for now, or just raise.
+             # Ideally we return a partial result, but for simplicity we raise 500
+             raise HTTPException(status_code=500, detail=f"Error processing pair {pair.protein1_id}-{pair.protein2_id}: {str(e)}")
+    return results
 
 @app.get("/network")
 async def get_network(limit: int = 100):

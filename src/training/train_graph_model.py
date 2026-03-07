@@ -14,14 +14,14 @@ from src.models.graph_model import GATLinkPredictor
 from src.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT, CHECKPOINT_DIR, MODELS_DIR
 
 
-def train(epochs: int = 10, lr: float = 1e-3, graph_path: str = None):
+def train(epochs: int = 100, lr: float = 0.005, graph_path: str = None):
     """
     Train the GAT Link Predictor with checkpoint-based resume and best-model saving.
 
     Checkpoint saved to: checkpoints/graph_checkpoint.pt   (overwritten each epoch)
     Best model saved to: models/graph_model_best.pth       (lowest validation loss)
     """
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Training Graph Model on {device}...")
 
     # ── Load Graph Data ──────────────────────────────────────────────────
@@ -36,7 +36,6 @@ def train(epochs: int = 10, lr: float = 1e-3, graph_path: str = None):
     print("Loading datasets for link prediction...")
     train_df = pd.read_csv(PROCESSED_DATA_DIR / "train.csv")
     val_df   = pd.read_csv(PROCESSED_DATA_DIR / "val.csv")
-
     mapping_path = str(graph_path).replace(".pt", "_mapping.pt")
     if os.path.exists(mapping_path):
         node_mapping = torch.load(mapping_path, weights_only=False)
@@ -66,9 +65,11 @@ def train(epochs: int = 10, lr: float = 1e-3, graph_path: str = None):
     print(f"Dataset: {train_labels.size(0)} train / {val_labels.size(0)} val edges")
 
     # ── Model, Optimizer, Loss ───────────────────────────────────────────
-    model     = GATLinkPredictor(in_channels=data.x.shape[1], hidden_channels=64, heads=4).to(device)
+    # Model — increased capacity: hidden=128, heads=8
+    model = GATLinkPredictor(in_channels=data.x.shape[1], hidden_channels=128, heads=8).to(device)
     optimizer = optim.Adam(model.parameters(), lr=lr)
-    criterion = nn.BCELoss()
+    # BCEWithLogitsLoss for better gradient stability (model outputs raw logits)
+    criterion = nn.BCEWithLogitsLoss()
 
     # ── Resume from checkpoint if it exists ──────────────────────────────
     checkpoint_path = CHECKPOINT_DIR / "graph_checkpoint.pt"
@@ -98,7 +99,7 @@ def train(epochs: int = 10, lr: float = 1e-3, graph_path: str = None):
         # --- Train phase (full-batch on graph) ---
         model.train()
         optimizer.zero_grad()
-
+        # Forward pass — model returns raw logits
         outputs = model(data.x, data.edge_index, train_edge_label_index)
         loss    = criterion(outputs.squeeze(), train_labels)
         loss.backward()
@@ -112,7 +113,9 @@ def train(epochs: int = 10, lr: float = 1e-3, graph_path: str = None):
             val_outputs = model(data.x, data.edge_index, val_edge_label_index)
             val_loss_t  = criterion(val_outputs.squeeze(), val_labels)
             val_loss    = val_loss_t.item()
-            val_preds   = (val_outputs.squeeze() > 0.5).float()
+            # Apply sigmoid only during evaluation for accuracy calculations
+            val_probs   = torch.sigmoid(val_outputs.squeeze())
+            val_preds   = (val_probs > 0.5).float()
             val_acc     = (val_preds == val_labels).sum().item() / val_labels.size(0)
 
         # --- Epoch summary ---
@@ -143,7 +146,6 @@ def train(epochs: int = 10, lr: float = 1e-3, graph_path: str = None):
         print(f"  ✓ Checkpoint saved → {checkpoint_path}")
 
     print(f"\nGraph Model training complete. Best val loss: {best_val_loss:.4f}")
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

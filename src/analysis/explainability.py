@@ -27,8 +27,10 @@ class PPIExplainer:
         """
         Explains a single prediction made by the ensemble.
         """
-        # SHAP expects a matrix
-        X = np.array([[seq_prob, graph_prob]])
+        # SHAP expects a matrix — enhanced with confidence features
+        conf_seq = abs(seq_prob - 0.5)
+        conf_graph = abs(graph_prob - 0.5)
+        X = np.array([[seq_prob, graph_prob, conf_seq, conf_graph]])
         shap_values = self.explainer.shap_values(X)
         
         # Plotting
@@ -45,7 +47,7 @@ class PPIExplainer:
              
         return shap_values
 
-    def save_summary_plot(self, X: np.ndarray, feature_names=["ESM-MLP", "GAT"], title="SHAP Summary Plot", output_path="shap_summary.png"):
+    def save_summary_plot(self, X: np.ndarray, feature_names=["ESM-MLP", "GAT", "|ESM-0.5|", "|GAT-0.5|"], title="SHAP Summary Plot", output_path="shap_summary.png"):
         """
         Generates and saves a SHAP summary plot for a batch of predictions.
         """

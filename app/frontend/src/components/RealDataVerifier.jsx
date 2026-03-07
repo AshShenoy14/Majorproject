@@ -18,13 +18,16 @@ import {
     TextField,
     InputAdornment,
     Collapse,
-    IconButton
+    IconButton,
+    useTheme
 } from '@mui/material';
 import { motion, AnimatePresence } from 'framer-motion';
 // Icons would ideally be imported from @mui/icons-material, but avoiding new deps for now if not installed.
 // Assuming we can use text or basic shapes if icons are missing, or basic SVG.
 
 const RealDataVerifier = () => {
+    const theme = useTheme();
+    const isDark = theme.palette.mode === 'dark';
     const [networkNodes, setNetworkNodes] = useState([]);
     const [filteredNodes, setFilteredNodes] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
@@ -75,12 +78,20 @@ const RealDataVerifier = () => {
 
     return (
         <Paper
-            elevation={3}
+            elevation={0}
             component={motion.div}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            sx={{ p: 4, borderRadius: 3, overflow: 'hidden' }}
+            sx={{
+                p: 4,
+                borderRadius: 4,
+                overflow: 'hidden',
+                background: isDark ? 'rgba(16, 33, 65, 0.6)' : 'rgba(255, 255, 255, 0.6)',
+                backdropFilter: 'blur(20px)',
+                border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)'}`,
+                boxShadow: isDark ? '0 20px 40px rgba(0,0,0,0.2)' : '0 20px 40px rgba(0,0,0,0.05)'
+            }}
         >
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Box>
@@ -109,7 +120,11 @@ const RealDataVerifier = () => {
                             size="small"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            sx={{ bgcolor: 'white' }}
+                            sx={{
+                                '& .MuiOutlinedInput-root': {
+                                    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.03)'
+                                }
+                            }}
                         />
                     </Box>
 
@@ -119,8 +134,9 @@ const RealDataVerifier = () => {
                             height: '500px',
                             overflow: 'auto',
                             p: 2,
-                            bgcolor: '#fafafa',
-                            borderColor: '#eee'
+                            bgcolor: isDark ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.02)',
+                            borderColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
+                            borderRadius: 2
                         }}
                     >
                         {loadingNetwork ? (
@@ -163,11 +179,13 @@ const RealDataVerifier = () => {
                             overflow: 'hidden',
                             display: 'flex',
                             flexDirection: 'column',
-                            borderColor: '#eee'
+                            bgcolor: isDark ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.02)',
+                            borderColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
+                            borderRadius: 2
                         }}
                     >
-                        <Box sx={{ p: 2, bgcolor: '#f5f5f5', borderBottom: '1px solid #eee' }}>
-                            <Typography variant="h6" color="text.primary">
+                        <Box sx={{ p: 2, bgcolor: isDark ? 'rgba(0, 229, 255, 0.05)' : 'rgba(0, 105, 92, 0.05)', borderBottom: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'}` }}>
+                            <Typography variant="h6" color="primary" sx={{ fontWeight: 600 }}>
                                 {selectedProtein ? `Targets for ${selectedProtein}` : "Select a Protein"}
                             </Typography>
                             <Typography variant="caption" color="text.secondary">
@@ -203,7 +221,18 @@ const RealDataVerifier = () => {
                                                         initial={{ opacity: 0, x: 10 }}
                                                         animate={{ opacity: 1, x: 0 }}
                                                         transition={{ delay: i * 0.05 }}
-                                                        sx={{ mb: 1.5, border: '1px solid #eee', p: 1, borderRadius: 2 }}
+                                                        sx={{
+                                                            mb: 1.5,
+                                                            border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'}`,
+                                                            bgcolor: isDark ? 'rgba(255, 255, 255, 0.02)' : 'rgba(0, 0, 0, 0.02)',
+                                                            p: 2,
+                                                            borderRadius: 2,
+                                                            transition: 'all 0.2s',
+                                                            '&:hover': {
+                                                                bgcolor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
+                                                                borderColor: isDark ? 'rgba(0, 229, 255, 0.3)' : 'rgba(0, 105, 92, 0.3)'
+                                                            }
+                                                        }}
                                                     >
                                                         <ListItem disablePadding>
                                                             <ListItemText
