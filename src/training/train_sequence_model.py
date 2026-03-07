@@ -28,8 +28,8 @@ def train(epochs: int = 10, batch_size: int = 32, lr: float = 1e-3, embedding_pa
     # ── Load Embeddings ──────────────────────────────────────────────────
     if embedding_path and os.path.exists(embedding_path):
         embeddings = torch.load(embedding_path, weights_only=False)
-        # Convert float16 embeddings to float32 for model compatibility
-        embeddings = {k: v.float() if v.dtype == torch.float16 else v for k, v in embeddings.items()}
+        # Keep embeddings in their native dtype (float16) to save ~7.5 GB RAM
+        # Conversion to float32 happens per-sample in the Dataset's __getitem__
     else:
         print("No embedding file provided/found. Cannot proceed without embeddings.")
         return
@@ -42,10 +42,10 @@ def train(epochs: int = 10, batch_size: int = 32, lr: float = 1e-3, embedding_pa
         train_dataset,
         batch_size=batch_size,
         shuffle=True,
-        num_workers=2,        # reduced for stability on Windows
+        num_workers=0,        # 0 to prevent workers from duplicating 15GB embeddings in RAM
         pin_memory=True
     )
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=0)
 
     print(f"Dataset: {len(train_dataset)} train / {len(val_dataset)} val samples")
     print(f"Batch size: {batch_size} | Total train batches/epoch: {len(train_loader)}")

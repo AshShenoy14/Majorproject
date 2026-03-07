@@ -128,8 +128,8 @@ async def predict_interaction(pair: ProteinPair):
 
         # 2. Get Embeddings
         embs = models["esm"].get_embeddings(sequences, batch_size=2)
-        e1 = embs[p1].unsqueeze(0).to(models["esm"].device)
-        e2 = embs[p2].unsqueeze(0).to(models["esm"].device)
+        e1 = embs[p1].unsqueeze(0).to(models["esm"].device).float()
+        e2 = embs[p2].unsqueeze(0).to(models["esm"].device).float()
         
         # 3. Sequence Prediction
         with torch.no_grad():
