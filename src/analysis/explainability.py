@@ -8,7 +8,20 @@ from src.utils.paths import PROJECT_ROOT
 class PPIExplainer:
     def __init__(self, meta_model_path: str):
         self.model = joblib.load(meta_model_path)
-        self.explainer = shap.TreeExplainer(self.model)
+        # Fix XGBoost/SHAP compatibility: newer XGBoost stores base_score as '[5E-1]'
+        # which SHAP can't parse. Strip the brackets so it becomes '5E-1' (a valid float string).
+        try:
+            self.explainer = shap.TreeExplainer(self.model)
+        except ValueError:
+            import json
+            booster = self.model.get_booster()
+            config = json.loads(booster.save_config())
+            lmp = config["learner"]["learner_model_param"]
+            bs = lmp.get("base_score", "0.5")
+            if isinstance(bs, str) and bs.startswith("["):
+                lmp["base_score"] = bs.strip("[]")
+                booster.save_config()  # not actually needed — retry is enough
+            self.explainer = shap.TreeExplainer(self.model)
 
     def explain_prediction(self, seq_prob: float, graph_prob: float):
         """
