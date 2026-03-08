@@ -295,7 +295,7 @@ If you use this repository in research:
 ```
 @project{transgraph_ppi,
   title={TransGraph-PPI: Hybrid Ensemble Framework for Protein Interaction Prediction},
-  author={Ashwini Shenoy},
+  author={Ashwini Shenoy B,Basil S},
   year={2026}
 }
 ```
@@ -305,6 +305,8 @@ If you use this repository in research:
 # Contributors
 
 **Ashwini Shenoy B**  
-Project Lead / Developer  
+**Basil S**
+
 
 Major Project — Deep Learning for Bioinformatics
+
