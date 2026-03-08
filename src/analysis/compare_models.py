@@ -83,8 +83,9 @@ def evaluate_models():
     graph_model_path = PROJECT_ROOT / "models" / "graph_model_best.pth"
     ensemble_path = PROJECT_ROOT / "models" / "ensemble_model.pkl"
 
-    sample_emb = next(iter(embeddings.values()))
-    seq_model = SequencePPIModel(input_dim=sample_emb.shape[0]).to(device)
+    # Use hardcoded input_dim=320 to match the trained checkpoint (esm2_t6_8M_UR50D)
+    input_dim = 320
+    seq_model = SequencePPIModel(input_dim=input_dim).to(device)
     if seq_path.exists():
          seq_model.load_state_dict(torch.load(seq_path, map_location=device))
     seq_model.eval()
@@ -108,8 +109,11 @@ def evaluate_models():
 
     for _, row in filtered_df.iterrows():
         p1, p2, label = row["protein1"], row["protein2"], row["label"]
-        batch_emb1.append(embeddings[p1])
-        batch_emb2.append(embeddings[p2])
+        # Mean-pool per-residue embeddings to fixed-size vectors (like train_ensemble.py)
+        e1 = embeddings[p1]
+        e2 = embeddings[p2]
+        batch_emb1.append(e1.mean(dim=0) if e1.dim() > 1 else e1)
+        batch_emb2.append(e2.mean(dim=0) if e2.dim() > 1 else e2)
         g_src.append(node_mapping[p1])
         g_dst.append(node_mapping[p2])
         labels.append(label)
@@ -128,7 +132,9 @@ def evaluate_models():
             e1 = batch_emb1[i:i+batch_size].to(device)
             e2 = batch_emb2[i:i+batch_size].to(device)
             out = seq_model(e1, e2)
-            seq_preds.extend(out.cpu().numpy().flatten())
+            # Apply sigmoid to raw logits (model no longer has built-in Sigmoid)
+            probs = torch.sigmoid(out)
+            seq_preds.extend(probs.cpu().numpy().flatten())
     seq_preds = np.array(seq_preds)
 
     # Predict Graph — apply sigmoid to raw logits

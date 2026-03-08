@@ -97,9 +97,11 @@ def train_ensemble(seq_model_path, graph_model_path, graph_data_path):
     for _, row in tqdm(filtered_df.iterrows(), total=len(filtered_df), desc="Aligning Data"):
         p1, p2, label = row["protein1"], row["protein2"], row["label"]
         
-        # Seq components
-        batch_emb1.append(embeddings[p1])
-        batch_emb2.append(embeddings[p2])
+        # Seq components — mean-pool per-residue embeddings to fixed-size vectors
+        e1 = embeddings[p1]
+        e2 = embeddings[p2]
+        batch_emb1.append(e1.mean(dim=0) if e1.dim() > 1 else e1)
+        batch_emb2.append(e2.mean(dim=0) if e2.dim() > 1 else e2)
         
         # Graph components
         g_src.append(node_mapping[p1])
@@ -119,7 +121,9 @@ def train_ensemble(seq_model_path, graph_model_path, graph_data_path):
             e1 = batch_emb1[i:i+batch_size].to(device)
             e2 = batch_emb2[i:i+batch_size].to(device)
             out = seq_model(e1, e2)
-            final_seq_preds.extend(out.cpu().numpy().flatten())
+            # Apply sigmoid to raw logits (model no longer has built-in Sigmoid)
+            probs = torch.sigmoid(out)
+            final_seq_preds.extend(probs.cpu().numpy().flatten())
             
     # Run Graph Model — apply sigmoid to raw logits
     print("Predicting with Graph Model...")

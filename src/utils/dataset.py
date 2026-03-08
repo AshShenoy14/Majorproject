@@ -14,7 +14,6 @@ class PPIDataset(Dataset):
         self.embeddings = embeddings
         
         # Filter out pairs where embeddings are missing
-        # In a real scenario, we should handle this earlier or ensure completeness.
         valid_indices = []
         for idx, row in self.df.iterrows():
             if row["protein1"] in self.embeddings and row["protein2"] in self.embeddings:
@@ -36,5 +35,11 @@ class PPIDataset(Dataset):
         # Convert to float32 on-the-fly (embeddings may be stored as float16 to save RAM)
         emb1 = self.embeddings[p1].float()
         emb2 = self.embeddings[p2].float()
+        
+        # Mean-pool per-residue embeddings to fixed-size vectors
+        if emb1.dim() > 1:
+            emb1 = emb1.mean(dim=0)
+        if emb2.dim() > 1:
+            emb2 = emb2.mean(dim=0)
         
         return emb1, emb2, torch.tensor(label, dtype=torch.float32)
