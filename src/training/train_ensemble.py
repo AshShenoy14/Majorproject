@@ -13,6 +13,9 @@ from src.models.graph_model import GATLinkPredictor
 from src.models.ensemble_model import PPIEnsemble
 from src.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT
 
+import matplotlib.pyplot as plt
+from sklearn.metrics import roc_curve, auc, precision_recall_curve, average_precision_score
+
 def train_ensemble(seq_model_path, graph_model_path, graph_data_path):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(f"Training using {device}...")
@@ -151,10 +154,77 @@ def train_ensemble(seq_model_path, graph_model_path, graph_data_path):
     ensemble = PPIEnsemble()
     ensemble.train_stacking(seq_preds_np, graph_preds_np, val_labels_np)
     
+    # Generate Ensemble Predictions
+    ensemble_preds = ensemble.predict(seq_preds_np, graph_preds_np, method="stacking")
+    
     # Save
     out_path = PROJECT_ROOT / "models" / "ensemble_model.pkl"
     ensemble.save(out_path)
     print("Ensemble training complete.")
+    
+    # 4. Generate ROC-AUC and Precision-Recall Curves
+    print("Generating ROC-AUC and Precision-Recall Curves...")
+    assets_dir = PROJECT_ROOT / "assets"
+    os.makedirs(assets_dir, exist_ok=True)
+    
+    # --- ROC Curve ---
+    plt.figure(figsize=(8, 6))
+    
+    # Sequence Model ROC
+    fpr_seq, tpr_seq, _ = roc_curve(val_labels_np, seq_preds_np)
+    roc_auc_seq = auc(fpr_seq, tpr_seq)
+    plt.plot(fpr_seq, tpr_seq, color='blue', lw=2, label=f'Sequence Model (AUC = {roc_auc_seq:.3f})')
+    
+    # Graph Model ROC
+    fpr_graph, tpr_graph, _ = roc_curve(val_labels_np, graph_preds_np)
+    roc_auc_graph = auc(fpr_graph, tpr_graph)
+    plt.plot(fpr_graph, tpr_graph, color='green', lw=2, label=f'Graph Model (AUC = {roc_auc_graph:.3f})')
+    
+    # Ensemble Model ROC
+    fpr_ens, tpr_ens, _ = roc_curve(val_labels_np, ensemble_preds)
+    roc_auc_ens = auc(fpr_ens, tpr_ens)
+    plt.plot(fpr_ens, tpr_ens, color='red', lw=2, label=f'Ensemble Model (AUC = {roc_auc_ens:.3f})')
+    
+    plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Receiver Operating Characteristic (ROC) Curve')
+    plt.legend(loc="lower right")
+    
+    roc_path = assets_dir / 'roc_curve.png'
+    plt.savefig(roc_path)
+    plt.close()
+    print(f"ROC Curve saved to {roc_path}")
+    
+    # --- Precision-Recall Curve ---
+    plt.figure(figsize=(8, 6))
+    
+    # Sequence Model PR
+    precision_seq, recall_seq, _ = precision_recall_curve(val_labels_np, seq_preds_np)
+    ap_seq = average_precision_score(val_labels_np, seq_preds_np)
+    plt.plot(recall_seq, precision_seq, color='blue', lw=2, label=f'Sequence Model (AP = {ap_seq:.3f})')
+    
+    # Graph Model PR
+    precision_graph, recall_graph, _ = precision_recall_curve(val_labels_np, graph_preds_np)
+    ap_graph = average_precision_score(val_labels_np, graph_preds_np)
+    plt.plot(recall_graph, precision_graph, color='green', lw=2, label=f'Graph Model (AP = {ap_graph:.3f})')
+    
+    # Ensemble Model PR
+    precision_ens, recall_ens, _ = precision_recall_curve(val_labels_np, ensemble_preds)
+    ap_ens = average_precision_score(val_labels_np, ensemble_preds)
+    plt.plot(recall_ens, precision_ens, color='red', lw=2, label=f'Ensemble Model (AP = {ap_ens:.3f})')
+    
+    plt.xlabel('Recall')
+    plt.ylabel('Precision')
+    plt.title('Precision-Recall Curve')
+    plt.legend(loc="lower left")
+    
+    pr_path = assets_dir / 'pr_curve.png'
+    plt.savefig(pr_path)
+    plt.close()
+    print(f"Precision-Recall Curve saved to {pr_path}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
