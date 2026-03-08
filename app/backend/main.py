@@ -1,16 +1,19 @@
+import sys
+import os
+from pathlib import Path
+
+# Add project root and configure environments BEFORE importing heavy ML libraries
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
+from src.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import torch
 import numpy as np
-import sys
-import os
 import pandas as pd
 import joblib
 from typing import List
-
-# Add project root
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
 from src.models.sequence_model import SequencePPIModel
 from src.models.graph_model import GATLinkPredictor
@@ -21,8 +24,6 @@ from src.data.target_manager import TargetManager
 from src.analysis.explainability import PPIExplainer
 from src.analysis.network_analysis import NetworkAnalyzer
 from app.backend.schemas import ProteinPair, PredictionResponse, NetworkResponse, BatchPredictionRequest
-
-from src.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT
 
 app = FastAPI(title="TransGraph-PPI API", description="Hybrid Ensemble PPI Prediction System with Real Data")
 

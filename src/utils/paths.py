@@ -4,6 +4,11 @@ from pathlib import Path
 # Project Root
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
+# Configure environment variables to use E: drive (project directory) for heavy caching
+import os
+os.environ["HF_HOME"] = str(PROJECT_ROOT / ".cache" / "huggingface")
+os.environ["TORCH_HOME"] = str(PROJECT_ROOT / ".cache" / "torch")
+
 # Data Directories
 DATA_DIR = PROJECT_ROOT / "data"
 RAW_DATA_DIR = DATA_DIR / "raw"
