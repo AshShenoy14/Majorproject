@@ -16,15 +16,15 @@ class PPIExplainer:
             print(f"Warning: SHAP initialization failed due to XGBoost compatibility issue: {e}")
             self.explainer = None
 
-    def explain_prediction(self, seq_prob: float, graph_prob: float):
+    def explain_prediction(self, seq_prob: float, graph_prob: float, conf_seq: float = 0.0, conf_graph: float = 0.0):
         """
         Explains a single prediction made by the ensemble.
         """
         if self.explainer is None:
-            return np.array([[0.0, 0.0]])
+            return np.array([[0.0, 0.0, 0.0, 0.0]])
             
         # SHAP expects a matrix
-        X = np.array([[seq_prob, graph_prob]])
+        X = np.array([[seq_prob, graph_prob, conf_seq, conf_graph]])
         shap_values = self.explainer.shap_values(X)
         
         # Plotting
@@ -41,7 +41,7 @@ class PPIExplainer:
              
         return shap_values
 
-    def save_summary_plot(self, X: np.ndarray, feature_names=["ESM-MLP", "GAT"], title="SHAP Summary Plot", output_path="shap_summary.png"):
+    def save_summary_plot(self, X: np.ndarray, feature_names=["ESM-MLP", "GAT", "|ESM-0.5|", "|GAT-0.5|"], title="SHAP Summary Plot", output_path="shap_summary.png"):
         """
         Generates and saves a SHAP summary plot for a batch of predictions.
         """
