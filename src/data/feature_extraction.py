@@ -39,12 +39,11 @@ class ESMFeatureExtractor:
             
             with torch.no_grad():
                 outputs = self.model(**inputs)
-                # Use the representation of the [CLS] token (index 0)
-                # Or mean pooling over the sequence length?
-                # ESM-2 embeddings are usually taken from the last hidden state.
-                # Common practice: Mean pooling excluding padding, or just CLS.
-                # Let's use BOS token (index 0) as sequence representation.
-                batch_embeddings = outputs.last_hidden_state[:, 0, :]
+                # Mean pooling over the sequence length, accounting for padding
+                attention_mask = inputs["attention_mask"].unsqueeze(-1)
+                sum_embeddings = torch.sum(outputs.last_hidden_state * attention_mask, dim=1)
+                sum_mask = torch.clamp(attention_mask.sum(dim=1), min=1e-9)
+                batch_embeddings = sum_embeddings / sum_mask
                 
             for pid, emb in zip(batch_ids, batch_embeddings):
                 embeddings[pid] = emb.cpu().half()

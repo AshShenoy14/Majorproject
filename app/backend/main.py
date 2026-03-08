@@ -156,7 +156,11 @@ async def predict_interaction(pair: ProteinPair):
         
         # 5. Ensemble Prediction
         if models["ensemble"].meta_model:
-            final_prob = models["ensemble"].meta_model.predict_proba(np.array([[seq_prob, graph_prob]]))[0, 1]
+            # Replicate PPIEnsemble._build_features logic for the single sample
+            conf_seq = abs(seq_prob - 0.5)
+            conf_graph = abs(graph_prob - 0.5)
+            X_input = np.array([[seq_prob, graph_prob, conf_seq, conf_graph]])
+            final_prob = models["ensemble"].meta_model.predict_proba(X_input)[0, 1]
         else:
             final_prob = (seq_prob + graph_prob) / 2
         
@@ -164,12 +168,17 @@ async def predict_interaction(pair: ProteinPair):
         explanation = {
             "Sequence_Model_Contribution": seq_prob,
             "Graph_Model_Contribution": graph_prob,
+            "Sequence_Confidence": conf_seq,
+            "Graph_Confidence": conf_graph,
         }
         
         if "explainer" in models:
-            shap_vals = models["explainer"].explain_prediction(seq_prob, graph_prob)
+            shap_vals = models["explainer"].explain_prediction(seq_prob, graph_prob, conf_seq, conf_graph)
+            # shap_vals[0] will have 4 elements corresponding to the 4 features
             explanation["SHAP_Sequence"] = float(shap_vals[0][0])
             explanation["SHAP_Graph"] = float(shap_vals[0][1])
+            explanation["SHAP_Seq_Conf"] = float(shap_vals[0][2])
+            explanation["SHAP_Graph_Conf"] = float(shap_vals[0][3])
 
         return {
             "interaction_probability": float(final_prob),
