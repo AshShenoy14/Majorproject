@@ -40,10 +40,9 @@ class ESMFeatureExtractor:
             with torch.no_grad():
                 outputs = self.model(**inputs)
                 # Mean pooling over the sequence length, accounting for padding
-                attention_mask = inputs["attention_mask"].unsqueeze(-1)
-                sum_embeddings = torch.sum(outputs.last_hidden_state * attention_mask, dim=1)
-                sum_mask = torch.clamp(attention_mask.sum(dim=1), min=1e-9)
-                batch_embeddings = sum_embeddings / sum_mask
+                # Use simple mean pooling over the sequence dimension
+                # to match how PPIDataset processes the pre-computed embeddings
+                batch_embeddings = outputs.last_hidden_state.mean(dim=1)
                 
             for pid, emb in zip(batch_ids, batch_embeddings):
                 embeddings[pid] = emb.cpu().half()
