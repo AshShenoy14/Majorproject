@@ -1,3 +1,6 @@
+<p align="center">
+  <img src="assets/banner_mp.png" alt="TransGraph-PPI Banner" width="100%">
+</p>
 # TransGraph-PPI  
 ### Hybrid Deep Learning Framework for Protein–Protein Interaction Prediction
 
