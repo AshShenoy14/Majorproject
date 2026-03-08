@@ -15,9 +15,13 @@ from src.utils.dataset import PPIDataset
 from src.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT, CHECKPOINT_DIR, MODELS_DIR
 
 
-def train(epochs: int = 10, batch_size: int = 32, lr: float = 1e-3, embedding_path: str = None):
+def train(epochs: int = 30, batch_size: int = 64, lr: float = 1e-3, embedding_path: str = None):
     """
-    Train the Sequence PPI Model with checkpoint-based resume and best-model saving.
+    Train the Sequence PPI Model with advanced techniques:
+    - BCEWithLogitsLoss (numerically stable)
+    - CosineAnnealingLR scheduler
+    - Weight decay & gradient clipping
+    - Early stopping (patience=5)
 
     Checkpoint saved to: checkpoints/sequence_checkpoint.pt  (overwritten each epoch)
     Best model saved to: models/sequence_model_best.pth      (lowest validation loss)
@@ -51,25 +55,31 @@ def train(epochs: int = 10, batch_size: int = 32, lr: float = 1e-3, embedding_pa
     print(f"Batch size: {batch_size} | Total train batches/epoch: {len(train_loader)}")
 
     # ── Model, Optimizer, Loss ───────────────────────────────────────────
-    sample_emb = next(iter(embeddings.values()))
-    input_dim = sample_emb.shape[0]
+    # Use hardcoded input_dim=320 for esm2_t6_8M_UR50D embeddings (after mean-pooling)
+    input_dim = 320
 
     model     = SequencePPIModel(input_dim=input_dim).to(device)
-    optimizer = optim.Adam(model.parameters(), lr=lr)
-    criterion = nn.BCELoss()
+    optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=1e-4)
+    # BCEWithLogitsLoss combines sigmoid + BCE for numerical stability
+    criterion = nn.BCEWithLogitsLoss()
+    # Cosine annealing scheduler for smooth LR decay
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-5)
 
     # ── Resume from checkpoint if it exists ──────────────────────────────
     checkpoint_path = CHECKPOINT_DIR / "sequence_checkpoint.pt"
     start_epoch     = 0
     best_val_loss   = float("inf")
+    patience        = 7
+    epochs_no_improve = 0
 
     if checkpoint_path.exists():
         print(f"Resuming from checkpoint: {checkpoint_path}")
         checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
         model.load_state_dict(checkpoint["model_state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-        start_epoch   = checkpoint["epoch"] + 1          # start from next epoch
-        best_val_loss = checkpoint.get("best_val_loss", float("inf"))
+        start_epoch       = checkpoint["epoch"] + 1          # start from next epoch
+        best_val_loss     = checkpoint.get("best_val_loss", float("inf"))
+        epochs_no_improve = checkpoint.get("epochs_no_improve", 0)
         print(f"  Resumed at epoch {start_epoch}/{epochs} | Best val loss so far: {best_val_loss:.4f}")
     else:
         print("No checkpoint found — starting fresh training.")
@@ -99,6 +109,8 @@ def train(epochs: int = 10, batch_size: int = 32, lr: float = 1e-3, embedding_pa
             outputs = model(emb1, emb2)
             loss = criterion(outputs, labels)
             loss.backward()
+            # Gradient clipping for training stability
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
 
             train_loss += loss.item()
@@ -119,19 +131,25 @@ def train(epochs: int = 10, batch_size: int = 32, lr: float = 1e-3, embedding_pa
                 loss = criterion(outputs, labels)
                 val_loss += loss.item()
 
-                predicted = (outputs > 0.5).float()
+                # Apply sigmoid for accuracy calculation (model outputs raw logits)
+                predicted = (torch.sigmoid(outputs) > 0.5).float()
                 val_total   += labels.size(0)
                 val_correct += (predicted == labels).sum().item()
 
         avg_val_loss = val_loss / len(val_loader) if len(val_loader) > 0 else 0.0
         val_acc      = val_correct / val_total if val_total > 0 else 0.0
 
+        # Step LR scheduler
+        scheduler.step()
+
         # --- Epoch summary ---
+        current_lr = optimizer.param_groups[0]['lr']
         print(
             f"Epoch [{epoch+1}/{epochs}] | "
             f"Train Loss: {avg_train_loss:.4f} | "
             f"Val Loss: {avg_val_loss:.4f} | "
             f"Val Acc: {val_acc:.4f} | "
+            f"LR: {current_lr:.6f} | "
             f"Best Val Loss: {best_val_loss:.4f}"
         )
         print(f"  Progress: {epoch+1}/{epochs} epochs done "
@@ -140,8 +158,12 @@ def train(epochs: int = 10, batch_size: int = 32, lr: float = 1e-3, embedding_pa
         # --- Save best model if validation loss improved ---
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
+            epochs_no_improve = 0
             torch.save(model.state_dict(), best_model_path)
             print(f"  ✓ New best model saved → {best_model_path}")
+        else:
+            epochs_no_improve += 1
+            print(f"  No improvement for {epochs_no_improve}/{patience} epochs.")
 
         # --- Save checkpoint (overwrite each epoch) ---
         torch.save({
@@ -150,16 +172,22 @@ def train(epochs: int = 10, batch_size: int = 32, lr: float = 1e-3, embedding_pa
             "optimizer_state_dict": optimizer.state_dict(),
             "train_loss": avg_train_loss,
             "best_val_loss": best_val_loss,
+            "epochs_no_improve": epochs_no_improve,
         }, checkpoint_path)
         print(f"  ✓ Checkpoint saved → {checkpoint_path}")
+
+        # --- Early stopping ---
+        if epochs_no_improve >= patience:
+            print(f"\n  ✗ Early stopping triggered after {patience} epochs without improvement.")
+            break
 
     print(f"\nSequence Model training complete. Best val loss: {best_val_loss:.4f}")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--epochs", type=int, default=10)
-    parser.add_argument("--batch_size", type=int, default=32)
+    parser.add_argument("--epochs", type=int, default=30)
+    parser.add_argument("--batch_size", type=int, default=64)
     parser.add_argument("--lr", type=float, default=1e-3)
     parser.add_argument("--embedding_path", type=str, required=True,
                         help="Path to dictionary of protein embeddings (.pt)")

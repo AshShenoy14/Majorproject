@@ -67,9 +67,11 @@ def train(epochs: int = 100, lr: float = 0.005, graph_path: str = None):
     # ── Model, Optimizer, Loss ───────────────────────────────────────────
     # Model — increased capacity: hidden=128, heads=8
     model = GATLinkPredictor(in_channels=data.x.shape[1], hidden_channels=128, heads=8).to(device)
-    optimizer = optim.Adam(model.parameters(), lr=lr)
+    optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=1e-4)
     # BCEWithLogitsLoss for better gradient stability (model outputs raw logits)
     criterion = nn.BCEWithLogitsLoss()
+    # Cosine annealing scheduler for smooth LR decay
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-5)
 
     # ── Resume from checkpoint if it exists ──────────────────────────────
     checkpoint_path = CHECKPOINT_DIR / "graph_checkpoint.pt"
@@ -103,6 +105,7 @@ def train(epochs: int = 100, lr: float = 0.005, graph_path: str = None):
         outputs = model(data.x, data.edge_index, train_edge_label_index)
         loss    = criterion(outputs.squeeze(), train_labels)
         loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimizer.step()
 
         train_loss = loss.item()
@@ -117,6 +120,9 @@ def train(epochs: int = 100, lr: float = 0.005, graph_path: str = None):
             val_probs   = torch.sigmoid(val_outputs.squeeze())
             val_preds   = (val_probs > 0.5).float()
             val_acc     = (val_preds == val_labels).sum().item() / val_labels.size(0)
+
+        # Step LR scheduler
+        scheduler.step()
 
         # --- Epoch summary ---
         print(
