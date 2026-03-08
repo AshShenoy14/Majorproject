@@ -5,6 +5,7 @@ import numpy as np
 from typing import Dict, Tuple
 import sys
 import os
+import gc
 
 # Add project root to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
@@ -45,9 +46,9 @@ def construct_graph(interactions_df: pd.DataFrame, embeddings: Dict[str, torch.T
     emb_dim = embeddings[valid_proteins[0]].shape[0]
     num_nodes = len(valid_proteins)
     
-    x = torch.zeros((num_nodes, emb_dim))
+    x = torch.empty((num_nodes, emb_dim), dtype=torch.float32)
     for p, i in node_mapping.items():
-        x[i] = embeddings[p]
+        x[i] = embeddings[p].float()
         
     # 3. Create Edge Index
     # Filter interactions where both proteins have embeddings
@@ -75,6 +76,8 @@ if __name__ == "__main__":
         sys.exit(1)
         
     embeddings = torch.load(emb_path, weights_only=False)
+    # Convert float16 embeddings to float32 for graph construction compatibility
+    embeddings = {k: v.float() if v.dtype == torch.float16 else v for k, v in embeddings.items()}
     
     # 2. Identify All Nodes (Train + Val + Test) to ensure consistent mapping
     print("Identifying all nodes...")
@@ -87,9 +90,9 @@ if __name__ == "__main__":
     # 4. Create Node Features
     emb_dim = embeddings[valid_proteins[0]].shape[0]
     num_nodes = len(valid_proteins)
-    x = torch.zeros((num_nodes, emb_dim))
+    x = torch.empty((num_nodes, emb_dim), dtype=torch.float32)
     for p, i in node_mapping.items():
-        x[i] = embeddings[p]
+        x[i] = embeddings[p].float()
         
     # 5. Load Training Edges ONLY
     train_df = pd.read_csv(PROCESSED_DATA_DIR / "train.csv")
@@ -109,6 +112,10 @@ if __name__ == "__main__":
     
     data = Data(x=x, edge_index=edge_index)
     print(f"Graph constructed: {data.num_nodes} nodes, {data.num_edges} edges.")
+    
+    # Clean up embeddings to free memory
+    del embeddings
+    gc.collect()
     
     # 6. Save Graph and Mapping
     torch.save(data, PROCESSED_DATA_DIR / "ppi_graph.pt")

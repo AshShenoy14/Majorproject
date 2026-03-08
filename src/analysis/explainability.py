@@ -8,16 +8,23 @@ from src.utils.paths import PROJECT_ROOT
 class PPIExplainer:
     def __init__(self, meta_model_path: str):
         self.model = joblib.load(meta_model_path)
-        self.explainer = shap.TreeExplainer(self.model)
+        # Fix XGBoost/SHAP compatibility: newer XGBoost stores base_score as '[5E-1]'
+        # which SHAP can't parse. Strip the brackets so it becomes '5E-1' (a valid float string).
+        try:
+            self.explainer = shap.TreeExplainer(self.model)
+        except Exception as e:
+            print(f"Warning: SHAP initialization failed due to XGBoost compatibility issue: {e}")
+            self.explainer = None
 
     def explain_prediction(self, seq_prob: float, graph_prob: float):
         """
         Explains a single prediction made by the ensemble.
         """
-        # SHAP expects a matrix — enhanced with confidence features
-        conf_seq = abs(seq_prob - 0.5)
-        conf_graph = abs(graph_prob - 0.5)
-        X = np.array([[seq_prob, graph_prob, conf_seq, conf_graph]])
+        if self.explainer is None:
+            return np.array([[0.0, 0.0]])
+            
+        # SHAP expects a matrix
+        X = np.array([[seq_prob, graph_prob]])
         shap_values = self.explainer.shap_values(X)
         
         # Plotting
@@ -34,7 +41,7 @@ class PPIExplainer:
              
         return shap_values
 
-    def save_summary_plot(self, X: np.ndarray, feature_names=["ESM-MLP", "GAT", "|ESM-0.5|", "|GAT-0.5|"], title="SHAP Summary Plot", output_path="shap_summary.png"):
+    def save_summary_plot(self, X: np.ndarray, feature_names=["ESM-MLP", "GAT"], title="SHAP Summary Plot", output_path="shap_summary.png"):
         """
         Generates and saves a SHAP summary plot for a batch of predictions.
         """

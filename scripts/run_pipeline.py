@@ -3,6 +3,7 @@ import os
 import torch
 import pandas as pd
 import argparse
+import gc
 from tqdm import tqdm
 
 # Add project root
@@ -56,11 +57,14 @@ def run_pipeline(limit_data: int = None):
         print("Embeddings file exists. Checking coverage...")
         try:
             loaded_embeddings = torch.load(emb_path, weights_only=False)
+            # Keep embeddings in float16 to save RAM — conversion done per-sample during training
             loaded_keys = set(loaded_embeddings.keys())
             missing_count = len(proteins - loaded_keys)
             
             if missing_count > len(proteins) * 0.1: # If more than 10% missing
                 print(f"Embedding coverage low. Missing {missing_count} proteins. Regenerating...")
+                # Delete old file before regenerating
+                os.remove(emb_path)
                 requires_extraction = True
             else:
                  print(f"Embedding coverage sufficient. Skipping extraction.")
@@ -68,6 +72,9 @@ def run_pipeline(limit_data: int = None):
                  requires_extraction = False
         except Exception as e:
             print(f"Error loading embeddings: {e}. Regenerating...")
+            # Delete corrupted file
+            if emb_path.exists():
+                os.remove(emb_path)
             requires_extraction = True
             
     if requires_extraction:
@@ -77,7 +84,7 @@ def run_pipeline(limit_data: int = None):
         device = "cuda" if torch.cuda.is_available() else "cpu"
         # Increased batch size for speed
         extractor = ESMFeatureExtractor(device=device)
-        embeddings = extractor.get_embeddings(valid_sequences, batch_size=32)
+        embeddings = extractor.get_embeddings(valid_sequences, batch_size=8)
         
         if not limit_data:
             print("Saving embeddings to file...")
@@ -106,19 +113,32 @@ def run_pipeline(limit_data: int = None):
             
     edge_index = torch.tensor([src, dst], dtype=torch.long)
     
-    # Node Features
-    x = torch.stack([embeddings[p] for p in valid_proteins])
+    # Node Features (float32 for model compatibility)
+    embedding_dim = next(iter(embeddings.values())).shape[0]
+    x = torch.empty(len(valid_proteins), embedding_dim, dtype=torch.float32)
+
+    for i, p in enumerate(valid_proteins):
+        x[i] = embeddings[p].float()
     
     data = Data(x=x, edge_index=edge_index)
     
     graph_path = PROCESSED_DATA_DIR / "ppi_graph.pt"
     mapping_path = PROCESSED_DATA_DIR / "ppi_graph_mapping.pt"
     
-    if not limit_data:
+    # Save temp files before deleting embeddings (for limit_data case)
+    if limit_data:
+        temp_emb_path = PROCESSED_DATA_DIR / "temp_embeddings.pt"
+        torch.save(embeddings, temp_emb_path)
+        temp_graph_path = PROCESSED_DATA_DIR / "temp_graph.pt"
+        torch.save(data, temp_graph_path)
+        torch.save(node_mapping, str(temp_graph_path).replace(".pt", "_mapping.pt"))
+    else:
         torch.save(data, graph_path)
         torch.save(node_mapping, mapping_path)
-        
-    # 5. Train Models
+    
+    # Always clean up embeddings after graph is built and saved to free memory
+    del embeddings
+    gc.collect()
     print("--- Training Models ---")
     
     # Paths
@@ -137,22 +157,18 @@ def run_pipeline(limit_data: int = None):
     # Just save it temporarily if limit_data
     if limit_data:
         temp_emb_path = PROCESSED_DATA_DIR / "temp_embeddings.pt"
-        torch.save(embeddings, temp_emb_path)
         train_seq(epochs=2, embedding_path=str(temp_emb_path))
     else:
-        train_seq(epochs=5, embedding_path=str(emb_path))
+        train_seq(epochs=50, embedding_path=str(emb_path))
         
     # Train Graph Model
     print("Training Graph Model...")
     if limit_data:
         temp_graph_path = PROCESSED_DATA_DIR / "temp_graph.pt"
-        torch.save(data, temp_graph_path)
-        # We need mapping for graph training logic?
-        # Graph training script expects mapping file
-        torch.save(node_mapping, str(temp_graph_path).replace(".pt", "_mapping.pt"))
+        # Graph training script expects mapping file next to graph
         train_graph(epochs=10, graph_path=str(temp_graph_path))
     else:
-        train_graph(epochs=20, graph_path=str(graph_path))
+        train_graph(epochs=100, graph_path=str(graph_path))
         
     # Train Ensemble
     print("Training Ensemble...")

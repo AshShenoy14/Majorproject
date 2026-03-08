@@ -33,7 +33,8 @@ class PPIDataset(Dataset):
         p2 = row["protein2"]
         label = row["label"]
         
-        emb1 = self.embeddings[p1]
-        emb2 = self.embeddings[p2]
+        # Convert to float32 on-the-fly (embeddings may be stored as float16 to save RAM)
+        emb1 = self.embeddings[p1].float()
+        emb2 = self.embeddings[p2].float()
         
         return emb1, emb2, torch.tensor(label, dtype=torch.float32)

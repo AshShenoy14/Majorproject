@@ -21,7 +21,7 @@ class ESMFeatureExtractor:
         self.model = AutoModel.from_pretrained(model_name).to(device)
         self.model.eval()
 
-    def get_embeddings(self, sequences: Dict[str, str], batch_size: int = 16) -> Dict[str, torch.Tensor]:
+    def get_embeddings(self, sequences: Dict[str, str], batch_size: int = 8) -> Dict[str, torch.Tensor]:
         """
         Generates embeddings for a dictionary of sequences.
         Returns a dictionary mapping ProteinID -> Embedding Tensor.
@@ -34,7 +34,7 @@ class ESMFeatureExtractor:
             batch_ids = ids[i:i+batch_size]
             batch_seqs = seqs[i:i+batch_size]
             
-            inputs = self.tokenizer(batch_seqs, return_tensors="pt", padding=True, truncation=True, max_length=1024)
+            inputs = self.tokenizer(batch_seqs, return_tensors="pt", padding=True, truncation=True)
             inputs = {k: v.to(self.device) for k, v in inputs.items()}
             
             with torch.no_grad():
@@ -47,7 +47,7 @@ class ESMFeatureExtractor:
                 batch_embeddings = outputs.last_hidden_state[:, 0, :]
                 
             for pid, emb in zip(batch_ids, batch_embeddings):
-                embeddings[pid] = emb.cpu()
+                embeddings[pid] = emb.cpu().half()
                 
         return embeddings
 
@@ -117,7 +117,7 @@ if __name__ == "__main__":
     device = "cuda" if torch.cuda.is_available() else "cpu"
     extractor = ESMFeatureExtractor(device=device)
     # Batch size might need adjustment for long sequences or GPU memory
-    embeddings = extractor.get_embeddings(sequences, batch_size=4) 
+    embeddings = extractor.get_embeddings(sequences, batch_size=32) 
     
     # 4. Save
     out_path = PROCESSED_DATA_DIR / "embeddings.pt"

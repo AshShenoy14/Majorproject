@@ -63,9 +63,12 @@ def evaluate_models():
         print("Required processed data (embeddings, mapping, graph) missing.")
         return
         
-    embeddings = torch.load(emb_path, map_location=device, weights_only=False)
-    node_mapping = torch.load(map_path, map_location=device, weights_only=False)
-    graph_data = torch.load(graph_data_path, map_location=device, weights_only=False)
+    # Load large data to CPU to avoid CUDA OOM — only small batches are moved to GPU at inference time
+    embeddings = torch.load(emb_path, map_location="cpu", weights_only=False)
+    # Convert float16 embeddings to float32 for model compatibility
+    embeddings = {k: v.float() if v.dtype == torch.float16 else v for k, v in embeddings.items()}
+    node_mapping = torch.load(map_path, map_location="cpu", weights_only=False)
+    graph_data = torch.load(graph_data_path, map_location="cpu", weights_only=False)
 
     # Filter test_df to valid entries
     filtered_df = test_df[
@@ -114,25 +117,31 @@ def evaluate_models():
     labels = np.array(labels)
 
     # Predict Sequence
-    batch_emb1 = torch.stack(batch_emb1).to(device)
-    batch_emb2 = torch.stack(batch_emb2).to(device)
+    # Keep stacked embeddings on CPU; batches will be moved to device during inference
+    batch_emb1 = torch.stack(batch_emb1)
+    batch_emb2 = torch.stack(batch_emb2)
     
     seq_preds = []
     with torch.no_grad():
         batch_size = 64
         for i in range(0, len(batch_emb1), batch_size):
-            out = seq_model(batch_emb1[i:i+batch_size], batch_emb2[i:i+batch_size])
+            e1 = batch_emb1[i:i+batch_size].to(device)
+            e2 = batch_emb2[i:i+batch_size].to(device)
+            out = seq_model(e1, e2)
             seq_preds.extend(out.cpu().numpy().flatten())
     seq_preds = np.array(seq_preds)
 
     # Predict Graph — apply sigmoid to raw logits
-    g_edge_label_index = torch.tensor([g_src, g_dst], dtype=torch.long).to(device)
+    g_edge_label_index = torch.tensor([g_src, g_dst], dtype=torch.long)  # stays on CPU until chunked
+    # Move graph node features and edges to device once (they are small compared to embeddings)
+    graph_x = graph_data.x.to(device)
+    graph_edge_index = graph_data.edge_index.to(device)
     graph_preds = []
     with torch.no_grad():
         batch_size = 10000
         for i in range(0, g_edge_label_index.size(1), batch_size):
-            chunk = g_edge_label_index[:, i:i+batch_size]
-            out = graph_model(graph_data.x, graph_data.edge_index, chunk)
+            chunk = g_edge_label_index[:, i:i+batch_size].to(device)
+            out = graph_model(graph_x, graph_edge_index, chunk)
             # Apply sigmoid to raw logits
             probs = torch.sigmoid(out)
             graph_preds.extend(probs.cpu().numpy().flatten())
@@ -206,11 +215,15 @@ def evaluate_models():
     # Generate SHAP summary plot
     if ensemble_model:
         print("\nGenerating SHAP Summary Plot...")
-        explainer = PPIExplainer(str(ensemble_path))
-        conf_seq = np.abs(seq_preds - 0.5)
-        conf_gat = np.abs(graph_preds - 0.5)
-        X_shap = np.column_stack((seq_preds, graph_preds, conf_seq, conf_gat))
-        explainer.save_summary_plot(X_shap, output_path=str(PROJECT_ROOT / "data" / "processed" / "plots" / "shap_summary.png"))
+        try:
+            explainer = PPIExplainer(str(ensemble_path))
+            conf_seq = np.abs(seq_preds - 0.5)
+            conf_gat = np.abs(graph_preds - 0.5)
+            X_shap = np.column_stack((seq_preds, graph_preds, conf_seq, conf_gat))
+            explainer.save_summary_plot(X_shap, output_path=str(PROJECT_ROOT / "data" / "processed" / "plots" / "shap_summary.png"))
+        except Exception as e:
+            print(f"SHAP generation failed (XGBoost/SHAP version mismatch): {e}")
+            print("Skipping SHAP plot. Metrics above are still valid.")
 
 if __name__ == "__main__":
     evaluate_models()
