@@ -19,11 +19,11 @@ import {
     InputAdornment,
     Collapse,
     IconButton,
-    useTheme
+    useTheme,
+    Tooltip
 } from '@mui/material';
 import { motion, AnimatePresence } from 'framer-motion';
-// Icons would ideally be imported from @mui/icons-material, but avoiding new deps for now if not installed.
-// Assuming we can use text or basic shapes if icons are missing, or basic SVG.
+import { InfoOutlined as InfoIcon } from '@mui/icons-material';
 
 const RealDataVerifier = () => {
     const theme = useTheme();
@@ -95,16 +95,21 @@ const RealDataVerifier = () => {
         >
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Box>
-                    <Typography variant="h5" sx={{
-                        fontWeight: 700,
-                        background: isDark
-                            ? 'linear-gradient(90deg, #00e5ff, #7c4dff)'
-                            : 'linear-gradient(90deg, #00695c, #1565c0)',
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent',
-                    }}>
-                        Real Data Verification
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography variant="h5" sx={{
+                            fontWeight: 700,
+                            background: isDark
+                                ? 'linear-gradient(90deg, #00e5ff, #7c4dff)'
+                                : 'linear-gradient(90deg, #00695c, #1565c0)',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                        }}>
+                            Real Data Verification
+                        </Typography>
+                        <Tooltip title="Verify predictions against real-world data from ChEMBL and known protein interaction networks. Ensembl Protein IDs (ENSP) are used for mapping." arrow>
+                            <InfoIcon sx={{ fontSize: '1.2rem', color: 'primary.main', cursor: 'help', opacity: 0.8 }} />
+                        </Tooltip>
+                    </Box>
                     <Typography variant="body2" color="text.secondary">
                         Explore protein interaction networks and drug targets from the graph.
                     </Typography>
@@ -158,24 +163,25 @@ const RealDataVerifier = () => {
                                     </Typography>
                                 ) : (
                                     filteredNodes.map(n => (
-                                        <Chip
-                                            key={n.id}
-                                            label={n.id}
-                                            onClick={() => handleNodeClick(n.id)}
-                                            color={selectedProtein === n.id ? "primary" : "default"}
-                                            variant={selectedProtein === n.id ? "filled" : "outlined"}
-                                            clickable
-                                            sx={{
-                                                fontWeight: selectedProtein === n.id ? 'bold' : 'normal',
-                                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                                '&:hover': {
-                                                    transform: 'translateY(-2px) scale(1.05)',
-                                                    boxShadow: isDark
-                                                        ? '0 4px 15px rgba(0, 229, 255, 0.2)'
-                                                        : '0 4px 15px rgba(0, 105, 92, 0.15)',
-                                                },
-                                            }}
-                                        />
+                                        <Tooltip key={n.id} title={`Ensembl ID: ${n.id}. Click to view drug targets.`} arrow>
+                                            <Chip
+                                                label={n.id}
+                                                onClick={() => handleNodeClick(n.id)}
+                                                color={selectedProtein === n.id ? "primary" : "default"}
+                                                variant={selectedProtein === n.id ? "filled" : "outlined"}
+                                                clickable
+                                                sx={{
+                                                    fontWeight: selectedProtein === n.id ? 'bold' : 'normal',
+                                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                                    '&:hover': {
+                                                        transform: 'translateY(-2px) scale(1.05)',
+                                                        boxShadow: isDark
+                                                            ? '0 4px 15px rgba(0, 229, 255, 0.2)'
+                                                            : '0 4px 15px rgba(0, 105, 92, 0.15)',
+                                                    },
+                                                }}
+                                            />
+                                        </Tooltip>
                                     ))
                                 )}
                             </Box>

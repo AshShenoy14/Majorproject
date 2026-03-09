@@ -17,10 +17,17 @@ import {
   ListItem,
   ListItemText,
   ListItemButton,
-  Chip
+  Chip,
+  IconButton,
+  Tooltip
 } from '@mui/material';
 import { motion, AnimatePresence } from 'framer-motion';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
+import {
+  Delete as DeleteIcon,
+  DeleteSweep as DeleteSweepIcon,
+  InfoOutlined as InfoIcon
+} from '@mui/icons-material';
 import InteractionVisualizer from './InteractionVisualizer';
 import ProteinViewer from './ProteinViewer';
 import html2pdf from 'html2pdf.js';
@@ -70,6 +77,18 @@ const PredictionForm = () => {
     const newHistory = [predictionData, ...history].slice(0, 10); // Keep last 10
     setHistory(newHistory);
     localStorage.setItem('predictionHistory', JSON.stringify(newHistory));
+  };
+
+  const removeFromHistory = (index, e) => {
+    e.stopPropagation();
+    const newHistory = history.filter((_, i) => i !== index);
+    setHistory(newHistory);
+    localStorage.setItem('predictionHistory', JSON.stringify(newHistory));
+  };
+
+  const clearHistory = () => {
+    setHistory([]);
+    localStorage.removeItem('predictionHistory');
   };
 
   const loadFromHistory = (item) => {
@@ -215,7 +234,12 @@ const PredictionForm = () => {
           <form onSubmit={handleSubmit}>
             <Stack spacing={3}>
               <Box sx={inputBoxStyles(isDark)}>
-                <Typography variant="caption" fontWeight="bold" color="secondary" sx={{ letterSpacing: '0.1em' }}>PROTEIN 1</Typography>
+                <Stack direction="row" alignItems="center" spacing={1}>
+                  <Typography variant="caption" fontWeight="bold" color="secondary" sx={{ letterSpacing: '0.1em' }}>PROTEIN 1</Typography>
+                  <Tooltip title="Ensembl Protein ID (e.g., ENSP...) or UniProt ID. These identifiers allow the system to fetch known sequences and structures." arrow>
+                    <InfoIcon sx={{ fontSize: '1rem', color: 'text.secondary', cursor: 'pointer', opacity: 0.7 }} />
+                  </Tooltip>
+                </Stack>
                 <TextField
                   label="ID (e.g., P12345)"
                   fullWidth
@@ -226,8 +250,14 @@ const PredictionForm = () => {
                   variant="outlined"
                   sx={{ mt: 1 }}
                 />
+                <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 1.5 }}>
+                  <Typography variant="caption" fontWeight="bold" color="secondary" sx={{ letterSpacing: '0.1em' }}>SEQUENCE (OPTIONAL)</Typography>
+                  <Tooltip title="Raw amino acid sequence in FASTA-like format. If provided, this overrides the ID lookup for embedding generation." arrow>
+                    <InfoIcon sx={{ fontSize: '1rem', color: 'text.secondary', cursor: 'pointer', opacity: 0.7 }} />
+                  </Tooltip>
+                </Stack>
                 <TextField
-                  label="Sequence (Optional)"
+                  label="Sequence"
                   fullWidth
                   multiline
                   rows={2}
@@ -240,7 +270,12 @@ const PredictionForm = () => {
               </Box>
 
               <Box sx={inputBoxStyles(isDark)}>
-                <Typography variant="caption" fontWeight="bold" color="secondary" sx={{ letterSpacing: '0.1em' }}>PROTEIN 2</Typography>
+                <Stack direction="row" alignItems="center" spacing={1}>
+                  <Typography variant="caption" fontWeight="bold" color="secondary" sx={{ letterSpacing: '0.1em' }}>PROTEIN 2</Typography>
+                  <Tooltip title="Ensembl Protein ID (e.g., ENSP...) or UniProt ID for the second interactive partner." arrow>
+                    <InfoIcon sx={{ fontSize: '1rem', color: 'text.secondary', cursor: 'pointer', opacity: 0.7 }} />
+                  </Tooltip>
+                </Stack>
                 <TextField
                   label="ID (e.g., Q98765)"
                   fullWidth
@@ -250,8 +285,14 @@ const PredictionForm = () => {
                   size="small"
                   sx={{ mt: 1 }}
                 />
+                <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 1.5 }}>
+                  <Typography variant="caption" fontWeight="bold" color="secondary" sx={{ letterSpacing: '0.1em' }}>SEQUENCE (OPTIONAL)</Typography>
+                  <Tooltip title="Amino acid sequence for the second protein. Use this if the protein ID is not in our database." arrow>
+                    <InfoIcon sx={{ fontSize: '1rem', color: 'text.secondary', cursor: 'pointer', opacity: 0.7 }} />
+                  </Tooltip>
+                </Stack>
                 <TextField
-                  label="Sequence (Optional)"
+                  label="Sequence"
                   fullWidth
                   multiline
                   rows={2}
@@ -310,20 +351,42 @@ const PredictionForm = () => {
 
           {history.length > 0 && (
             <Box sx={{ mt: 4, p: 2, background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)', borderRadius: 2 }}>
-              <Typography variant="subtitle2" color="text.secondary" gutterBottom>Recent Predictions</Typography>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                <Typography variant="subtitle2" color="text.secondary">Recent Predictions</Typography>
+                <Button
+                  size="small"
+                  color="error"
+                  startIcon={<DeleteSweepIcon />}
+                  onClick={clearHistory}
+                  sx={{ fontSize: '0.7rem', opacity: 0.7, '&:hover': { opacity: 1 } }}
+                >
+                  Clear All
+                </Button>
+              </Box>
               <List dense>
                 {history.map((h, i) => (
-                  <ListItem key={i} disablePadding>
-                    <ListItemButton onClick={() => loadFromHistory(h)} sx={{ borderRadius: 1, mb: 0.5 }}>
+                  <ListItem
+                    key={i}
+                    disablePadding
+                    secondaryAction={
+                      <IconButton edge="end" aria-label="delete" size="small" onClick={(e) => removeFromHistory(i, e)} sx={{ color: 'error.main', opacity: 0.5, '&:hover': { opacity: 1 } }}>
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    }
+                  >
+                    <ListItemButton onClick={() => loadFromHistory(h)} sx={{ borderRadius: 1, mb: 0.5, pr: 5 }}>
                       <ListItemText
                         primary={`${h.id1} ↔ ${h.id2}`}
                         secondary={`Confidence: ${(h.result.confidence_score * 100).toFixed(1)}%`}
+                        primaryTypographyProps={{ sx: { fontSize: '0.85rem', fontWeight: 600 } }}
+                        secondaryTypographyProps={{ sx: { fontSize: '0.75rem' } }}
                       />
                       <Chip
                         size="small"
                         label={(h.result.interaction_probability * 100).toFixed(1) + '%'}
                         color={h.result.interaction_probability > 0.5 ? 'success' : 'error'}
                         variant="outlined"
+                        sx={{ ml: 1, height: 20, fontSize: '0.7rem' }}
                       />
                     </ListItemButton>
                   </ListItem>
@@ -423,7 +486,7 @@ const PredictionForm = () => {
                               <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                             ))}
                           </Pie>
-                          <Tooltip />
+                          <RechartsTooltip />
                         </PieChart>
                       </ResponsiveContainer>
                     </Box>
