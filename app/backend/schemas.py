@@ -13,6 +13,8 @@ class PredictionResponse(BaseModel):
     gat_probability: float
     confidence_score: float
     explanation: Dict[str, float] # SHAP values or similar
+    protein1_uniprot_id: Optional[str] = None
+    protein2_uniprot_id: Optional[str] = None
     
 class NetworkRequest(BaseModel):
     threshold: float = 0.5

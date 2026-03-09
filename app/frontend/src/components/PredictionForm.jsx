@@ -25,6 +25,27 @@ import InteractionVisualizer from './InteractionVisualizer';
 import ProteinViewer from './ProteinViewer';
 import html2pdf from 'html2pdf.js';
 
+const inputBoxStyles = (isDark) => ({
+  p: 2.5,
+  borderRadius: 3,
+  background: isDark ? 'rgba(0, 0, 0, 0.25)' : 'rgba(0, 0, 0, 0.02)',
+  border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)'}`,
+  transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+  '&:hover': {
+    borderColor: isDark ? 'rgba(0, 229, 255, 0.2)' : 'rgba(0, 105, 92, 0.2)',
+    transform: 'translateY(-2px)',
+    boxShadow: isDark
+      ? '0 8px 30px rgba(0, 229, 255, 0.08)'
+      : '0 8px 30px rgba(0, 0, 0, 0.04)',
+  },
+  '&:focus-within': {
+    borderColor: isDark ? 'rgba(0, 229, 255, 0.35)' : 'rgba(0, 105, 92, 0.35)',
+    boxShadow: isDark
+      ? '0 0 20px rgba(0, 229, 255, 0.1)'
+      : '0 0 20px rgba(0, 105, 92, 0.06)',
+  },
+});
+
 const PredictionForm = () => {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
@@ -163,21 +184,28 @@ const PredictionForm = () => {
       component={motion.div}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
+      transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
       sx={{
-        p: 4,
+        p: { xs: 3, md: 4 },
         borderRadius: 4,
         overflow: 'hidden',
-        background: isDark ? 'rgba(16, 33, 65, 0.6)' : 'rgba(255, 255, 255, 0.6)',
-        backdropFilter: 'blur(20px)',
-        border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)'}`,
-        boxShadow: isDark ? '0 20px 40px rgba(0,0,0,0.2)' : '0 20px 40px rgba(0,0,0,0.05)'
+        background: isDark ? 'rgba(16, 33, 65, 0.5)' : 'rgba(255, 255, 255, 0.6)',
+        backdropFilter: 'blur(24px) saturate(180%)',
+        border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)'}`,
+        boxShadow: isDark ? '0 24px 48px rgba(0,0,0,0.25)' : '0 24px 48px rgba(0,0,0,0.06)',
       }}
     >
       <Grid container spacing={4}>
         {/* Input Section */}
         <Grid item xs={12} md={6}>
-          <Typography variant="h4" color="primary" gutterBottom sx={{ fontWeight: 700, textShadow: '0 0 15px rgba(0, 229, 255, 0.3)' }}>
+          <Typography variant="h4" gutterBottom sx={{
+            fontWeight: 800,
+            background: isDark
+              ? 'linear-gradient(90deg, #00e5ff, #7c4dff)'
+              : 'linear-gradient(90deg, #00695c, #1565c0)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+          }}>
             Analyze Interaction
           </Typography>
           <Typography variant="body1" color="text.secondary" paragraph sx={{ mb: 4 }}>
@@ -186,7 +214,7 @@ const PredictionForm = () => {
 
           <form onSubmit={handleSubmit}>
             <Stack spacing={3}>
-              <Box p={2} sx={{ background: isDark ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.02)', borderRadius: 2, border: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}` }}>
+              <Box sx={inputBoxStyles(isDark)}>
                 <Typography variant="caption" fontWeight="bold" color="secondary" sx={{ letterSpacing: '0.1em' }}>PROTEIN 1</Typography>
                 <TextField
                   label="ID (e.g., P12345)"
@@ -211,7 +239,7 @@ const PredictionForm = () => {
                 />
               </Box>
 
-              <Box p={2} sx={{ background: isDark ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.02)', borderRadius: 2, border: `1px solid ${isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'}` }}>
+              <Box sx={inputBoxStyles(isDark)}>
                 <Typography variant="caption" fontWeight="bold" color="secondary" sx={{ letterSpacing: '0.1em' }}>PROTEIN 2</Typography>
                 <TextField
                   label="ID (e.g., Q98765)"
@@ -241,9 +269,25 @@ const PredictionForm = () => {
                 size="large"
                 fullWidth
                 disabled={loading}
-                sx={{ mt: 2, height: 52, fontSize: '1.1rem' }}
+                sx={{
+                  mt: 2,
+                  height: 54,
+                  fontSize: '1.1rem',
+                  fontWeight: 700,
+                  borderRadius: '50px',
+                  boxShadow: isDark
+                    ? '0 0 25px rgba(0, 229, 255, 0.2)'
+                    : '0 8px 25px rgba(0, 105, 92, 0.15)',
+                  '&:hover': {
+                    boxShadow: isDark
+                      ? '0 0 40px rgba(0, 229, 255, 0.35)'
+                      : '0 12px 35px rgba(0, 105, 92, 0.25)',
+                    transform: 'translateY(-2px)',
+                  },
+                  transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
+                }}
               >
-                {loading ? <CircularProgress size={24} color="inherit" /> : 'Run Prediction'}
+                {loading ? <CircularProgress size={24} color="inherit" /> : '⚡ Run Prediction'}
               </Button>
 
               <Button
@@ -314,12 +358,23 @@ const PredictionForm = () => {
 
               {loading && (
                 <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0 }}
                 >
-                  <Box sx={{ textAlign: 'center', py: 8 }}>
-                    <Typography variant="h6" color="primary">Analyzing Sequences...</Typography>
+                  <Box sx={{
+                    textAlign: 'center',
+                    py: 8,
+                    animation: 'pulseGlow 2s ease-in-out infinite',
+                  }}>
+                    <CircularProgress
+                      size={48}
+                      sx={{
+                        mb: 3,
+                        color: isDark ? '#00e5ff' : '#00695c',
+                      }}
+                    />
+                    <Typography variant="h6" color="primary" sx={{ fontWeight: 600 }}>Analyzing Sequences...</Typography>
                     <Typography variant="caption">Calculating embeddings and graph attention</Typography>
                   </Box>
                 </motion.div>
@@ -432,13 +487,13 @@ const PredictionForm = () => {
                         <Typography variant="caption" color="primary" gutterBottom display="block" align="center">
                           {id1 || "Protein A"}
                         </Typography>
-                        <ProteinViewer proteinId={id1} />
+                        <ProteinViewer proteinId={result.protein1_uniprot_id || id1} />
                       </Grid>
                       <Grid item xs={12} sm={6}>
                         <Typography variant="caption" color="secondary" gutterBottom display="block" align="center">
                           {id2 || "Protein B"}
                         </Typography>
-                        <ProteinViewer proteinId={id2} />
+                        <ProteinViewer proteinId={result.protein2_uniprot_id || id2} />
                       </Grid>
                     </Grid>
                   </Box>

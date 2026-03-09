@@ -82,20 +82,27 @@ const RealDataVerifier = () => {
             component={motion.div}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
+            transition={{ delay: 0.2, duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
             sx={{
-                p: 4,
+                p: { xs: 3, md: 4 },
                 borderRadius: 4,
                 overflow: 'hidden',
-                background: isDark ? 'rgba(16, 33, 65, 0.6)' : 'rgba(255, 255, 255, 0.6)',
-                backdropFilter: 'blur(20px)',
-                border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)'}`,
-                boxShadow: isDark ? '0 20px 40px rgba(0,0,0,0.2)' : '0 20px 40px rgba(0,0,0,0.05)'
+                background: isDark ? 'rgba(16, 33, 65, 0.5)' : 'rgba(255, 255, 255, 0.6)',
+                backdropFilter: 'blur(24px) saturate(180%)',
+                border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)'}`,
+                boxShadow: isDark ? '0 24px 48px rgba(0,0,0,0.25)' : '0 24px 48px rgba(0,0,0,0.06)',
             }}
         >
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                 <Box>
-                    <Typography variant="h5" color="primary" sx={{ fontWeight: 600 }}>
+                    <Typography variant="h5" sx={{
+                        fontWeight: 700,
+                        background: isDark
+                            ? 'linear-gradient(90deg, #00e5ff, #7c4dff)'
+                            : 'linear-gradient(90deg, #00695c, #1565c0)',
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                    }}>
                         Real Data Verification
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
@@ -160,7 +167,13 @@ const RealDataVerifier = () => {
                                             clickable
                                             sx={{
                                                 fontWeight: selectedProtein === n.id ? 'bold' : 'normal',
-                                                transition: 'all 0.2s'
+                                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                                '&:hover': {
+                                                    transform: 'translateY(-2px) scale(1.05)',
+                                                    boxShadow: isDark
+                                                        ? '0 4px 15px rgba(0, 229, 255, 0.2)'
+                                                        : '0 4px 15px rgba(0, 105, 92, 0.15)',
+                                                },
                                             }}
                                         />
                                     ))

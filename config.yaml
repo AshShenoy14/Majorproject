@@ -1,0 +1,31 @@
+# Project Configuration Settings
+# This file is used to manage global execution variables to avoid hardcoding.
+
+hardware:
+  # Sets the default execution device. Options: "cuda", "cpu", "auto"
+  # "auto" will try to use CUDA if available, else fallback to CPU.
+  device: "auto"
+  
+  # For multi-GPU setups. 0 is the primary GPU.
+  gpu_id: 0
+  
+  # Set memory limits if needed. Used to avoid CUDA Out of Memory (OOM) errors.
+  # Value in GB. Set to 0 for unlimited.
+  max_gpu_memory_gb: 0
+
+  # DataLoader settings for PyTorch
+  num_workers: 4
+  
+  # Pin memory speeds up data transfer from CPU to GPU
+  pin_memory: true
+
+training:
+  batch_size: 64
+  learning_rate: 0.001
+  epochs: 50
+  early_stopping_patience: 5
+
+paths:
+  # Caching directories for heavy models configured via paths.py
+  cache_dir_huggingface: "./.cache/huggingface"
+  cache_dir_torch: "./.cache/torch"

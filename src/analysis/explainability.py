@@ -16,14 +16,14 @@ class PPIExplainer:
             print(f"Warning: SHAP initialization failed due to XGBoost compatibility issue: {e}")
             self.explainer = None
 
-    def explain_prediction(self, seq_prob: float, graph_prob: float, conf_seq: float = 0.0, conf_graph: float = 0.0):
+    def explain_prediction(self, seq_prob: float, graph_prob: float, conf_seq: float, conf_graph: float):
         """
-        Explains a single prediction made by the ensemble.
+        Explains a single prediction made by the ensemble using the 4 enhanced features.
         """
         if self.explainer is None:
             return np.array([[0.0, 0.0, 0.0, 0.0]])
             
-        # SHAP expects a matrix
+        # SHAP expects a matrix matching the 4 features the model was trained on
         X = np.array([[seq_prob, graph_prob, conf_seq, conf_graph]])
         shap_values = self.explainer.shap_values(X)
         

@@ -1,16 +1,19 @@
+import sys
+import os
+from pathlib import Path
+
+# Add project root and configure environments BEFORE importing heavy ML libraries
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
+from src.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 import torch
 import numpy as np
-import sys
-import os
 import pandas as pd
 import joblib
 from typing import List
-
-# Add project root
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
 from src.models.sequence_model import SequencePPIModel
 from src.models.graph_model import GATLinkPredictor
@@ -18,11 +21,10 @@ from src.models.ensemble_model import PPIEnsemble
 from src.data.feature_extraction import ESMFeatureExtractor
 from src.data.sequence_manager import SequenceManager
 from src.data.target_manager import TargetManager
+from src.data.id_mapper import IDMapper
 from src.analysis.explainability import PPIExplainer
 from src.analysis.network_analysis import NetworkAnalyzer
 from app.backend.schemas import ProteinPair, PredictionResponse, NetworkResponse, BatchPredictionRequest
-
-from src.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT
 
 app = FastAPI(title="TransGraph-PPI API", description="Hybrid Ensemble PPI Prediction System with Real Data")
 
@@ -48,6 +50,7 @@ async def load_system():
     # 1. Managers
     managers["sequence"] = SequenceManager()
     managers["target"] = TargetManager()
+    managers["id_mapper"] = IDMapper()
     
     # 2. Base Models
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -155,12 +158,12 @@ async def predict_interaction(pair: ProteinPair):
                 graph_prob = torch.sigmoid(g_out).item()
         
         # 5. Ensemble Prediction
-        conf_s = abs(seq_prob - 0.5)
-        conf_g = abs(graph_prob - 0.5)
-        X = np.array([[seq_prob, graph_prob, conf_s, conf_g]])
+        conf_seq = abs(seq_prob - 0.5)
+        conf_graph = abs(graph_prob - 0.5)
+        X_input = np.array([[seq_prob, graph_prob, conf_seq, conf_graph]])
         
         if models["ensemble"].meta_model:
-            final_prob = models["ensemble"].meta_model.predict_proba(X)[0, 1]
+            final_prob = models["ensemble"].meta_model.predict_proba(X_input)[0, 1]
         else:
             final_prob = (seq_prob + graph_prob) / 2
         
@@ -168,19 +171,31 @@ async def predict_interaction(pair: ProteinPair):
         explanation = {
             "Sequence_Model_Contribution": seq_prob,
             "Graph_Model_Contribution": graph_prob,
+            "Sequence_Confidence": conf_seq,
+            "Graph_Confidence": conf_graph,
         }
         
         if "explainer" in models:
-            shap_vals = models["explainer"].explain_prediction(seq_prob, graph_prob, conf_s, conf_g)
+            shap_vals = models["explainer"].explain_prediction(seq_prob, graph_prob, conf_seq, conf_graph)
+            # shap_vals[0] will have 4 elements corresponding to the 4 features
             explanation["SHAP_Sequence"] = float(shap_vals[0][0])
             explanation["SHAP_Graph"] = float(shap_vals[0][1])
+            explanation["SHAP_Seq_Conf"] = float(shap_vals[0][2])
+            explanation["SHAP_Graph_Conf"] = float(shap_vals[0][3])
+
+        # 7. Uniprot ID Mapping for 3D Visuals
+        uniprot_maps = {}
+        if "id_mapper" in managers:
+            uniprot_maps = managers["id_mapper"].ensp_to_uniprot([p1, p2])
 
         return {
             "interaction_probability": float(final_prob),
             "esm_probability": float(seq_prob),
             "gat_probability": float(graph_prob),
             "confidence_score": abs(float(final_prob) - 0.5) * 2,
-            "explanation": explanation
+            "explanation": explanation,
+            "protein1_uniprot_id": uniprot_maps.get(p1, p1), # Fallback to original if not found
+            "protein2_uniprot_id": uniprot_maps.get(p2, p2)
         }
 
     except Exception as e:
