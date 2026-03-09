@@ -7,7 +7,7 @@ const ProteinViewer = ({ proteinId }) => {
     const isDark = theme.palette.mode === 'dark';
 
     useEffect(() => {
-        if (!proteinId) return;
+        if (!proteinId || proteinId === "Protein A" || proteinId === "Protein B") return;
 
         // Dynamically load the correct CSS based on theme
         const linkId = 'pdbe-molstar-css';
@@ -26,16 +26,27 @@ const ProteinViewer = ({ proteinId }) => {
         const scriptId = 'pdbe-molstar-js';
         let script = document.getElementById(scriptId);
 
-        const renderViewer = () => {
+        const renderViewer = async () => {
             if (viewerRef.current && window.PDBeMolstarPlugin) {
                 viewerRef.current.innerHTML = ''; // Clear previous
+
+                let realPdbUrl = `https://alphafold.ebi.ac.uk/files/AF-${proteinId.toUpperCase()}-F1-model_v4.pdb`;
+                try {
+                    // Try to fetch the accurate URL from AlphaFold's API directly
+                    const res = await fetch(`https://alphafold.ebi.ac.uk/api/prediction/${proteinId.toUpperCase()}`);
+                    const data = await res.json();
+                    if (data && data.length > 0 && data[0].pdbUrl) {
+                        realPdbUrl = data[0].pdbUrl;
+                    }
+                } catch (e) { } // Fallback to v4 string
+
                 const viewerInstance = new window.PDBeMolstarPlugin();
 
                 const bgColor = isDark ? { r: 10, g: 25, b: 47 } : { r: 244, g: 246, b: 248 };
 
                 const options = {
                     customData: {
-                        url: `https://alphafold.ebi.ac.uk/files/AF-${proteinId.toUpperCase()}-F1-model_v4.pdb`,
+                        url: realPdbUrl,
                         format: 'pdb'
                     },
                     alphafoldView: true,
@@ -55,16 +66,25 @@ const ProteinViewer = ({ proteinId }) => {
             }
         };
 
+        const checkPluginAndRender = () => {
+            if (window.PDBeMolstarPlugin) {
+                renderViewer();
+            } else {
+                // Poll every 100ms until the script is fully parsed
+                setTimeout(checkPluginAndRender, 100);
+            }
+        };
+
         if (!script) {
             script = document.createElement('script');
             script.id = scriptId;
             script.src = 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.2.0/build/pdbe-molstar-plugin.js';
             script.async = true;
-            script.onload = renderViewer;
             document.body.appendChild(script);
+            checkPluginAndRender(); // Start polling
         } else {
-            // Already loaded
-            renderViewer();
+            // Already added to DOM, start polling in case it's still downloading
+            checkPluginAndRender();
         }
 
         return () => {
@@ -84,9 +104,12 @@ const ProteinViewer = ({ proteinId }) => {
             border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0,0,0,0.1)'}`,
             bgcolor: isDark ? '#0a192f' : '#f4f6f8'
         }}>
-            {!proteinId ? (
-                <Box display="flex" alignItems="center" justifyContent="center" height="100%">
-                    <Typography color="text.secondary">Select a protein to view 3D structure</Typography>
+            {!proteinId || proteinId === "Protein A" || proteinId === "Protein B" ? (
+                <Box display="flex" alignItems="center" justifyContent="center" height="100%" textAlign="center" p={3}>
+                    <Typography color="text.secondary">
+                        <strong>No 3D Structure Available</strong><br /><br />
+                        You entered a custom sequence without a known UniProt/ENSP ID. While our model can predict interactions purely from amino acid sequences, rendering a visual 3D structure requires a pre-computed PDB file associated with a known ID.
+                    </Typography>
                 </Box>
             ) : (
                 <div ref={viewerRef} style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0 }} />

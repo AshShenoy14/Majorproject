@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  # The Backend API (FastAPI) responsible for AI inference and data processing
+  backend:
+    build: 
+      context: ./app/backend
+      dockerfile: Dockerfile
+    container_name: transgraph_backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./:/workspace # Mount the root project for live reloading and model access
+      - ./data:/workspace/data
+      - ./models:/workspace/models
+      - ./.cache:/workspace/.cache # Persist HF and PyTorch heavy downloads
+    environment:
+      - HF_HOME=/workspace/.cache/huggingface
+      - TORCH_HOME=/workspace/.cache/torch
+      - DEVICE=auto # Configurable via config.yaml in production
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu] # Enable GPU support automatically if NVIDIA drivers are present
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    restart: unless-stopped
+
+  # The Frontend UI (React + Vite/Webpack)
+  frontend:
+    build:
+      context: ./app/frontend
+      dockerfile: Dockerfile
+    container_name: transgraph_frontend
+    ports:
+      - "5173:5173" # Assuming Vite. Change to 3000 if CRA
+    volumes:
+      - ./app/frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8000 # Let Vite proxy know where backend is
+    depends_on:
+      - backend
+    command: npm run dev -- --host 0.0.0.0
+    restart: unless-stopped

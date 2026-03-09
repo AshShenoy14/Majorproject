@@ -487,13 +487,13 @@ const PredictionForm = () => {
                         <Typography variant="caption" color="primary" gutterBottom display="block" align="center">
                           {id1 || "Protein A"}
                         </Typography>
-                        <ProteinViewer proteinId={id1} />
+                        <ProteinViewer proteinId={result.protein1_uniprot_id || id1} />
                       </Grid>
                       <Grid item xs={12} sm={6}>
                         <Typography variant="caption" color="secondary" gutterBottom display="block" align="center">
                           {id2 || "Protein B"}
                         </Typography>
-                        <ProteinViewer proteinId={id2} />
+                        <ProteinViewer proteinId={result.protein2_uniprot_id || id2} />
                       </Grid>
                     </Grid>
                   </Box>

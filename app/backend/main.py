@@ -21,6 +21,7 @@ from src.models.ensemble_model import PPIEnsemble
 from src.data.feature_extraction import ESMFeatureExtractor
 from src.data.sequence_manager import SequenceManager
 from src.data.target_manager import TargetManager
+from src.data.id_mapper import IDMapper
 from src.analysis.explainability import PPIExplainer
 from src.analysis.network_analysis import NetworkAnalyzer
 from app.backend.schemas import ProteinPair, PredictionResponse, NetworkResponse, BatchPredictionRequest
@@ -49,6 +50,7 @@ async def load_system():
     # 1. Managers
     managers["sequence"] = SequenceManager()
     managers["target"] = TargetManager()
+    managers["id_mapper"] = IDMapper()
     
     # 2. Base Models
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
@@ -181,12 +183,19 @@ async def predict_interaction(pair: ProteinPair):
             explanation["SHAP_Seq_Conf"] = float(shap_vals[0][2])
             explanation["SHAP_Graph_Conf"] = float(shap_vals[0][3])
 
+        # 7. Uniprot ID Mapping for 3D Visuals
+        uniprot_maps = {}
+        if "id_mapper" in managers:
+            uniprot_maps = managers["id_mapper"].ensp_to_uniprot([p1, p2])
+
         return {
             "interaction_probability": float(final_prob),
             "esm_probability": float(seq_prob),
             "gat_probability": float(graph_prob),
             "confidence_score": abs(float(final_prob) - 0.5) * 2,
-            "explanation": explanation
+            "explanation": explanation,
+            "protein1_uniprot_id": uniprot_maps.get(p1, p1), # Fallback to original if not found
+            "protein2_uniprot_id": uniprot_maps.get(p2, p2)
         }
 
     except Exception as e:
