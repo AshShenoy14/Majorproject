@@ -31,3 +31,7 @@ models/*
 **\node_modules
 data/9606.protein.links.v12.0.txt
 .cache/
+checkpoints/
+TRAINING_COMPARISON_ANALYSIS.md
+GAT_TRAINING_ANALYSIS_REPORT.md
+master_training_log.txt
