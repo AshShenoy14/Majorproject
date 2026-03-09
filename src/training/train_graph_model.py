@@ -87,7 +87,7 @@ def train(epochs: int = 100, lr: float = 0.005, graph_path: str = None):
         best_val_loss = checkpoint.get("best_val_loss", float("inf"))
         print(f"  Resumed at epoch {start_epoch}/{epochs} | Best val loss so far: {best_val_loss:.4f}")
     else:
-        print("No checkpoint found — starting fresh training.")
+        print("No checkpoint found - starting fresh training.")
 
     if start_epoch >= epochs:
         print(f"Training already completed ({start_epoch}/{epochs} epochs). Nothing to do.")
@@ -133,13 +133,13 @@ def train(epochs: int = 100, lr: float = 0.005, graph_path: str = None):
             f"Best Val Loss: {best_val_loss:.4f}"
         )
         print(f"  Progress: {epoch+1}/{epochs} epochs done "
-              f"({(epoch+1)/epochs*100:.0f}%) — {epochs - epoch - 1} remaining")
+              f"({(epoch+1)/epochs*100:.0f}%) - {epochs - epoch - 1} remaining")
 
         # --- Save best model if validation loss improved ---
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             torch.save(model.state_dict(), best_model_path)
-            print(f"  ✓ New best model saved → {best_model_path}")
+            print(f"  [OK] New best model saved -> {best_model_path}")
 
         # --- Save checkpoint (overwrite each epoch) ---
         torch.save({
@@ -149,7 +149,7 @@ def train(epochs: int = 100, lr: float = 0.005, graph_path: str = None):
             "train_loss": train_loss,
             "best_val_loss": best_val_loss,
         }, checkpoint_path)
-        print(f"  ✓ Checkpoint saved → {checkpoint_path}")
+        print(f"  [OK] Checkpoint saved -> {checkpoint_path}")
 
     print(f"\nGraph Model training complete. Best val loss: {best_val_loss:.4f}")
 
