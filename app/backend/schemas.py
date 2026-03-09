@@ -2,10 +2,10 @@ from pydantic import BaseModel
 from typing import List, Optional, Dict
 
 class ProteinPair(BaseModel):
-    protein1_seq: str
-    protein2_seq: str
-    protein1_id: Optional[str] = "Protein A"
-    protein2_id: Optional[str] = "Protein B"
+    protein1_seq: Optional[str] = None
+    protein2_seq: Optional[str] = None
+    protein1_id: Optional[str] = None
+    protein2_id: Optional[str] = None
 
 class PredictionResponse(BaseModel):
     interaction_probability: float

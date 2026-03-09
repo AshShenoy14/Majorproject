@@ -1,6 +1,5 @@
 import pandas as pd
 from typing import List
-from chembl_webresource_client.new_client import new_client
 from pathlib import Path
 import os
 from src.utils.paths import PROCESSED_DATA_DIR
@@ -8,10 +7,15 @@ from src.utils.paths import PROCESSED_DATA_DIR
 from src.data.id_mapper import IDMapper
 
 class TargetManager:
-    def __init__(self, cache_file: str = "chembl_targets.csv"): # Changed default to match paths.py usually? or keep consistent
+    def __init__(self, cache_file: str = "chembl_targets.csv"):
         self.cache_path = PROCESSED_DATA_DIR / cache_file
         self.targets_df = self._load_cache()
-        self.target_client = new_client.target
+        try:
+            from chembl_webresource_client.new_client import new_client
+            self.target_client = new_client.target
+        except Exception as e:
+            print(f"Warning: ChEMBL API is unreachable ({e}). Drug target generation will be limited.")
+            self.target_client = None
         self.mapper = IDMapper()
 
     def _load_cache(self) -> pd.DataFrame:
@@ -69,6 +73,9 @@ class TargetManager:
         """
         mapping_dict: {ensp_id: uniprot_id}
         """
+        if self.target_client is None:
+            return pd.DataFrame()
+            
         results = []
         uniprot_to_ensp = {v: k for k, v in mapping_dict.items()}
         uniprot_ids = list(mapping_dict.values())

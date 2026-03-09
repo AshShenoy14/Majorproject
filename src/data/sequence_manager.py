@@ -70,6 +70,14 @@ class SequenceManager:
         print(f"Fetching {len(missing_ids)} missing sequences from UniProt...")
         fetched_seqs = self._fetch_from_uniprot(missing_ids)
 
+        # 3. Update Cache & Results
+        if fetched_seqs:
+            self.sequences.update(fetched_seqs)
+            self._save_cache()
+            results.update(fetched_seqs)
+        
+        return results
+
     def _load_from_local_file(self, missing_ids: List[str]) -> Dict[str, str]:
         found = {}
         if not STRING_SEQUENCES_FILE.exists():
@@ -97,17 +105,6 @@ class SequenceManager:
             print(f"Error reading local sequences file: {e}")
             
         return found
-        
-        # 3. Update Cache & Results
-        if fetched_seqs:
-            self.sequences.update(fetched_seqs)
-            self._save_cache()
-            results.update(fetched_seqs)
-        
-        # Fill missing with None or handle errors? 
-        # For now, just return what we found.
-        
-        return results
 
     def _fetch_from_uniprot(self, ids: List[str], batch_size: int = 50) -> Dict[str, str]:
         fetched = {}

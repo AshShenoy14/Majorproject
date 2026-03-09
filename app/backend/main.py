@@ -158,11 +158,11 @@ async def predict_interaction(pair: ProteinPair):
                 graph_prob = torch.sigmoid(g_out).item()
         
         # 5. Ensemble Prediction
+        conf_seq = abs(seq_prob - 0.5)
+        conf_graph = abs(graph_prob - 0.5)
+        X_input = np.array([[seq_prob, graph_prob, conf_seq, conf_graph]])
+        
         if models["ensemble"].meta_model:
-            # Replicate PPIEnsemble._build_features logic for the single sample
-            conf_seq = abs(seq_prob - 0.5)
-            conf_graph = abs(graph_prob - 0.5)
-            X_input = np.array([[seq_prob, graph_prob, conf_seq, conf_graph]])
             final_prob = models["ensemble"].meta_model.predict_proba(X_input)[0, 1]
         else:
             final_prob = (seq_prob + graph_prob) / 2
