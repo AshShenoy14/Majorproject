@@ -24,7 +24,12 @@ from src.data.target_manager import TargetManager
 from src.data.id_mapper import IDMapper
 from src.analysis.explainability import PPIExplainer
 from src.analysis.network_analysis import NetworkAnalyzer
-from app.backend.schemas import ProteinPair, PredictionResponse, NetworkResponse, BatchPredictionRequest
+from src.analysis.mutation_analyzer import MutationAnalyzer
+from src.analysis.biological_managers import BiologicalManager
+from app.backend.schemas import (
+    ProteinPair, PredictionResponse, NetworkResponse, BatchPredictionRequest,
+    MutationRequest, MutationAnalysisResponse, BioMetaResponse, FeasibilityResponse
+)
 
 app = FastAPI(title="TransGraph-PPI API", description="Hybrid Ensemble PPI Prediction System with Real Data")
 
@@ -110,6 +115,15 @@ async def load_system():
         analyzers["network"] = NetworkAnalyzer()
         analyzers["network"].build_from_dataframe(df_pos)
         print("Network Analyzer Ready.")
+
+    # 4. Mutation Analyzer
+    if "seq_model" in models and "esm" in models:
+        analyzers["mutation"] = MutationAnalyzer(models["seq_model"], models["esm"])
+        print("Mutation Analyzer Ready.")
+
+    # 5. Biological Manager
+    managers["bio"] = BiologicalManager()
+    print("Biological Manager Ready.")
 
     print("System Loaded.")
 
@@ -285,6 +299,45 @@ async def get_network_stats():
     if "network" not in analyzers:
         return {}
     return analyzers["network"].get_graph_stats()
+
+@app.post("/analysis/mutate", response_model=MutationAnalysisResponse)
+async def scan_mutations(request: MutationRequest):
+    if "mutation" not in analyzers:
+        raise HTTPException(status_code=503, detail="Mutation Analyzer not initialized (Check models)")
+    
+    try:
+        results = analyzers["mutation"].project_mutation_impact(
+            request.protein1_id, request.protein1_seq,
+            request.protein2_id, request.protein2_seq,
+            [m.dict() for m in request.mutations]
+        )
+        return results
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/bio/metadata", response_model=List[BioMetaResponse])
+async def get_bio_metadata(proteins: str):
+    if "bio" not in managers:
+        raise HTTPException(status_code=503, detail="Biological Manager not initialized")
+    
+    try:
+        p_list = proteins.split(",")
+        df = managers["bio"].get_bio_metadata(p_list)
+        return df.to_dict(orient="records")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/bio/feasibility", response_model=FeasibilityResponse)
+async def check_feasibility(p1: str, p2: str):
+    if "bio" not in managers:
+        raise HTTPException(status_code=503, detail="Biological Manager not initialized")
+    
+    try:
+        return managers["bio"].check_localization_compatibility(p1, p2)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

@@ -23,7 +23,7 @@ const Verify = () => {
                 <motion.div variants={fadeUp}>
                     <Box textAlign="center" mb={6}>
                         <Chip
-                            label="🧬 Biological Validation"
+                            label="Biological Validation"
                             variant="outlined"
                             size="small"
                             sx={{

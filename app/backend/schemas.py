@@ -25,3 +25,45 @@ class NetworkResponse(BaseModel):
 
 class BatchPredictionRequest(BaseModel):
     pairs: List[ProteinPair]
+
+class MutationItem(BaseModel):
+    protein: int # 1 or 2
+    pos: int
+    orig: str
+    mut: str
+
+class MutationRequest(BaseModel):
+    protein1_id: str
+    protein1_seq: str
+    protein2_id: str
+    protein2_seq: str
+    mutations: List[MutationItem]
+
+class MutationResult(BaseModel):
+    protein: int
+    pos: int
+    orig: str
+    mut: str
+    base_score: float
+    mutated_score: float
+    impact_delta: float
+    interpretation: str
+    error: Optional[str] = None
+
+class MutationAnalysisResponse(BaseModel):
+    protein1: str
+    protein2: str
+    mutation_results: List[MutationResult]
+
+class BioMetaResponse(BaseModel):
+    protein_id: str
+    uniprot_id: str
+    localization: str
+    pathways: str
+
+class FeasibilityResponse(BaseModel):
+    compatible: bool
+    intersection: List[str]
+    p1_locs: List[str]
+    p2_locs: List[str]
+    reason: str

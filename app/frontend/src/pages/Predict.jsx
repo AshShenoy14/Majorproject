@@ -23,7 +23,7 @@ const Predict = () => {
                 <motion.div variants={fadeUp}>
                     <Box textAlign="center" mb={6}>
                         <Chip
-                            label="🔬 AI-Powered Analysis"
+                            label=" AI-Powered Analysis"
                             variant="outlined"
                             size="small"
                             sx={{

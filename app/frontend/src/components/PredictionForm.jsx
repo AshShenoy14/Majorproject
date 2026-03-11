@@ -30,6 +30,7 @@ import {
 } from '@mui/icons-material';
 import InteractionVisualizer from './InteractionVisualizer';
 import ProteinViewer from './ProteinViewer';
+import MutationScanner from './MutationScanner';
 import html2pdf from 'html2pdf.js';
 
 const inputBoxStyles = (isDark) => ({
@@ -65,6 +66,8 @@ const PredictionForm = () => {
   const [error, setError] = useState(null);
   const [history, setHistory] = useState([]);
   const [batchResults, setBatchResults] = useState([]);
+  const [bioInfo, setBioInfo] = useState(null);
+  const [feasibility, setFeasibility] = useState(null);
 
   useEffect(() => {
     const saved = localStorage.getItem('predictionHistory');
@@ -182,11 +185,29 @@ const PredictionForm = () => {
       const response = await axios.post('http://localhost:8000/predict', payload);
       setResult(response.data);
       saveToHistory({ id1: id1 || "Protein A", id2: id2 || "Protein B", result: response.data });
+      
+      // Fetch Bio Metadata and Feasibility
+      fetchBioData(id1, id2);
     } catch (err) {
       setError('Failed to fetch prediction. Ensure backend is running.');
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchBioData = async (p1, p2) => {
+    try {
+      if (p1 && p2) {
+        const [bioRes, feasRes] = await Promise.all([
+          axios.get(`http://localhost:8000/bio/metadata?proteins=${p1},${p2}`),
+          axios.get(`http://localhost:8000/bio/feasibility?p1=${p1}&p2=${p2}`)
+        ]);
+        setBioInfo(bioRes.data);
+        setFeasibility(feasRes.data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch biological context", err);
     }
   };
 
@@ -328,7 +349,7 @@ const PredictionForm = () => {
                   transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
                 }}
               >
-                {loading ? <CircularProgress size={24} color="inherit" /> : '⚡ Run Prediction'}
+                {loading ? <CircularProgress size={24} color="inherit" /> : ' Run Prediction'}
               </Button>
 
               <Button
@@ -560,6 +581,46 @@ const PredictionForm = () => {
                       </Grid>
                     </Grid>
                   </Box>
+                  
+                  {/* Novelty 1: Localization Feasibility */}
+                  {feasibility && (
+                    <Alert 
+                      severity={feasibility.compatible ? "success" : "warning"} 
+                      variant="outlined"
+                      sx={{ borderRadius: 2 }}
+                    >
+                      <Typography variant="subtitle2" fontWeight="bold">Biological Feasibility</Typography>
+                      <Typography variant="caption">{feasibility.reason}</Typography>
+                      {feasibility.intersection?.length > 0 && (
+                        <Box sx={{ mt: 1 }}>
+                          <Typography variant="caption" sx={{ opacity: 0.8 }}>Shared Locations: </Typography>
+                          {feasibility.intersection.map(l => <Chip key={l} label={l} size="small" sx={{ height: 18, fontSize: '0.6rem', ml: 0.5 }} />)}
+                        </Box>
+                      )}
+                    </Alert>
+                  )}
+
+                  {/* Novelty 2: Biological Context (Pathways) */}
+                  {bioInfo && bioInfo.length > 0 && (
+                    <Box sx={{ p: 2, bgcolor: isDark ? 'rgba(0, 229, 255, 0.05)' : 'rgba(0, 105, 92, 0.05)', borderRadius: 2 }}>
+                      <Typography variant="subtitle2" color="secondary" gutterBottom fontWeight="bold">Biological Context</Typography>
+                      {bioInfo.map(info => (
+                        <Box key={info.protein_id} sx={{ mb: 1.5 }}>
+                          <Typography variant="caption" fontWeight="bold">{info.protein_id}</Typography>
+                          <Typography variant="caption" display="block" color="text.secondary">
+                            Pathways: {info.pathways || "Unknown"}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Box>
+                  )}
+
+                  {/* Novelty 3: Mutation Impact Scanner */}
+                  <MutationScanner 
+                    isDark={isDark}
+                    protein1={{ id: id1, seq: seq1 || result.protein1_seq }}
+                    protein2={{ id: id2, seq: seq2 || result.protein2_seq }}
+                  />
 
                   {/* Accessible Visualizer */}
                   <InteractionVisualizer result={result} id1={id1} id2={id2} />
