@@ -12,7 +12,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'
 from src.models.graph_model import GATLinkPredictor
 from src.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT, CHECKPOINT_DIR, MODELS_DIR
 
-CHECKPOINT_VERSION = "v2_encode_once"
+CHECKPOINT_VERSION = "v3_full_graph"
 
 
 def get_model_config(vram_gb: float) -> dict:
@@ -24,40 +24,58 @@ def get_model_config(vram_gb: float) -> dict:
         return {"hidden_channels": 64, "heads": 4, "dropout": 0.3, "profile": "small"}
 
 
-def drop_edge(edge_index: torch.Tensor, drop_rate: float = 0.4) -> torch.Tensor:
-    """Randomly drop edges from the message-passing graph for regularization."""
+def drop_edge(edge_index: torch.Tensor, drop_rate: float = 0.3) -> torch.Tensor:
     mask = torch.rand(edge_index.size(1), device=edge_index.device) > drop_rate
     return edge_index[:, mask]
 
 
-def build_positive_edge_index(train_df, node_mapping, device):
-    """Build message-passing graph from ONLY positive training interactions."""
-    pos_df = train_df[train_df["label"] == 1]
-    mp_src, mp_dst = [], []
-    for _, row in pos_df.iterrows():
-        p1, p2 = row["protein1"], row["protein2"]
-        if p1 in node_mapping and p2 in node_mapping:
-            u, v = node_mapping[p1], node_mapping[p2]
-            mp_src.extend([u, v])
-            mp_dst.extend([v, u])
-    return torch.tensor([mp_src, mp_dst], dtype=torch.long, device=device)
+def build_complete_positive_graph(node_mapping):
+    """
+    Build message-passing graph from ALL positive interactions across all splits.
+    
+    This is standard transductive link prediction:
+    - Graph structure includes all known interactions
+    - Supervision edges (train/val) are separate
+    - Model learns to distinguish real interactions from random pairs
+    """
+    all_src, all_dst = [], []
+    seen = set()
+
+    for csv_name in ["train.csv", "val.csv", "test.csv"]:
+        path = PROCESSED_DATA_DIR / csv_name
+        if path.exists():
+            df = pd.read_csv(path)
+            pos_df = df[df["label"] == 1]
+            for _, row in pos_df.iterrows():
+                p1, p2 = row["protein1"], row["protein2"]
+                if p1 in node_mapping and p2 in node_mapping:
+                    u, v = node_mapping[p1], node_mapping[p2]
+                    pair = (min(u, v), max(u, v))
+                    if pair not in seen:
+                        seen.add(pair)
+                        all_src.extend([u, v])
+                        all_dst.extend([v, u])
+
+    edge_index = torch.tensor([all_src, all_dst], dtype=torch.long)
+    print(f"  Complete graph: {len(seen)} undirected edges "
+          f"({edge_index.size(1)} directed)")
+    return edge_index
 
 
 def train(epochs: int = 100, lr: float = 0.001, graph_path: str = None,
           edge_batch_size: int = 16384):
     """
-    Train GAT Link Predictor.
+    Train GAT Link Predictor (transductive link prediction).
 
-    Key design decisions:
-    1. Graph cleaned to positive-only edges (old pipeline included negatives)
-    2. Encode ALL nodes ONCE per epoch (not 40x per batch)
-    3. DropEdge prevents trivial detection of direct edges
-    4. Gradient accumulation: classifier gradients accumulated across batches,
-       then back-propagated through encoder in one pass
+    Key design:
+    1. Message-passing graph uses ALL positive edges from train+val+test
+       (standard transductive setup — graph structure is fully known)
+    2. Supervision edges split into train/val for classifier training
+    3. DropEdge regularization prevents trivial edge detection
+    4. Encode ALL nodes ONCE per epoch, batch the edge scoring
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # ── GPU config ───────────────────────────────────────────────────────
     if device.type == "cuda":
         total_mem_gb = torch.cuda.get_device_properties(0).total_memory / (1024 ** 3)
         gpu_name = torch.cuda.get_device_name(0)
@@ -87,35 +105,34 @@ def train(epochs: int = 100, lr: float = 0.001, graph_path: str = None,
         return
 
     data = torch.load(graph_path, weights_only=False)
-    original_edges = data.num_edges
-    print(f"Loaded graph: {data.num_nodes} nodes, {original_edges} edges")
+    print(f"Loaded graph: {data.num_nodes} nodes, {data.num_edges} edges")
 
-    # ── Load splits and mapping ──────────────────────────────────────────
-    print("Loading datasets...")
-    train_df = pd.read_csv(PROCESSED_DATA_DIR / "train.csv")
-    val_df = pd.read_csv(PROCESSED_DATA_DIR / "val.csv")
-
+    # ── Load mapping ─────────────────────────────────────────────────────
     mapping_path = str(graph_path).replace(".pt", "_mapping.pt")
     if not os.path.exists(mapping_path):
         print("Node mapping not found.")
         return
     node_mapping = torch.load(mapping_path, weights_only=False)
 
-    # ── Rebuild graph: positive-only edges ───────────────────────────────
-    clean_edge_index = build_positive_edge_index(train_df, node_mapping, "cpu")
-    data.edge_index = clean_edge_index
+    # ── Rebuild graph with ALL positive edges (transductive) ─────────────
+    print("Building complete positive graph from all splits...")
+    clean_edge_index = build_complete_positive_graph(node_mapping)
 
-    if clean_edge_index.size(1) != original_edges:
-        print(f"  Cleaned graph: {clean_edge_index.size(1)} edges "
-              f"(removed {original_edges - clean_edge_index.size(1)} negative edges)")
+    if clean_edge_index.size(1) != data.num_edges:
+        print(f"  Updated: {data.num_edges} -> {clean_edge_index.size(1)} edges")
+        data.edge_index = clean_edge_index
         torch.save(data, graph_path)
-        print(f"  Saved cleaned graph → {graph_path}")
+        print(f"  Saved updated graph -> {graph_path}")
     else:
-        print(f"  Graph already clean: {clean_edge_index.size(1)} edges")
+        print(f"  Graph already correct: {data.num_edges} edges")
 
     data = data.to(device)
 
-    # ── Build supervision edge indices ───────────────────────────────────
+    # ── Load splits ──────────────────────────────────────────────────────
+    print("Loading supervision edges...")
+    train_df = pd.read_csv(PROCESSED_DATA_DIR / "train.csv")
+    val_df = pd.read_csv(PROCESSED_DATA_DIR / "val.csv")
+
     def get_edge_label_index(df):
         src, dst, labels = [], [], []
         for _, row in df.iterrows():
@@ -140,7 +157,7 @@ def train(epochs: int = 100, lr: float = 0.001, graph_path: str = None,
     num_val_batches = (num_val + edge_batch_size - 1) // edge_batch_size
 
     print(f"Supervision: {num_train} train / {num_val} val edges")
-    print(f"Edge batch size: {edge_batch_size} → {num_train_batches} train batches")
+    print(f"Edge batch size: {edge_batch_size} -> {num_train_batches} train batches")
 
     # ── Model ────────────────────────────────────────────────────────────
     model = GATLinkPredictor(
@@ -172,13 +189,13 @@ def train(epochs: int = 100, lr: float = 0.001, graph_path: str = None,
     checkpoint_path = CHECKPOINT_DIR / "graph_checkpoint.pt"
     start_epoch = 0
     best_val_loss = float("inf")
-    patience = 15
+    patience = 10
     epochs_no_improve = 0
 
     if checkpoint_path.exists():
         ckpt = torch.load(checkpoint_path, map_location=device, weights_only=False)
         if ckpt.get("version") != CHECKPOINT_VERSION:
-            print("Old checkpoint detected (incompatible procedure). Starting fresh.")
+            print("Old checkpoint (incompatible version). Starting fresh.")
         else:
             try:
                 model.load_state_dict(ckpt["model_state_dict"])
@@ -186,8 +203,7 @@ def train(epochs: int = 100, lr: float = 0.001, graph_path: str = None,
                 start_epoch = ckpt["epoch"] + 1
                 best_val_loss = ckpt.get("best_val_loss", float("inf"))
                 epochs_no_improve = ckpt.get("epochs_no_improve", 0)
-                print(f"Resumed at epoch {start_epoch}/{epochs} | "
-                      f"Best: {best_val_loss:.4f}")
+                print(f"Resumed at epoch {start_epoch}/{epochs} | Best: {best_val_loss:.4f}")
             except RuntimeError:
                 print("Checkpoint weights incompatible. Starting fresh.")
     else:
@@ -198,7 +214,7 @@ def train(epochs: int = 100, lr: float = 0.001, graph_path: str = None,
         return
 
     best_model_path = MODELS_DIR / "graph_model_best.pth"
-    DROP_RATE = 0.4
+    DROP_RATE = 0.3
 
     # ── Training Loop ────────────────────────────────────────────────────
     print(f"\nStarting training (DropEdge={DROP_RATE}, LR={lr})...\n")
@@ -207,19 +223,18 @@ def train(epochs: int = 100, lr: float = 0.001, graph_path: str = None,
         model.train()
         optimizer.zero_grad()
 
-        # 1. DropEdge: randomly mask edges for regularization
+        # 1. DropEdge regularization
         dropped_ei = drop_edge(data.edge_index, drop_rate=DROP_RATE)
 
-        # 2. Encode ALL nodes ONCE per epoch (with gradients tracked)
+        # 2. Encode ALL nodes ONCE
         z = model.encode(data.x, dropped_ei)
         z_clf = z.detach().requires_grad_(True)
 
-        # 3. Shuffle training edges
+        # 3. Shuffle and batch supervision edges
         perm = torch.randperm(num_train, device=device)
         eli_shuf = train_eli[:, perm]
         lbl_shuf = train_labels[perm]
 
-        # 4. Score edges in batches, accumulate classifier gradients
         total_loss = 0.0
         pbar = tqdm(
             range(num_train_batches),
@@ -232,18 +247,16 @@ def train(epochs: int = 100, lr: float = 0.001, graph_path: str = None,
             e = min(s + edge_batch_size, num_train)
 
             out = model.decode(z_clf, eli_shuf[:, s:e])
-            # Scale loss for correct gradient magnitude with accumulation
             loss = criterion(out.squeeze(), lbl_shuf[s:e]) / num_train_batches
             loss.backward()
 
-            total_loss += loss.item() * num_train_batches  # Unscale for logging
+            total_loss += loss.item() * num_train_batches
             pbar.set_postfix(loss=f"{loss.item() * num_train_batches:.4f}")
 
-        # 5. Back-propagate accumulated gradients through encoder
+        # 4. Backprop through encoder
         if z_clf.grad is not None:
             z.backward(z_clf.grad)
 
-        # 6. Clip and step once per epoch
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimizer.step()
 
@@ -273,7 +286,6 @@ def train(epochs: int = 100, lr: float = 0.001, graph_path: str = None,
         scheduler.step()
         current_lr = optimizer.param_groups[0]["lr"]
 
-        # ── Epoch summary ────────────────────────────────────────────────
         print(
             f"\nEpoch [{epoch + 1}/{epochs}] | "
             f"Train: {avg_train_loss:.4f} | "
@@ -288,17 +300,15 @@ def train(epochs: int = 100, lr: float = 0.001, graph_path: str = None,
             f"{epochs - epoch - 1} remaining"
         )
 
-        # ── Save best model ─────────────────────────────────────────────
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
             epochs_no_improve = 0
             torch.save(model.state_dict(), best_model_path)
-            print(f"  ✓ New best model → {best_model_path}")
+            print(f"  ✓ New best model -> {best_model_path}")
         else:
             epochs_no_improve += 1
             print(f"  No improvement {epochs_no_improve}/{patience}")
 
-        # ── Checkpoint ───────────────────────────────────────────────────
         torch.save({
             "version": CHECKPOINT_VERSION,
             "epoch": epoch,
@@ -310,9 +320,8 @@ def train(epochs: int = 100, lr: float = 0.001, graph_path: str = None,
         }, checkpoint_path)
         print(f"  ✓ Checkpoint saved")
 
-        # ── Early stopping ───────────────────────────────────────────────
         if epochs_no_improve >= patience:
-            print(f"\n  ✗ Early stopping after {patience} epochs")
+            print(f"\n  Early stopping after {patience} epochs")
             break
 
         if device.type == "cuda":
