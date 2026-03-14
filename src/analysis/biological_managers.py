@@ -110,3 +110,32 @@ class BiologicalManager:
             "p2_locs": list(l2),
             "reason": "Shared localization found" if compatible else "No shared subcellular localization found"
         }
+    def calculate_pathway_vulnerability(self, p1_id: str, p2_id: str, delta_score: float) -> Dict[str, Any]:
+        """
+        Estimates the risk to biological pathways if this interaction is disrupted.
+        """
+        meta = self.get_bio_metadata([p1_id, p2_id])
+        pathways = []
+        if not meta.empty:
+            for _, row in meta.iterrows():
+                if pd.notna(row['pathways']):
+                    pathways.extend([p.strip() for p in str(row['pathways']).split(";") if p.strip()])
+        
+        pathways = list(set(pathways))
+        
+        # Risk Score Logic: 
+        # If the interaction drop (delta_score) is high, the pathways associated 
+        # with these proteins are considered "at risk".
+        risk_level = "Low"
+        if abs(delta_score) > 0.1:
+            risk_level = "Moderate"
+        if abs(delta_score) > 0.25:
+            risk_level = "High"
+            
+        return {
+            "interaction": f"{p1_id}<->{p2_id}",
+            "impact_delta": delta_score,
+            "risk_level": risk_level,
+            "affected_pathways": pathways,
+            "description": f"A {risk_level} risk detected for {len(pathways)} cellular pathways due to interaction variance."
+        }

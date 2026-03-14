@@ -28,15 +28,22 @@ from src.analysis.mutation_analyzer import MutationAnalyzer
 from src.analysis.biological_managers import BiologicalManager
 from app.backend.schemas import (
     ProteinPair, PredictionResponse, NetworkResponse, BatchPredictionRequest,
-    MutationRequest, MutationAnalysisResponse, BioMetaResponse, FeasibilityResponse
+    MutationRequest, MutationAnalysisResponse, BioMetaResponse, FeasibilityResponse,
+    ResidueGraphRequest
 )
 
 app = FastAPI(title="TransGraph-PPI API", description="Hybrid Ensemble PPI Prediction System with Real Data")
 
-# CORS
+# CORS configuration
+origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Allow all for dev
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -116,10 +123,15 @@ async def load_system():
         analyzers["network"].build_from_dataframe(df_pos)
         print("Network Analyzer Ready.")
 
-    # 4. Mutation Analyzer
+    # 4. Mutation and Novel Analyzers
     if "seq_model" in models and "esm" in models:
+        from src.analysis.hotspot_analyzer import HotspotAnalyzer
+        from src.analysis.residue_graph_generator import ResidueGraphGenerator
+        
         analyzers["mutation"] = MutationAnalyzer(models["seq_model"], models["esm"])
-        print("Mutation Analyzer Ready.")
+        analyzers["hotspot"] = HotspotAnalyzer(models["seq_model"], models["esm"])
+        analyzers["residue_graph"] = ResidueGraphGenerator(device=device)
+        print("Mutation and Novel Analyzers Ready.")
 
     # 5. Biological Manager
     managers["bio"] = BiologicalManager()
@@ -130,7 +142,11 @@ async def load_system():
 @app.post("/predict", response_model=PredictionResponse)
 async def predict_interaction(pair: ProteinPair):
     try:
-        p1, p2 = pair.protein1_id, pair.protein2_id
+        p1 = pair.protein1_id.strip() if pair.protein1_id else None
+        p2 = pair.protein2_id.strip() if pair.protein2_id else None
+        
+        if not p1 or not p2:
+             raise HTTPException(status_code=400, detail="Protein IDs are required.")
         
         # 1. Get Sequences
         sequences = {}
@@ -208,8 +224,10 @@ async def predict_interaction(pair: ProteinPair):
             "gat_probability": float(graph_prob),
             "confidence_score": abs(float(final_prob) - 0.5) * 2,
             "explanation": explanation,
-            "protein1_uniprot_id": uniprot_maps.get(p1, p1), # Fallback to original if not found
-            "protein2_uniprot_id": uniprot_maps.get(p2, p2)
+            "protein1_uniprot_id": uniprot_maps.get(p1, p1),
+            "protein2_uniprot_id": uniprot_maps.get(p2, p2),
+            "protein1_seq": sequences[p1],
+            "protein2_seq": sequences[p2]
         }
 
     except Exception as e:
@@ -338,6 +356,83 @@ async def check_feasibility(p1: str, p2: str):
         return managers["bio"].check_localization_compatibility(p1, p2)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/analysis/hotspots")
+async def get_hotspots(request: ProteinPair):
+    if "hotspot" not in analyzers:
+        raise HTTPException(status_code=503, detail="Hotspot Analyzer not initialized")
+    
+    try:
+        # Get sequences if missing
+        sequences = {}
+        to_fetch = []
+        if not request.protein1_seq: to_fetch.append(request.protein1_id)
+        else: sequences[request.protein1_id] = request.protein1_seq
+        if not request.protein2_seq: to_fetch.append(request.protein2_id)
+        else: sequences[request.protein2_id] = request.protein2_seq
+        
+        if to_fetch:
+            sequences.update(managers["sequence"].get_sequences(to_fetch))
+            
+        return analyzers["hotspot"].identify_hotspots(
+            request.protein1_id, sequences[request.protein1_id],
+            request.protein2_id, sequences[request.protein2_id]
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/analysis/residue_graph")
+async def get_residue_graph(request: ResidueGraphRequest):
+    if "residue_graph" not in analyzers:
+         raise HTTPException(status_code=503, detail="Residue Graph Generator not initialized")
+    
+    try:
+        protein_id = request.protein_id
+        sequence = request.sequence
+        
+        if not sequence:
+            seq_dict = managers["sequence"].get_sequences([protein_id])
+            if protein_id not in seq_dict:
+                raise HTTPException(status_code=404, detail="Sequence not found")
+            sequence = seq_dict[protein_id]
+            
+        return analyzers["residue_graph"].generate_rig(sequence)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/analysis/optimize")
+async def get_optimization(request: ProteinPair, mode: str = "disrupt"):
+    if "mutation" not in analyzers:
+        raise HTTPException(status_code=503, detail="Mutation Analyzer not initialized")
+    
+    try:
+        # Get sequences
+        sequences = {}
+        to_fetch = []
+        if not request.protein1_seq: to_fetch.append(request.protein1_id)
+        else: sequences[request.protein1_id] = request.protein1_seq
+        if not request.protein2_seq: to_fetch.append(request.protein2_id)
+        else: sequences[request.protein2_id] = request.protein2_seq
+        
+        if to_fetch:
+            sequences.update(managers["sequence"].get_sequences(to_fetch))
+            
+        return analyzers["mutation"].suggest_optimal_mutations(
+            request.protein1_id, sequences[request.protein1_id],
+            request.protein2_id, sequences[request.protein2_id],
+            mode=mode
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/analysis/vulnerability")
+async def get_vulnerability(p1: str, p2: str, delta: float):
+    if "bio" not in managers:
+        raise HTTPException(status_code=503, detail="Biological Manager not initialized")
+    return managers["bio"].calculate_pathway_vulnerability(p1, p2, delta)
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

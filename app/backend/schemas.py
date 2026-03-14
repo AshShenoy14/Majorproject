@@ -15,9 +15,15 @@ class PredictionResponse(BaseModel):
     explanation: Dict[str, float] # SHAP values or similar
     protein1_uniprot_id: Optional[str] = None
     protein2_uniprot_id: Optional[str] = None
+    protein1_seq: Optional[str] = None
+    protein2_seq: Optional[str] = None
     
 class NetworkRequest(BaseModel):
     threshold: float = 0.5
+
+class ResidueGraphRequest(BaseModel):
+    protein_id: str
+    sequence: Optional[str] = None
     
 class NetworkResponse(BaseModel):
     nodes: List[Dict]

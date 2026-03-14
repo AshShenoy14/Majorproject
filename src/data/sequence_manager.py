@@ -106,6 +106,16 @@ class SequenceManager:
             
         return found
 
+    def _fetch_direct_uniprot(self, accession: str) -> str:
+        url = f"https://rest.uniprot.org/uniprotkb/{accession}.fasta"
+        try:
+            r = requests.get(url, timeout=5)
+            r.raise_for_status()
+            lines = r.text.splitlines()
+            return "".join(lines[1:]) if len(lines) > 1 else None
+        except:
+            return None
+
     def _fetch_from_uniprot(self, ids: List[str], batch_size: int = 50) -> Dict[str, str]:
         fetched = {}
         
@@ -231,51 +241,15 @@ class SequenceManager:
                     print(f"Fetched {i}/{len(ensp_ids)}...")
                 time.sleep(0.1) 
         
-        # 2. UniProt Fetch (Batch)
+        # 2. UniProt Fetch 
         if other_ids:
-             # Use the previous batch logic for standardized UniProt IDs
              print(f"Fetching {len(other_ids)} IDs from UniProt...")
-             
-             for i in range(0, len(other_ids), 50):
-                batch = other_ids[i:i+50]
-                query = " OR ".join([f"accession:{uid}" for uid in batch])
-                params = {
-                    "query": query,
-                    "format": "fasta",
-                    "size": 50
-                }
-                try:
-                    response = requests.get(self.uniprot_api_url, params=params)
-                    response.raise_for_status()
-                    
-                    current_header = None
-                    current_seq = []
-                    for line in response.text.splitlines():
-                        if line.startswith(">"):
-                            if current_header and current_seq:
-                                # Map back logic? 
-                                # Standard UniProt FASTA header: >sp|P12345|...
-                                # We can extract P12345.
-                                parts = current_header.split("|")
-                                if len(parts) >= 2:
-                                    pid = parts[1]
-                                    if pid in batch:
-                                        fetched[pid] = "".join(current_seq)
-                            current_header = line
-                            current_seq = []
-                        else:
-                            current_seq.append(line.strip())
-                    
-                    if current_header and current_seq:
-                        parts = current_header.split("|")
-                        if len(parts) >= 2:
-                            pid = parts[1]
-                            if pid in batch:
-                                fetched[pid] = "".join(current_seq)
-                                
-                    time.sleep(0.5)
-                except Exception as e:
-                    print(f"Error fetching UniProt batch {i}: {e}")
+             for uid in other_ids:
+                 seq = self._fetch_direct_uniprot(uid)
+                 if seq:
+                     fetched[uid] = seq
+                 else:
+                     print(f"UniProt returned no sequence for {uid}")
              
         return fetched
 

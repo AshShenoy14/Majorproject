@@ -3,10 +3,12 @@ import { Box, Typography, Skeleton, useTheme } from '@mui/material';
 
 const ProteinViewer = ({ proteinId }) => {
     const viewerRef = useRef(null);
+    const isMounted = useRef(true);
     const theme = useTheme();
     const isDark = theme.palette.mode === 'dark';
 
     useEffect(() => {
+        isMounted.current = true;
         if (!proteinId || proteinId === "Protein A" || proteinId === "Protein B") return;
 
         // Dynamically load the correct CSS based on theme
@@ -27,7 +29,7 @@ const ProteinViewer = ({ proteinId }) => {
         let script = document.getElementById(scriptId);
 
         const renderViewer = async () => {
-            if (viewerRef.current && window.PDBeMolstarPlugin) {
+            if (viewerRef.current && window.PDBeMolstarPlugin && isMounted.current) {
                 viewerRef.current.innerHTML = ''; // Clear previous
 
                 let realPdbUrl = `https://alphafold.ebi.ac.uk/files/AF-${proteinId.toUpperCase()}-F1-model_v4.pdb`;
@@ -67,6 +69,7 @@ const ProteinViewer = ({ proteinId }) => {
         };
 
         const checkPluginAndRender = () => {
+            if (!isMounted.current) return;
             if (window.PDBeMolstarPlugin) {
                 renderViewer();
             } else {
@@ -88,6 +91,7 @@ const ProteinViewer = ({ proteinId }) => {
         }
 
         return () => {
+            isMounted.current = false;
             if (viewerRef.current) {
                 viewerRef.current.innerHTML = '';
             }
