@@ -14,7 +14,7 @@ class BiologicalManager:
 
     def _load_cache(self) -> pd.DataFrame:
         if self.cache_path.exists():
-            return pd.read_csv(self.cache_path)
+            return pd.read_csv(self.cache_path).fillna("")
         return pd.DataFrame(columns=["protein_id", "uniprot_id", "localization", "pathways"])
 
     def _save_cache(self):

@@ -87,7 +87,7 @@ async def load_system():
     if graph_data_path.exists():
         data_cache["graph"] = torch.load(graph_data_path, weights_only=False).to(device)
         in_channels = data_cache["graph"].x.shape[1]
-        models["graph_model"] = GATLinkPredictor(in_channels=in_channels, hidden_channels=128).to(device)
+        models["graph_model"] = GATLinkPredictor(in_channels=in_channels, hidden_channels=64).to(device)
         if graph_path.exists():
             try:
                 models["graph_model"].load_state_dict(torch.load(graph_path, map_location=device))

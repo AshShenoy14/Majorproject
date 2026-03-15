@@ -44,7 +44,7 @@ def train_ensemble(seq_model_path, graph_model_path, graph_data_path):
         return
     
     graph_data = torch.load(graph_data_path, weights_only=False).to(device)
-    graph_model = GATLinkPredictor(in_channels=graph_data.x.shape[1], hidden_channels=128).to(device)
+    graph_model = GATLinkPredictor(in_channels=graph_data.x.shape[1], hidden_channels=64).to(device)
     try:
         if os.path.exists(graph_model_path):
             graph_model.load_state_dict(torch.load(graph_model_path, map_location=device))

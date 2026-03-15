@@ -90,8 +90,8 @@ def evaluate_models():
          seq_model.load_state_dict(torch.load(seq_path, map_location=device))
     seq_model.eval()
 
-    # Updated GAT: hidden_channels=128
-    graph_model = GATLinkPredictor(in_channels=graph_data.x.shape[1], hidden_channels=128).to(device)
+    # Updated GAT: hidden_channels=64 (Optimized for CPU)
+    graph_model = GATLinkPredictor(in_channels=graph_data.x.shape[1], hidden_channels=64).to(device)
     if graph_model_path.exists():
          graph_model.load_state_dict(torch.load(graph_model_path, map_location=device))
     graph_model.eval()
