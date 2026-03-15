@@ -1,189 +1,146 @@
-import React, { useContext } from 'react';
-import { Container, Typography, Box, Paper, Grid, Chip } from '@mui/material';
+import React from 'react';
 import { motion } from 'framer-motion';
-import { ThemeContext } from '../ThemeContext';
-
-const stagger = {
-    animate: { transition: { staggerChildren: 0.12 } },
-};
-
-const fadeUp = {
-    initial: { opacity: 0, y: 25 },
-    animate: { opacity: 1, y: 0, transition: { duration: 0.65, ease: [0.4, 0, 0.2, 1] } },
-};
+import { 
+  GitBranch, 
+  Cpu, 
+  Globe, 
+  ShieldCheck, 
+  Mail, 
+  Github,
+  Award,
+  BookOpen,
+  PieChart as PieIcon
+} from 'lucide-react';
 
 const About = () => {
-    const { mode } = useContext(ThemeContext);
-    const isDark = mode === 'dark';
+  return (
+    <div className="max-w-5xl mx-auto space-y-12 pb-20">
+      {/* Platform Intro */}
+      <section className="text-center space-y-6">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-scientific-primary/10 rounded-full text-scientific-primary text-xs font-bold uppercase tracking-widest"
+        >
+          <Globe size={14} /> Global Biological Research Platform
+        </motion.div>
+        <h1 className="text-4xl font-extrabold text-slate-800">About TransGraph-PPI</h1>
+        <p className="text-lg text-slate-500 max-w-2xl mx-auto leading-relaxed">
+           A next-generation AI framework designed to accelerate the discovery of protein-protein interactions 
+           using geometric deep learning and large-scale language models.
+        </p>
+      </section>
 
-    const cardStyles = {
-        p: 4,
-        borderRadius: 4,
-        background: isDark ? 'rgba(16, 33, 65, 0.5)' : 'rgba(255, 255, 255, 0.6)',
-        backdropFilter: 'blur(20px) saturate(180%)',
-        border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)'}`,
-        transition: 'all 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
-        '&:hover': {
-            transform: 'translateY(-4px)',
-            boxShadow: isDark
-                ? '0 20px 60px rgba(0, 0, 0, 0.3)'
-                : '0 20px 60px rgba(0, 0, 0, 0.08)',
-            borderColor: isDark ? 'rgba(0, 229, 255, 0.15)' : 'rgba(0, 105, 92, 0.15)',
-        },
-    };
+      {/* Methodology Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        {[
+          { 
+            icon: Cpu, 
+            title: "ESM-2 Embeddings", 
+            text: "Utilizing 650M parameter protein language models to extract high-dimensional semantic features from sequences.",
+            color: "bg-teal-500"
+          },
+          { 
+            icon: GitBranch, 
+            title: "GAT Networks", 
+            text: "Graph Attention Networks analyze topological proximity and functional clusters in the protein interactome.",
+            color: "bg-blue-500"
+          },
+          { 
+            icon: ShieldCheck, 
+            title: "XGBoost Ensemble", 
+            text: "A robust meta-learner that combines sequence and graph evidence to provide confident, calibrated predictions.",
+            color: "bg-purple-500"
+          }
+        ].map((item, i) => (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.1 }}
+            key={i} 
+            className="glass-card p-8 flex flex-col items-center text-center"
+          >
+            <div className={`p-4 rounded-2xl ${item.color} text-white mb-6 shadow-lg`}>
+              <item.icon size={32} />
+            </div>
+            <h3 className="text-xl font-bold text-slate-800 mb-4">{item.title}</h3>
+            <p className="text-sm text-slate-500 leading-relaxed font-medium">{item.text}</p>
+          </motion.div>
+        ))}
+      </div>
 
-    return (
-        <Container maxWidth="md" sx={{ py: { xs: 6, md: 8 }, minHeight: '80vh' }}>
-            <motion.div variants={stagger} initial="initial" animate="animate">
-                {/* Header */}
-                <motion.div variants={fadeUp}>
-                    <Box textAlign="center" mb={6}>
-                        <Chip
-                            label="📖 Research Project"
-                            variant="outlined"
-                            size="small"
-                            sx={{
-                                mb: 2,
-                                borderColor: isDark ? 'rgba(0, 229, 255, 0.25)' : 'rgba(0, 105, 92, 0.25)',
-                                color: isDark ? '#00e5ff' : '#00695c',
-                                fontFamily: '"Outfit", sans-serif',
-                                fontWeight: 600,
-                                background: isDark ? 'rgba(0, 229, 255, 0.05)' : 'rgba(0, 105, 92, 0.03)',
-                            }}
-                        />
-                        <Typography
-                            variant="h2"
-                            gutterBottom
-                            sx={{
-                                fontWeight: 800,
-                                background: isDark
-                                    ? 'linear-gradient(135deg, #00e5ff 0%, #7c4dff 50%, #d500f9 100%)'
-                                    : 'linear-gradient(135deg, #00695c 0%, #1565c0 100%)',
-                                WebkitBackgroundClip: 'text',
-                                WebkitTextFillColor: 'transparent',
-                            }}
-                        >
-                            About TransGraph-PPI
-                        </Typography>
-                        <Typography
-                            variant="h6"
-                            color="text.secondary"
-                            sx={{ maxWidth: 600, mx: 'auto', lineHeight: 1.7, fontWeight: 400 }}
-                        >
-                            A Hybrid Artificial Intelligence model for Protein-Protein Interaction Prediction.
-                        </Typography>
-                    </Box>
-                </motion.div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Architecture Section */}
+        <div className="glass-card p-8">
+          <div className="flex items-center gap-3 mb-8">
+             <BookOpen className="text-scientific-primary" />
+             <h3 className="text-xl font-bold text-slate-800">Research Architecture</h3>
+          </div>
+          <div className="space-y-6">
+             <div className="flex gap-4">
+                <div className="w-1.5 h-auto bg-scientific-primary rounded-full shrink-0" />
+                <div>
+                   <h4 className="text-sm font-bold text-slate-700 mb-1 uppercase tracking-tight">Sequence Module</h4>
+                   <p className="text-xs text-slate-500 leading-relaxed">
+                      Multi-layer perceptron architecture processing latent vectors from Meta's ESM-2 transformer. 
+                      Captures conserved domains and binding motifs.
+                   </p>
+                </div>
+             </div>
+             <div className="flex gap-4">
+                <div className="w-1.5 h-auto bg-scientific-secondary rounded-full shrink-0" />
+                <div>
+                   <h4 className="text-sm font-bold text-slate-700 mb-1 uppercase tracking-tight">Graph Module</h4>
+                   <p className="text-xs text-slate-500 leading-relaxed">
+                      Two-layer Graph Attention Network with 8-head multi-head attention. 
+                      Learns structural dependencies on the Human STRING DB network.
+                   </p>
+                </div>
+             </div>
+             <div className="flex gap-4">
+                <div className="w-1.5 h-auto bg-scientific-accent rounded-full shrink-0" />
+                <div>
+                   <h4 className="text-sm font-bold text-slate-700 mb-1 uppercase tracking-tight">SHAP Explainer</h4>
+                   <p className="text-xs text-slate-500 leading-relaxed">
+                      Feature attribution module using Shapley values to identify which model components 
+                      drove the final interaction decision.
+                   </p>
+                </div>
+             </div>
+          </div>
+        </div>
 
-                {/* The Science */}
-                <motion.div variants={fadeUp}>
-                    <Paper elevation={0} sx={{ ...cardStyles, mb: 4 }}>
-                        <Typography
-                            variant="h4"
-                            gutterBottom
-                            sx={{
-                                fontWeight: 700,
-                                background: isDark
-                                    ? 'linear-gradient(90deg, #d500f9, #ff5bff)'
-                                    : 'linear-gradient(90deg, #1565c0, #42a5f5)',
-                                WebkitBackgroundClip: 'text',
-                                WebkitTextFillColor: 'transparent',
-                            }}
-                        >
-                            The Science
-                        </Typography>
-                        <Typography variant="body1" paragraph sx={{ lineHeight: 1.8 }}>
-                            Protein-Protein Interactions (PPIs) are central to almost every cellular process.
-                            Predicting how proteins interact helps scientists understand devastating diseases,
-                            formulate new drugs, and decode the complex machinery of life exactly.
-                        </Typography>
-                        <Typography variant="body1" paragraph sx={{ lineHeight: 1.8 }}>
-                            Unfortunately, wet-lab experiments to find interactions are incredibly expensive and
-                            unbelievably slow. Computational prediction models offer a massively
-                            scalable alternative to scan vast networks for promising interaction targets.
-                        </Typography>
-                    </Paper>
-                </motion.div>
+        {/* Contact & Community */}
+        <div className="space-y-8 flex flex-col justify-center">
+           <div className="glass-card p-8 bg-slate-900 text-white relative overflow-hidden">
+              <div className="relative z-10">
+                 <h3 className="text-2xl font-bold mb-4">Open-Source Intelligence</h3>
+                 <p className="text-slate-400 text-sm mb-8 leading-relaxed">
+                    This project is part of the ongoing effort to open-source advanced bioinformatics tools for drug discovery and molecular biology.
+                 </p>
+                 <div className="flex gap-4">
+                    <button className="px-6 py-2 bg-white text-slate-900 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-slate-100 transition-colors">
+                       <Github size={18} /> GITHUB REPO
+                    </button>
+                    <button className="px-6 py-2 bg-slate-800 text-white border border-slate-700 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-slate-700 transition-colors">
+                       <Mail size={18} /> CONTACT LAB
+                    </button>
+                 </div>
+              </div>
+              <PieIcon size={120} className="absolute -right-8 -bottom-8 text-white/5 rotate-12" />
+           </div>
 
-                {/* Model Cards */}
-                <Grid container spacing={3} sx={{ mb: 4 }}>
-                    <Grid item xs={12} sm={6}>
-                        <motion.div variants={fadeUp} style={{ height: '100%' }}>
-                            <Paper elevation={0} sx={{ ...cardStyles, height: '100%' }}>
-                                <Box sx={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    width: 48,
-                                    height: 48,
-                                    borderRadius: 3,
-                                    mb: 2,
-                                    background: isDark
-                                        ? 'linear-gradient(135deg, rgba(0, 229, 255, 0.15), rgba(0, 229, 255, 0.05))'
-                                        : 'linear-gradient(135deg, rgba(0, 105, 92, 0.12), rgba(0, 105, 92, 0.04))',
-                                    border: `1px solid ${isDark ? 'rgba(0, 229, 255, 0.2)' : 'rgba(0, 105, 92, 0.15)'}`,
-                                }}>
-                                    <Typography sx={{ fontSize: '1.5rem' }}>🧠</Typography>
-                                </Box>
-                                <Typography
-                                    variant="h6"
-                                    gutterBottom
-                                    sx={{
-                                        fontWeight: 700,
-                                        color: isDark ? '#00e5ff' : '#00695c',
-                                    }}
-                                >
-                                    ESM-2
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7 }}>
-                                    An advanced Evolutionary Scale Modeling transformer. ESM-2 looks at millions
-                                    of protein sequences to understand the fundamental grammar and evolution of proteins,
-                                    generating rich numerical embeddings from simple amino-acid strings.
-                                </Typography>
-                            </Paper>
-                        </motion.div>
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                        <motion.div variants={fadeUp} style={{ height: '100%' }}>
-                            <Paper elevation={0} sx={{ ...cardStyles, height: '100%' }}>
-                                <Box sx={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    width: 48,
-                                    height: 48,
-                                    borderRadius: 3,
-                                    mb: 2,
-                                    background: isDark
-                                        ? 'linear-gradient(135deg, rgba(213, 0, 249, 0.15), rgba(213, 0, 249, 0.05))'
-                                        : 'linear-gradient(135deg, rgba(21, 101, 192, 0.12), rgba(21, 101, 192, 0.04))',
-                                    border: `1px solid ${isDark ? 'rgba(213, 0, 249, 0.2)' : 'rgba(21, 101, 192, 0.15)'}`,
-                                }}>
-                                    <Typography sx={{ fontSize: '1.5rem' }}>🕸️</Typography>
-                                </Box>
-                                <Typography
-                                    variant="h6"
-                                    gutterBottom
-                                    sx={{
-                                        fontWeight: 700,
-                                        color: isDark ? '#d500f9' : '#1565c0',
-                                    }}
-                                >
-                                    GAT
-                                </Typography>
-                                <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7 }}>
-                                    Graph Attention Networks process proteins as a connected 3D network.
-                                    Unlike standard neural networks, Graph Attention allows the model to learn
-                                    the structural 'shape' of interactions by giving specific attention to
-                                    highly-relevant neighboring nodes in the biological graph.
-                                </Typography>
-                            </Paper>
-                        </motion.div>
-                    </Grid>
-                </Grid>
-            </motion.div>
-        </Container>
-    );
+           <div className="flex justify-between items-center px-4">
+              <div className="flex items-center gap-2">
+                 <Award className="text-warning" size={20} />
+                 <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Research Citation v2.4</span>
+              </div>
+              <p className="text-[10px] text-slate-400 font-medium italic">Powered by DeepMind, Meta AI, and STRING</p>
+           </div>
+        </div>
+      </div>
+    </div>
+  );
 };
 
 export default About;

@@ -34,6 +34,24 @@ class BiologicalManager:
 
         # Map ENSP -> UniProt
         mapping = self.mapper.ensp_to_uniprot(missing_ids)
+        
+        # Fallback: Search UniProt for missing mappings (e.g. if TSV is incomplete)
+        unmapped = [p for p in missing_ids if p not in mapping]
+        if unmapped:
+            print(f"Fallback: Searching UniProt for {len(unmapped)} unmapped IDs...")
+            for p in unmapped:
+                try:
+                    search_resp = requests.get(self.uniprot_url, params={"query": p, "format": "json"}, timeout=10)
+                    if search_resp.status_code == 200:
+                        s_data = search_resp.json()
+                        if s_data.get("results"):
+                            uni_id = s_data["results"][0].get("primaryAccession")
+                            if uni_id:
+                                mapping[p] = uni_id
+                                print(f"Mapped {p} -> {uni_id} via search.")
+                except Exception as e:
+                    print(f"Search fallback failed for {p}: {e}")
+
         if not mapping:
             return existing
 

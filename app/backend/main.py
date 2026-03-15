@@ -76,10 +76,10 @@ async def load_system():
     models["seq_model"] = SequencePPIModel(input_dim=320).to(device)
     if seq_path.exists():
         models["seq_model"].load_state_dict(torch.load(seq_path, map_location=device))
-        models["seq_model"].eval()
         print("Sequence Model loaded.")
     else:
-        print("Warning: Sequence Model weights not found.")
+        print("Warning: Sequence Model weights not found. Using randomly initialized weights.")
+    models["seq_model"].eval()
 
     # Graph Model
     graph_path = PROJECT_ROOT / "models" / "graph_model_best.pth"
@@ -91,12 +91,12 @@ async def load_system():
         if graph_path.exists():
             try:
                 models["graph_model"].load_state_dict(torch.load(graph_path, map_location=device))
-                models["graph_model"].eval()
                 print("Graph Model loaded.")
             except Exception as e:
                 print(f"Warning: Could not load Graph Model weights ({e}). Graph predictions will use defaults.")
         else:
-            print("Warning: Graph Model weights not found.")
+            print("Warning: Graph Model weights not found. Using randomly initialized weights.")
+        models["graph_model"].eval()
         
         map_path = PROCESSED_DATA_DIR / "ppi_graph_mapping.pt"
         if map_path.exists():
@@ -139,8 +139,23 @@ async def load_system():
 
     print("System Loaded.")
 
-@app.post("/predict", response_model=PredictionResponse)
+@app.post("/predict", 
+          response_model=PredictionResponse,
+          summary="Predict Interaction probability",
+          description="Predicts the interaction probability between two proteins using a hybrid ESM-MLP and GAT ensemble model.",
+          tags=["Prediction"])
 async def predict_interaction(pair: ProteinPair):
+    """
+    Computes a hybrid interaction probability for a protein pair.
+    
+    - **protein1_id**: Identifier for the first protein (e.g., ENSP ID).
+    - **protein2_id**: Identifier for the second protein.
+    - **protein1_seq** (optional): Amino acid sequence if not in database.
+    - **protein2_seq** (optional): Amino acid sequence if not in database.
+    
+    Returns a unified probability score along with individual model contributions and SHAP explanations.
+    """
+
     try:
         p1 = pair.protein1_id.strip() if pair.protein1_id else None
         p2 = pair.protein2_id.strip() if pair.protein2_id else None
@@ -230,26 +245,47 @@ async def predict_interaction(pair: ProteinPair):
             "protein2_seq": sequences[p2]
         }
 
+    except HTTPException as he:
+        raise he
     except Exception as e:
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/predict_batch", response_model=List[PredictionResponse])
+
+@app.post("/predict_batch", 
+          response_model=List[PredictionResponse],
+          summary="Batch Predict Interactions",
+          description="Processes multiple protein pairs sequentially for interaction prediction.",
+          tags=["Prediction"])
 async def predict_batch(request: BatchPredictionRequest):
+    """
+    Accepts a list of protein pairs and returns a list of prediction responses.
+    """
+
     results = []
     for pair in request.pairs:
         try:
              res = await predict_interaction(pair)
              results.append(res)
+        except HTTPException as he:
+             raise he
         except Exception as e:
              # Log the error but continue or fail? We'll fail the batch if one severely errors for now, or just raise.
              # Ideally we return a partial result, but for simplicity we raise 500
              raise HTTPException(status_code=500, detail=f"Error processing pair {pair.protein1_id}-{pair.protein2_id}: {str(e)}")
+
     return results
 
-@app.get("/network")
+@app.get("/network",
+         summary="Get Verified Network Subgraph",
+         description="Returns a subset of the positive interaction network for visualization.",
+         tags=["Analysis"])
 async def get_network(limit: int = 100):
+    """
+    Fetches the top N verified interactions from the training set.
+    """
+
     try:
         train_path = PROCESSED_DATA_DIR / "train.csv"
         if not train_path.exists():
@@ -271,11 +307,21 @@ async def get_network(limit: int = 100):
         
         return {"nodes": node_list, "edges": edges}
         
+    except HTTPException as he:
+        raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/drug_targets")
+
+@app.get("/drug_targets",
+         summary="Get Drug Targets",
+         description="Retrieves known drug targets for a given list of proteins.",
+         tags=["Biology"])
 async def get_drug_targets(proteins: str = None):
+    """
+    Returns drug target information from ChEMBL/UniProt mappings.
+    """
+
     try:
         if proteins:
             p_list = proteins.split(",")
@@ -289,14 +335,21 @@ async def get_drug_targets(proteins: str = None):
             
         return df.to_dict(orient="records")
         
+    except HTTPException as he:
+        raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/analysis/centrality")
+
+@app.get("/analysis/centrality",
+         summary="Get Network Centrality",
+         description="Calculates node centrality metrics for proteins in the interaction network.",
+         tags=["Analysis"])
 async def get_centrality(top_k: int = 10):
     """
-    Get top centrality metrics for nodes in the network.
+    Returns top-K proteins by degree centrality in the interactome.
     """
+
     if "network" not in analyzers:
         raise HTTPException(status_code=503, detail="Network Analysis not running (Check train.csv)")
     
@@ -306,11 +359,21 @@ async def get_centrality(top_k: int = 10):
             return []
         # Return top K nodes by Degree
         return df.head(top_k).to_dict(orient="records")
+    except HTTPException as he:
+        raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/analysis/stats")
+
+@app.get("/analysis/stats",
+         summary="Get Network Statistics",
+         description="Returns global statistics of the protein interaction network.",
+         tags=["Analysis"])
 async def get_network_stats():
+    """
+    Returns node count, edge count, and density metrics.
+    """
+
     """
     Get global network statistics.
     """
@@ -318,25 +381,62 @@ async def get_network_stats():
         return {}
     return analyzers["network"].get_graph_stats()
 
-@app.post("/analysis/mutate", response_model=MutationAnalysisResponse)
+@app.post("/analysis/mutate", 
+          response_model=MutationAnalysisResponse,
+          summary="Analyze Mutation Impact",
+          description="Predicts how specific amino acid mutations affect the interaction probability of a protein pair.",
+          tags=["Analysis"])
 async def scan_mutations(request: MutationRequest):
+    """
+    Simulates in-silico mutations and measures the delta in interaction probability.
+    """
+
     if "mutation" not in analyzers:
         raise HTTPException(status_code=503, detail="Mutation Analyzer not initialized (Check models)")
     
     try:
+        # Get sequences if missing
+        sequences = {}
+        to_fetch = []
+        p1_id, p1_seq = request.protein1_id, request.protein1_seq
+        p2_id, p2_seq = request.protein2_id, request.protein2_seq
+
+        if not p1_seq: to_fetch.append(p1_id)
+        else: sequences[p1_id] = p1_seq
+        
+        if not p2_seq: to_fetch.append(p2_id)
+        else: sequences[p2_id] = p2_seq
+
+        if to_fetch:
+            sequences.update(managers["sequence"].get_sequences(to_fetch))
+        
+        if p1_id not in sequences or p2_id not in sequences:
+             raise HTTPException(status_code=404, detail="Could not find sequences for one or both proteins.")
+
         results = analyzers["mutation"].project_mutation_impact(
-            request.protein1_id, request.protein1_seq,
-            request.protein2_id, request.protein2_seq,
+            p1_id, sequences[p1_id],
+            p2_id, sequences[p2_id],
             [m.dict() for m in request.mutations]
         )
         return results
+    except HTTPException as he:
+        raise he
     except Exception as e:
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/bio/metadata", response_model=List[BioMetaResponse])
+
+@app.get("/bio/metadata", 
+         response_model=List[BioMetaResponse],
+         summary="Get Biological Metadata",
+         description="Fetches localization and pathway information for specific proteins.",
+         tags=["Biology"])
 async def get_bio_metadata(proteins: str):
+    """
+    Returns subcellular localization and functional pathway data.
+    """
+
     if "bio" not in managers:
         raise HTTPException(status_code=503, detail="Biological Manager not initialized")
     
@@ -344,22 +444,43 @@ async def get_bio_metadata(proteins: str):
         p_list = proteins.split(",")
         df = managers["bio"].get_bio_metadata(p_list)
         return df.to_dict(orient="records")
+    except HTTPException as he:
+        raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/bio/feasibility", response_model=FeasibilityResponse)
+
+@app.get("/bio/feasibility", 
+         response_model=FeasibilityResponse,
+         summary="Check Interaction Feasibility",
+         description="Checks if two proteins share compatible subcellular localizations.",
+         tags=["Biology"])
 async def check_feasibility(p1: str, p2: str):
+    """
+    Determines if an interaction is physically possible based on biological context.
+    """
+
     if "bio" not in managers:
         raise HTTPException(status_code=503, detail="Biological Manager not initialized")
     
     try:
         return managers["bio"].check_localization_compatibility(p1, p2)
+    except HTTPException as he:
+        raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/analysis/hotspots")
+
+@app.post("/analysis/hotspots",
+          summary="Identify Interaction Hotspots",
+          description="Detects critical residues (hotspots) for the interaction using gradient-based importance.",
+          tags=["Analysis"])
 async def get_hotspots(request: ProteinPair):
+    """
+    Identifies specific amino acids that contribute most significantly to the interaction.
+    """
+
     if "hotspot" not in analyzers:
         raise HTTPException(status_code=503, detail="Hotspot Analyzer not initialized")
     
@@ -379,11 +500,21 @@ async def get_hotspots(request: ProteinPair):
             request.protein1_id, sequences[request.protein1_id],
             request.protein2_id, sequences[request.protein2_id]
         )
+    except HTTPException as he:
+        raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/analysis/residue_graph")
+
+@app.post("/analysis/residue_graph",
+          summary="Generate Residue Interaction Graph",
+          description="Generates a graph representation of internal residue-residue interactions for a single protein.",
+          tags=["Analysis"])
 async def get_residue_graph(request: ResidueGraphRequest):
+    """
+    Constructs a RIG (Residue Interaction Graph) based on distance-truncated contacts.
+    """
+
     if "residue_graph" not in analyzers:
          raise HTTPException(status_code=503, detail="Residue Graph Generator not initialized")
     
@@ -398,13 +529,23 @@ async def get_residue_graph(request: ResidueGraphRequest):
             sequence = seq_dict[protein_id]
             
         return analyzers["residue_graph"].generate_rig(sequence)
+    except HTTPException as he:
+        raise he
     except Exception as e:
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/analysis/optimize")
+
+@app.post("/analysis/optimize",
+          summary="Optimize Interaction",
+          description="Suggests mutations to either disrupt or enhance a protein-protein interaction.",
+          tags=["Analysis"])
 async def get_optimization(request: ProteinPair, mode: str = "disrupt"):
+    """
+    In-silico optimization or disruption of a PPI.
+    """
+
     if "mutation" not in analyzers:
         raise HTTPException(status_code=503, detail="Mutation Analyzer not initialized")
     
@@ -425,11 +566,21 @@ async def get_optimization(request: ProteinPair, mode: str = "disrupt"):
             request.protein2_id, sequences[request.protein2_id],
             mode=mode
         )
+    except HTTPException as he:
+        raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/analysis/vulnerability")
+
+@app.get("/analysis/vulnerability",
+         summary="Calculate Pathway Vulnerability",
+         description="Assesses how fragile a biological pathway is to mutations in a specific protein pair.",
+         tags=["Analysis"])
 async def get_vulnerability(p1: str, p2: str, delta: float):
+    """
+    Calculates vulnerability scores for downstream pathways.
+    """
+
     if "bio" not in managers:
         raise HTTPException(status_code=503, detail="Biological Manager not initialized")
     return managers["bio"].calculate_pathway_vulnerability(p1, p2, delta)

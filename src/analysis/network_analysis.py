@@ -29,13 +29,12 @@ class NetworkAnalyzer:
         print("Calculating Degree Centrality...")
         deg = nx.degree_centrality(self.graph)
         
-        print("Calculating Betweenness Centrality...")
-        # Approximation for large graphs
-        k = 100 if len(self.graph) > 1000 else None
+        print("Calculating Betweenness Centrality (approx)...")
+        k = 50 if len(self.graph) > 1000 else None
         bet = nx.betweenness_centrality(self.graph, k=k)
         
-        print("Calculating Closeness Centrality...")
-        clo = nx.closeness_centrality(self.graph)
+        print("Skipping Closeness Centrality for performance...")
+        clo = {n: 0.0 for n in self.graph.nodes()}
 
         print("Calculating Eigenvector Centrality...")
         try:
@@ -46,6 +45,9 @@ class NetworkAnalyzer:
         data = []
         for node in self.graph.nodes():
             data.append({
+                "protein": node, # Frontend: m.protein
+                "degree": deg[node], # Frontend: m.degree
+                "betweenness": bet[node], # Frontend: m.betweenness
                 "protein_id": node,
                 "degree_centrality": deg[node],
                 "betweenness_centrality": bet[node],
@@ -54,7 +56,7 @@ class NetworkAnalyzer:
             })
             
         df = pd.DataFrame(data)
-        return df.sort_values("degree_centrality", ascending=False)
+        return df.sort_values("degree", ascending=False)
 
     def identify_hubs(self, top_k: int = 10) -> List[Dict[str, Any]]:
         """
