@@ -253,25 +253,40 @@ class SequenceManager:
                     for line in response.text.splitlines():
                         if line.startswith(">"):
                             if current_header and current_seq:
-                                # Map back logic? 
-                                # Standard UniProt FASTA header: >sp|P12345|...
-                                # We can extract P12345.
+                                seq_str = "".join(current_seq)
+                                matched = False
                                 parts = current_header.split("|")
                                 if len(parts) >= 2:
                                     pid = parts[1]
                                     if pid in batch:
-                                        fetched[pid] = "".join(current_seq)
+                                        fetched[pid] = seq_str
+                                        matched = True
+                                
+                                # Fallback: if the primary accession doesn't match, check if any requested ID is in the header (e.g. secondary accession)
+                                if not matched:
+                                    for req_id in batch:
+                                        if req_id in current_header and req_id not in fetched:
+                                            fetched[req_id] = seq_str
+                                            break
                             current_header = line
                             current_seq = []
                         else:
                             current_seq.append(line.strip())
                     
                     if current_header and current_seq:
+                        seq_str = "".join(current_seq)
+                        matched = False
                         parts = current_header.split("|")
                         if len(parts) >= 2:
                             pid = parts[1]
                             if pid in batch:
-                                fetched[pid] = "".join(current_seq)
+                                fetched[pid] = seq_str
+                                matched = True
+                        if not matched:
+                            for req_id in batch:
+                                if req_id in current_header and req_id not in fetched:
+                                    fetched[req_id] = seq_str
+                                    break
                                 
                     time.sleep(0.5)
                 except Exception as e:

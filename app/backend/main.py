@@ -80,7 +80,7 @@ async def load_system():
     if graph_data_path.exists():
         data_cache["graph"] = torch.load(graph_data_path, weights_only=False).to(device)
         in_channels = data_cache["graph"].x.shape[1]
-        models["graph_model"] = GATLinkPredictor(in_channels=in_channels, hidden_channels=128).to(device)
+        models["graph_model"] = GATLinkPredictor(in_channels=in_channels, hidden_channels=64, heads=4).to(device)
         if graph_path.exists():
             try:
                 models["graph_model"].load_state_dict(torch.load(graph_path, map_location=device))
@@ -159,25 +159,49 @@ async def predict_interaction(pair: ProteinPair):
             # Apply sigmoid to raw logits (model outputs logits, not probabilities)
             seq_prob = torch.sigmoid(models["seq_model"](e1, e2)).item()
             
-        # 4. Graph Prediction
+        # 4. Graph Prediction (with Inductive Support for Unseen Nodes)
         graph_prob = 0.5 
-        if "mapping" in data_cache and p1 in data_cache["mapping"] and p2 in data_cache["mapping"]:
-            idx1 = data_cache["mapping"][p1]
-            idx2 = data_cache["mapping"][p2]
+        if "graph" in data_cache:
+            x_graph = data_cache["graph"].x
+            edge_index = data_cache["graph"].edge_index
             
+            idx1 = data_cache["mapping"].get(p1, None) if "mapping" in data_cache else None
+            idx2 = data_cache["mapping"].get(p2, None) if "mapping" in data_cache else None
+            
+            append_nodes = []
+            if idx1 is None:
+                idx1 = x_graph.shape[0]
+                append_nodes.append(e1.view(1, -1))
+            if idx2 is None:
+                idx2 = x_graph.shape[0] + len(append_nodes)
+                append_nodes.append(e2.view(1, -1))
+                
+            if append_nodes:
+                # Inductive step: dynamically inject new unseen node embeddings to the graph 
+                # (isolated nodes that will self-loop in GAT)
+                x_graph = torch.cat([x_graph] + append_nodes, dim=0)
+                
             edge_label_index = torch.tensor([[idx1], [idx2]], dtype=torch.long).to(models["esm"].device)
             
             with torch.no_grad():
-                g_out = models["graph_model"](data_cache["graph"].x, data_cache["graph"].edge_index, edge_label_index)
+                g_out = models["graph_model"](x_graph, edge_index, edge_label_index)
                 graph_prob = torch.sigmoid(g_out).item()
         
         # 5. Ensemble Prediction
         conf_seq = abs(seq_prob - 0.5)
         conf_graph = abs(graph_prob - 0.5)
-        X_input = np.array([[seq_prob, graph_prob, conf_seq, conf_graph]])
+        disagreement = abs(seq_prob - graph_prob)
         
+        X_input = np.array([[seq_prob, graph_prob, conf_seq, conf_graph, disagreement]])
         if models["ensemble"].meta_model:
-            final_prob = models["ensemble"].meta_model.predict_proba(X_input)[0, 1]
+            # Note: A model retrain is technically required to accept 5 features.
+            # We catch exceptions here to gracefully fallback if the model hasn't been retrained
+            try:
+                final_prob = models["ensemble"].meta_model.predict_proba(X_input)[0, 1]
+            except ValueError:
+                # If model expects 4 features
+                X_input_fallback = np.array([[seq_prob, graph_prob, conf_seq, conf_graph]])
+                final_prob = models["ensemble"].meta_model.predict_proba(X_input_fallback)[0, 1]
         else:
             final_prob = (seq_prob + graph_prob) / 2
         
@@ -191,11 +215,15 @@ async def predict_interaction(pair: ProteinPair):
         
         if "explainer" in models:
             shap_vals = models["explainer"].explain_prediction(seq_prob, graph_prob, conf_seq, conf_graph)
-            # shap_vals[0] will have 4 elements corresponding to the 4 features
+            # shap_vals[0] will have 4 or 5 elements corresponding to the features
             explanation["SHAP_Sequence"] = float(shap_vals[0][0])
             explanation["SHAP_Graph"] = float(shap_vals[0][1])
             explanation["SHAP_Seq_Conf"] = float(shap_vals[0][2])
             explanation["SHAP_Graph_Conf"] = float(shap_vals[0][3])
+            
+            # Conditionally check if the 5th feature is in the explanation output
+            if len(shap_vals[0]) > 4:
+                explanation["SHAP_Disagreement"] = float(shap_vals[0][4])
 
         # 7. Uniprot ID Mapping for 3D Visuals
         uniprot_maps = {}
@@ -325,7 +353,7 @@ async def get_bio_metadata(proteins: str):
     try:
         p_list = proteins.split(",")
         df = managers["bio"].get_bio_metadata(p_list)
-        return df.to_dict(orient="records")
+        return df.fillna("").to_dict(orient="records")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

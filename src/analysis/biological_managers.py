@@ -86,7 +86,7 @@ class BiologicalManager:
         """
         meta = self.get_bio_metadata([p1_id, p2_id])
         if len(meta) < 2:
-            return {"compatible": True, "reason": "Insufficient localization data", "p1_locs": [], "p2_locs": []}
+            return {"compatible": True, "reason": "Insufficient localization data", "intersection": [], "p1_locs": [], "p2_locs": []}
         
         row1 = meta[meta["protein_id"] == p1_id].iloc[0]
         row2 = meta[meta["protein_id"] == p2_id].iloc[0]
@@ -95,7 +95,7 @@ class BiologicalManager:
         l2 = set([x.strip().lower() for x in str(row2["localization"]).split(";") if x.strip()])
         
         if not l1 or not l2:
-            return {"compatible": True, "reason": "Missing localization for one or both proteins", "p1_locs": list(l1), "p2_locs": list(l2)}
+            return {"compatible": True, "reason": "Missing localization for one or both proteins", "intersection": [], "p1_locs": list(l1), "p2_locs": list(l2)}
         
         intersection = l1.intersection(l2)
         

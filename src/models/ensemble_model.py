@@ -24,10 +24,14 @@ class PPIEnsemble:
 
     @staticmethod
     def _build_features(base_preds_1: np.ndarray, base_preds_2: np.ndarray) -> np.ndarray:
-        """Build enhanced 4-feature matrix for meta-learner."""
+        """
+        Build enhanced 5-feature matrix for meta-learner:
+        [seq_prob, gat_prob, seq_confidence, gat_confidence, model_disagreement]
+        """
         conf_1 = np.abs(base_preds_1 - 0.5)
         conf_2 = np.abs(base_preds_2 - 0.5)
-        return np.column_stack([base_preds_1, base_preds_2, conf_1, conf_2])
+        disagreement = np.abs(base_preds_1 - base_preds_2)
+        return np.column_stack([base_preds_1, base_preds_2, conf_1, conf_2, disagreement])
 
     def train_stacking(self, base_preds_1: np.ndarray, base_preds_2: np.ndarray,
                        labels: np.ndarray):

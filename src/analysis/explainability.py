@@ -13,21 +13,23 @@ class PPIExplainer:
         self.explainer = None
 
         try:
-            # Fix XGBoost/SHAP compatibility:
-            # Newer XGBoost stores base_score as '[5E-1]' with brackets
-            # SHAP can't parse this as float. Strip brackets before init.
-            if hasattr(self.model, "get_booster"):
-                booster = self.model.get_booster()
-                raw_config = booster.save_config()
-                config = json.loads(raw_config)
-                base_score = config["learner"]["learner_model_param"]["base_score"]
-                if isinstance(base_score, str) and base_score.startswith("["):
-                    fixed = base_score.strip("[]")
-                    config["learner"]["learner_model_param"]["base_score"] = fixed
-                    booster.load_config(json.dumps(config))
-                    print(f"  Fixed XGBoost base_score: '{base_score}' -> '{fixed}'")
+            import shap.explainers._tree
+            orig_decode = shap.explainers._tree.decode_ubjson_buffer
+            
+            def patched_decode(*args, **kwargs):
+                jmodel = orig_decode(*args, **kwargs)
+                learner_param = jmodel["learner"]["learner_model_param"]
+                bs = learner_param.get("base_score")
+                if isinstance(bs, str) and bs.startswith('['):
+                    learner_param["base_score"] = bs.strip('[]')
+                return jmodel
 
-            self.explainer = shap.TreeExplainer(self.model)
+            try:
+                shap.explainers._tree.decode_ubjson_buffer = patched_decode
+                self.explainer = shap.TreeExplainer(self.model)
+                print("  SHAP explainer initialized successfully.")
+            finally:
+                shap.explainers._tree.decode_ubjson_buffer = orig_decode
         except Exception as e:
             print(f"Warning: SHAP initialization failed: {e}")
             self.explainer = None
@@ -36,9 +38,10 @@ class PPIExplainer:
                            conf_seq: float, conf_graph: float):
         """Explains a single prediction using SHAP values."""
         if self.explainer is None:
-            return np.array([[0.0, 0.0, 0.0, 0.0]])
+            return np.array([[0.0, 0.0, 0.0, 0.0, 0.0]])
 
-        X = np.array([[seq_prob, graph_prob, conf_seq, conf_graph]])
+        disagreement = abs(seq_prob - graph_prob)
+        X = np.array([[seq_prob, graph_prob, conf_seq, conf_graph, disagreement]])
         shap_values = self.explainer.shap_values(X)
 
         if isinstance(shap_values, list):
@@ -55,7 +58,7 @@ class PPIExplainer:
             return
 
         if feature_names is None:
-            feature_names = ["ESM-MLP", "GAT", "|ESM-0.5|", "|GAT-0.5|"]
+            feature_names = ["ESM-MLP", "GAT", "|ESM-0.5|", "|GAT-0.5|", "|ESM-GAT|"]
 
         shap_values = self.explainer.shap_values(X)
         if isinstance(shap_values, list) and len(shap_values) == 2:
