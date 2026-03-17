@@ -9,7 +9,7 @@ from tqdm import tqdm
 # Add project root
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
 
-from src.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT
+from src.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT, MODELS_DIR
 from src.data.sequence_manager import SequenceManager
 from src.data.feature_extraction import ESMFeatureExtractor
 from src.training.train_sequence_model import train as train_seq
@@ -114,11 +114,26 @@ def run_pipeline(limit_data: int = None):
     edge_index = torch.tensor([src, dst], dtype=torch.long)
     
     # Node Features (float32 for model compatibility)
-    embedding_dim = next(iter(embeddings.values())).shape[0]
+    # ESM-2 t6_8M_UR50D has embedding dimension 320
+    embedding_dim = 320
     x = torch.empty(len(valid_proteins), embedding_dim, dtype=torch.float32)
 
     for i, p in enumerate(valid_proteins):
-        x[i] = embeddings[p].float()
+        emb = embeddings[p].float()
+        # If per-residue embeddings are provided [seq_len, 320], mean pool them
+        if emb.dim() > 1:
+            emb = emb.mean(dim=0)
+        
+        # Safety check: if for some reason the dimension is wrong (e.g. if emb was already 1D but not 320)
+        if emb.shape[0] != embedding_dim:
+             # This should only happen if sequences are very short or something is corrupted
+             # but we'll pad/truncate just in case to prevent crash
+             new_emb = torch.zeros(embedding_dim)
+             copy_size = min(emb.shape[0], embedding_dim)
+             new_emb[:copy_size] = emb[:copy_size]
+             emb = new_emb
+             
+        x[i] = emb
     
     data = Data(x=x, edge_index=edge_index)
     
@@ -170,15 +185,12 @@ def run_pipeline(limit_data: int = None):
     else:
         train_graph(epochs=100, graph_path=str(graph_path))
         
-    # Train Ensemble
-    print("Training Ensemble...")
-    # The ensemble script expects validation data.
-    # It loads models from paths.
-    if not limit_data:
+        # --- Phase 4: Ensemble Meta-Learner ---
+        print("\n=== Phase 4: Training Ensemble Meta-Learner (XGBoost) ===")
+        seq_model_path = MODELS_DIR / "sequence_model_best.pth"
+        graph_model_path = MODELS_DIR / "graph_model_best.pth"
         train_ensemble(str(seq_model_path), str(graph_model_path), str(graph_path))
-    else:
-        print("Skipping full ensemble training in limited mode (needs validation data alignment).")
-
+        
     print("=== Pipeline Complete ===")
 
 if __name__ == "__main__":

@@ -48,6 +48,10 @@ export const ppiService = {
 
   getResidueGraph: (protein_id, sequence = null) => 
     api.post('/analysis/residue_graph', { protein_id, sequence }),
+
+  // AI Assistant
+  getChatGreeting: () => api.get('/chat/greeting'),
+  sendChatMessage: (message) => api.post('/chat', { message }),
 };
 
 export default api;

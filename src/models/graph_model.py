@@ -6,7 +6,7 @@ from torch_geometric.nn import GATv2Conv
 class GATLinkPredictor(nn.Module):
     def __init__(self, in_channels: int, hidden_channels: int = 64, heads: int = 4, dropout: float = 0.3):
         super().__init__()
-        # Use GATv2Conv for more expressive attention coefficients
+        # Refined capacity for stability
         self.conv1 = GATv2Conv(in_channels, hidden_channels, heads=heads, dropout=dropout)
         self.ln1 = nn.LayerNorm(hidden_channels * heads)
         
@@ -18,10 +18,13 @@ class GATLinkPredictor(nn.Module):
         
         self.res_proj1 = nn.Linear(in_channels, hidden_channels * heads)
         
+        # Skip connection for raw signal
+        self.skip_proj1 = nn.Linear(in_channels, hidden_channels)
+        
         self.dropout = dropout
         
-        # Aligned Link Prediction Classifier (Similar to SequencePPIModel)
-        # Input: h_u, h_v, |h_u - h_v|, h_u * h_v → hidden_channels × 4
+        # Aligned Link Prediction Classifier
+        # Input: h_u, h_v, |h_u - h_v|, h_u * h_v → (hidden_channels) × 4
         pair_dim = hidden_channels * 4
         classifier_hidden = 512
         
@@ -31,16 +34,11 @@ class GATLinkPredictor(nn.Module):
             nn.GELU(),
             nn.Dropout(dropout),
             
-            # Residual block style
             nn.Linear(classifier_hidden, classifier_hidden // 2),
             nn.BatchNorm1d(classifier_hidden // 2),
             nn.GELU(),
-            nn.Dropout(dropout),
-            
-            nn.Linear(classifier_hidden // 2, classifier_hidden // 4),
-            nn.GELU(),
             nn.Dropout(dropout / 2),
-            nn.Linear(classifier_hidden // 4, 1)
+            nn.Linear(classifier_hidden // 2, 1)
         )
 
     def encode(self, x, edge_index):
@@ -80,9 +78,14 @@ class GATLinkPredictor(nn.Module):
         """
         z = self.encode(x, edge_index)
         
+        # Project raw features for skip connection
+        z_raw = self.skip_proj1(x)
+        
         src, dst = edge_label_index
-        h_u = z[src]
-        h_v = z[dst]
+        
+        # Combine GAT learned features with raw projected features
+        h_u = z[src] + z_raw[src]
+        h_v = z[dst] + z_raw[dst]
         
         abs_diff = torch.abs(h_u - h_v)
         hadamard = h_u * h_v

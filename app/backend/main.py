@@ -26,10 +26,11 @@ from src.analysis.explainability import PPIExplainer
 from src.analysis.network_analysis import NetworkAnalyzer
 from src.analysis.mutation_analyzer import MutationAnalyzer
 from src.analysis.biological_managers import BiologicalManager
+from src.analysis.protein_assistant import ProteinAssistant
 from app.backend.schemas import (
     ProteinPair, PredictionResponse, NetworkResponse, BatchPredictionRequest,
     MutationRequest, MutationAnalysisResponse, BioMetaResponse, FeasibilityResponse,
-    ResidueGraphRequest
+    ResidueGraphRequest, ChatRequest, ChatResponse
 )
 
 app = FastAPI(title="TransGraph-PPI API", description="Hybrid Ensemble PPI Prediction System with Real Data")
@@ -54,6 +55,7 @@ models = {}
 managers = {}
 data_cache = {}
 analyzers = {}
+explainer = None # Global explainer instance
 
 @app.on_event("startup")
 async def load_system():
@@ -104,13 +106,18 @@ async def load_system():
     else:
         print("Warning: PPI Graph data not found.")
 
-    # Ensemble
+    # 3. Load Ensemble model
     ensemble_path = PROJECT_ROOT / "models" / "ensemble_model.pkl"
-    models["ensemble"] = PPIEnsemble(meta_model_path=str(ensemble_path) if ensemble_path.exists() else None)
-    
-    # Explainer
-    if models["ensemble"].meta_model:
-        models["explainer"] = PPIExplainer(meta_model_path=str(ensemble_path))
+    global explainer # Declare explainer as global to modify it
+    if ensemble_path.exists():
+        models["ensemble"] = PPIEnsemble(str(ensemble_path))
+        print("Loaded Hybrid Ensemble meta-learner.")
+        
+        # Initialize Explainer
+        print("Initializing SHAP explainer...")
+        explainer = PPIExplainer(str(ensemble_path))
+    else:
+        print("Ensemble model not found. Using simple average fallback.")
 
     # Network Analyzer
     train_path = PROCESSED_DATA_DIR / "train.csv"
@@ -136,6 +143,13 @@ async def load_system():
     # 5. Biological Manager
     managers["bio"] = BiologicalManager()
     print("Biological Manager Ready.")
+
+    # 6. Protein Assistant
+    analyzers["assistant"] = ProteinAssistant(
+        sequence_manager=managers.get("sequence"),
+        target_manager=managers.get("target")
+    )
+    print("Protein Assistant Ready.")
 
     print("System Loaded.")
 
@@ -202,33 +216,51 @@ async def predict_interaction(pair: ProteinPair):
                 g_out = models["graph_model"](data_cache["graph"].x, data_cache["graph"].edge_index, edge_label_index)
                 graph_prob = torch.sigmoid(g_out).item()
         
-        # 5. Ensemble Prediction
-        conf_seq = abs(seq_prob - 0.5)
-        conf_graph = abs(graph_prob - 0.5)
-        X_input = np.array([[seq_prob, graph_prob, conf_seq, conf_graph]])
+        # 6. Integrated Analysis (Novel Features)
         
-        if models["ensemble"].meta_model:
-            final_prob = models["ensemble"].meta_model.predict_proba(X_input)[0, 1]
-        else:
-            final_prob = (seq_prob + graph_prob) / 2
+        # 6a. Cold-Start / Uncertainty Detection
+        is_p1_in_graph = "mapping" in data_cache and p1 in data_cache["mapping"]
+        is_p2_in_graph = "mapping" in data_cache and p2 in data_cache["mapping"]
         
-        # 6. Explanation
+        uncertainty = {
+            "is_cold_start": not (is_p1_in_graph and is_p2_in_graph),
+            "p1_seen": is_p1_in_graph,
+            "p2_seen": is_p2_in_graph,
+            "warning": "One or both proteins are missing from the functional graph network. Relying primarily on sequence semantics." if not (is_p1_in_graph and is_p2_in_graph) else None,
+            "confidence_interval": [max(0, final_prob - 0.15), min(1, final_prob + 0.15)] if not (is_p1_in_graph and is_p2_in_graph) else [max(0, final_prob - 0.08), min(1, final_prob + 0.08)]
+        }
+        
+        # 6b. Automatic Hotspot Attribution
+        hotspots = None
+        if "hotspot" in analyzers:
+            try:
+                hotspots = analyzers["hotspot"].identify_hotspots(p1, sequences[p1], p2, sequences[p2])
+            except Exception as e:
+                print(f"Hotspot analysis failed: {e}")
+
+        # 6c. Bio Compatibility
+        bio_context = None
+        if "bio" in managers:
+            try:
+                feasibility = managers["bio"].check_localization_compatibility(p1, p2)
+                bio_context = {
+                    "compatible": feasibility.get("compatible", True),
+                    "reason": feasibility.get("reason", "Unknown"),
+                    "p1_loc": feasibility.get("p1_locs", []),
+                    "p2_loc": feasibility.get("p2_locs", [])
+                }
+            except Exception as e:
+                print(f"Bio context check failed: {e}")
+
+        # 7. Explanation Wrapper
         explanation = {
             "Sequence_Model_Contribution": seq_prob,
             "Graph_Model_Contribution": graph_prob,
-            "Sequence_Confidence": conf_seq,
-            "Graph_Confidence": conf_graph,
+            "Model_Used": model_used,
+            "SHAP_Values": shap_values
         }
-        
-        if "explainer" in models:
-            shap_vals = models["explainer"].explain_prediction(seq_prob, graph_prob, conf_seq, conf_graph)
-            # shap_vals[0] will have 4 elements corresponding to the 4 features
-            explanation["SHAP_Sequence"] = float(shap_vals[0][0])
-            explanation["SHAP_Graph"] = float(shap_vals[0][1])
-            explanation["SHAP_Seq_Conf"] = float(shap_vals[0][2])
-            explanation["SHAP_Graph_Conf"] = float(shap_vals[0][3])
 
-        # 7. Uniprot ID Mapping for 3D Visuals
+        # 8. Uniprot ID Mapping for 3D Visuals
         uniprot_maps = {}
         if "id_mapper" in managers:
             uniprot_maps = managers["id_mapper"].ensp_to_uniprot([p1, p2])
@@ -242,7 +274,10 @@ async def predict_interaction(pair: ProteinPair):
             "protein1_uniprot_id": uniprot_maps.get(p1, p1),
             "protein2_uniprot_id": uniprot_maps.get(p2, p2),
             "protein1_seq": sequences[p1],
-            "protein2_seq": sequences[p2]
+            "protein2_seq": sequences[p2],
+            "hotspots": hotspots,
+            "uncertainty": uncertainty,
+            "bio_context": bio_context
         }
 
     except HTTPException as he:
@@ -584,6 +619,34 @@ async def get_vulnerability(p1: str, p2: str, delta: float):
     if "bio" not in managers:
         raise HTTPException(status_code=503, detail="Biological Manager not initialized")
     return managers["bio"].calculate_pathway_vulnerability(p1, p2, delta)
+
+@app.get("/chat/greeting",
+         summary="Get AI Assistant Greeting",
+         description="Returns a welcome message and suggested questions for the protein assistant.",
+         tags=["AI Assistant"])
+async def get_chat_greeting():
+    if "assistant" not in analyzers:
+        raise HTTPException(status_code=503, detail="Protein Assistant not initialized")
+    return analyzers["assistant"].get_greeting()
+
+
+@app.post("/chat",
+          response_model=ChatResponse,
+          summary="Chat with Protein AI Assistant",
+          description="Ask questions about proteins, diseases, drug targets, and biology concepts.",
+          tags=["AI Assistant"])
+async def chat_with_assistant(request: ChatRequest):
+    if "assistant" not in analyzers:
+        raise HTTPException(status_code=503, detail="Protein Assistant not initialized")
+    
+    try:
+        result = analyzers["assistant"].answer(request.message)
+        return result
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

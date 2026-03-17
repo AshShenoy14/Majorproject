@@ -23,31 +23,75 @@ const StructureViewer = () => {
   const viewerContainerRef = useRef(null);
   const pluginRef = useRef(null);
 
+  const loadStructure = async (uniprotId) => {
+    if (!pluginRef.current || !viewerContainerRef.current) return;
+    
+    // Destroy existing instance and create new one
+    try {
+      if (pluginRef.current.plugin) {
+        pluginRef.current.plugin.dispose();
+      }
+    } catch (e) { /* ignore */ }
+    
+    // Fetch the current CIF URL from AlphaFold API to avoid version mismatches
+    let cifUrl = `https://alphafold.ebi.ac.uk/files/AF-${uniprotId}-F1-model_v6.cif`;
+    try {
+      const res = await fetch(`https://alphafold.ebi.ac.uk/api/prediction/${uniprotId}`);
+      const data = await res.json();
+      if (data && data.length > 0 && data[0].cifUrl) {
+        cifUrl = data[0].cifUrl;
+      }
+    } catch (e) { /* fallback to v6 URL */ }
+
+    pluginRef.current = new window.PDBeMolstarPlugin();
+    pluginRef.current.render(viewerContainerRef.current, {
+      customData: {
+        url: cifUrl,
+        format: 'cif'
+      },
+      alphafoldView: true,
+      expanded: false,
+      hideCanvasControls: ['selection', 'animation', 'geometry'],
+      bgColor: { r: 248, g: 250, b: 252 }
+    });
+  };
+
+  const initViewer = async () => {
+    if (window.PDBeMolstarPlugin && viewerContainerRef.current && !pluginRef.current) {
+      try {
+        // Fetch the current CIF URL from AlphaFold API for the default protein (P01112)
+        let cifUrl = 'https://alphafold.ebi.ac.uk/files/AF-P01112-F1-model_v6.cif';
+        try {
+          const res = await fetch('https://alphafold.ebi.ac.uk/api/prediction/P01112');
+          const data = await res.json();
+          if (data && data.length > 0 && data[0].cifUrl) {
+            cifUrl = data[0].cifUrl;
+          }
+        } catch (e) { /* fallback to v6 URL */ }
+
+        pluginRef.current = new window.PDBeMolstarPlugin();
+        pluginRef.current.render(viewerContainerRef.current, {
+          customData: {
+            url: cifUrl,
+            format: 'cif'
+          },
+          alphafoldView: true,
+          expanded: false,
+          hideCanvasControls: ['selection', 'animation', 'geometry'],
+          bgColor: { r: 248, g: 250, b: 252 }
+        });
+        setViewerLoading(false);
+      } catch (err) {
+        console.error("Molstar render error:", err);
+        setError("Failed to initialize 3D viewer.");
+        setViewerLoading(false);
+      }
+    }
+  };
+
   useEffect(() => {
     const scriptId = 'pdbe-molstar-script';
     const linkId = 'pdbe-molstar-link';
-
-    const initViewer = () => {
-      if (window.PDBeMolstarPlugin && viewerContainerRef.current && !pluginRef.current) {
-        try {
-          pluginRef.current = new window.PDBeMolstarPlugin();
-          pluginRef.current.render(viewerContainerRef.current, {
-            moleculeId: 'P01112',
-            alphafoldView: true,
-            expanded: false,
-            hideCanvasControls: ['selection', 'animation', 'geometry'],
-            theme: {
-              background: { color: { r: 248, g: 250, b: 252 } }
-            }
-          });
-          setViewerLoading(false);
-        } catch (err) {
-          console.error("Molstar render error:", err);
-          setError("Failed to initialize 3D viewer.");
-          setViewerLoading(false);
-        }
-      }
-    };
 
     if (!document.getElementById(scriptId)) {
       const script = document.createElement('script');
@@ -65,7 +109,6 @@ const StructureViewer = () => {
 
       script.onload = initViewer;
     } else {
-      // Script already exists, wait a bit for window object if it's still loading
       const interval = setInterval(() => {
         if (window.PDBeMolstarPlugin) {
           initViewer();
@@ -86,10 +129,7 @@ const StructureViewer = () => {
       const data = response.data[0];
       setMetadata(data);
 
-      // 2. Try to render structure
-      // We need UniProt ID for AlphaFold. our backend might return it as protein1_uniprot_id if we used /predict
-      // or we can try to use the ENSP ID directly if AlphaFold supports it, but usually it's UniProt.
-      // For now let's assume 'data.protein_id' might be UniProt if mapped, or we use a fallback.
+      // 2. Get UniProt ID for AlphaFold
       let uniProtId = data?.uniprot_id || (proteinId.length === 6 || proteinId.length === 10 ? proteinId : null);
       
       if (!uniProtId) {
@@ -98,12 +138,8 @@ const StructureViewer = () => {
         return;
       }
       
-      if (pluginRef.current) {
-        pluginRef.current.visual.update({
-          moleculeId: uniProtId,
-          alphafoldView: true
-        });
-      }
+      // 3. Load AlphaFold structure using direct CIF URL
+      loadStructure(uniProtId);
     } catch (err) {
       setError("Failed to fetch structure or metadata.");
       console.error(err);

@@ -61,10 +61,13 @@ def train(epochs: int = 100, lr: float = 0.001, graph_path: str = None, patience
     val_labels             = val_labels.to(device)
 
     # ── Model, Optimizer, Loss ───────────────────────────────────────────
+    # Optimized architecture (3-layer + skip) with stable dimensions (64/4)
     model = GATLinkPredictor(in_channels=data.x.shape[1], hidden_channels=64, heads=4).to(device)
     optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-3)
     criterion = nn.BCEWithLogitsLoss()
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=10, min_lr=1e-6)
+    
+    # Using CosineAnnealingLR for better convergence on CPU
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-5)
 
     # ── Resume from checkpoint if it exists ──────────────────────────────
     checkpoint_path = CHECKPOINT_DIR / "graph_checkpoint.pt"
@@ -83,18 +86,19 @@ def train(epochs: int = 100, lr: float = 0.001, graph_path: str = None, patience
             epochs_no_improve = checkpoint.get("epochs_no_improve", 0)
             print(f"  Resumed at epoch {start_epoch}/{epochs} | Best val loss: {best_val_loss:.4f}")
         except Exception as e:
-            print(f"Starting fresh for Phase 2/3: {e}")
+            print(f"Starting fresh: {e}")
     else:
         print("No checkpoint found - starting fresh training.")
 
     # ── Training Loop ────────────────────────────────────────────────────
     best_model_path = MODELS_DIR / "graph_model_best.pth"
-    print("Starting training loop (Full-Batch)...")
+    print("Starting training loop (Stable Full-Batch with Optimized Architecture)...")
 
     for epoch in range(start_epoch, epochs):
         model.train()
         optimizer.zero_grad()
         
+        # Link prediction on full graph structure
         outputs = model(data.x, data.edge_index, train_edge_label_index)
         loss    = criterion(outputs.squeeze(), train_labels)
         
@@ -117,10 +121,10 @@ def train(epochs: int = 100, lr: float = 0.001, graph_path: str = None, patience
             val_acc     = (val_preds == y_true).mean()
             val_f1      = f1_score(y_true, val_preds, zero_division=0)
 
-        scheduler.step(val_loss)
+        scheduler.step()
 
         if (epoch + 1) % 5 == 0 or epoch == 0:
-            print(f"Epoch [{epoch+1}/{epochs}] | Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f} | Acc: {val_acc:.4f} | F1: {val_f1:.4f}")
+            print(f"Epoch [{epoch+1}/{epochs}] | Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f} | Acc: {val_acc:.4f} | F1: {val_f1:.4f}")
 
         if val_loss < best_val_loss:
             best_val_loss = val_loss

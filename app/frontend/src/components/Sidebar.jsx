@@ -9,7 +9,8 @@ import {
   ShieldAlert, 
   Info,
   Database,
-  Activity
+  Activity,
+  Bot
 } from 'lucide-react';
 
 const Sidebar = () => {
@@ -20,6 +21,7 @@ const Sidebar = () => {
     { name: 'Protein Structure', icon: <Box size={20} />, path: '/structure' },
     { name: 'Network Explorer', icon: <Share2 size={20} />, path: '/network' },
     { name: 'Drug Target Insights', icon: <ShieldAlert size={20} />, path: '/drug-targets' },
+    { name: 'AI Assistant', icon: <Bot size={20} />, path: '/assistant' },
     { name: 'About', icon: <Info size={20} />, path: '/about' },
   ];
 

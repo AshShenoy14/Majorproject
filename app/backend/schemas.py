@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict
+from typing import Any, List, Optional, Dict
 
 class ProteinPair(BaseModel):
     protein1_seq: Optional[str] = Field(None, description="Amino acid sequence for protein 1", example="MAH...")
@@ -12,11 +12,14 @@ class PredictionResponse(BaseModel):
     esm_probability: float = Field(..., description="Probability from the ESM-MLP sequence model", example=0.92)
     gat_probability: float = Field(..., description="Probability from the GAT graph model", example=0.75)
     confidence_score: float = Field(..., description="Normalized confidence score [0, 1]", example=0.76)
-    explanation: Dict[str, float] = Field(..., description="Feature importance scores (e.g., SHAP values)")
+    explanation: Dict[str, Any] = Field(..., description="Feature importance scores (e.g., SHAP values)")
     protein1_uniprot_id: Optional[str] = Field(None, description="Mapped UniProt ID for protein 1", example="P12345")
     protein2_uniprot_id: Optional[str] = Field(None, description="Mapped UniProt ID for protein 2", example="Q67890")
     protein1_seq: Optional[str] = Field(None, description="Sequence used for protein 1")
     protein2_seq: Optional[str] = Field(None, description="Sequence used for protein 2")
+    hotspots: Optional[Dict[str, Any]] = Field(None, description="Residue-level importance hotspots")
+    uncertainty: Optional[Dict[str, Any]] = Field(None, description="Uncertainty quantification and warnings")
+    bio_context: Optional[Dict[str, Any]] = Field(None, description="Biological localization and compatibility")
     
 class NetworkRequest(BaseModel):
     threshold: float = Field(0.5, description="Interaction probability threshold for network inclusion", ge=0, le=1)
@@ -73,4 +76,12 @@ class FeasibilityResponse(BaseModel):
     p1_locs: List[str]
     p2_locs: List[str]
     reason: str
+
+class ChatRequest(BaseModel):
+    message: str = Field(..., description="User's question about proteins or biology", example="What is p53?")
+
+class ChatResponse(BaseModel):
+    response: str = Field(..., description="The assistant's answer in markdown format")
+    suggestions: List[str] = Field(default=[], description="Suggested follow-up questions")
+    sources: List[str] = Field(default=[], description="Data sources used for the answer")
 

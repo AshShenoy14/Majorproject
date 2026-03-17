@@ -588,30 +588,44 @@ const PredictionForm = () => {
                           </Typography>
                         </Box>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', bgcolor: isDark ? 'rgba(0, 255, 136, 0.05)' : 'rgba(46, 125, 50, 0.05)', border: `1px solid ${isDark ? 'rgba(0, 255, 136, 0.2)' : 'rgba(46, 125, 50, 0.2)'}`, p: 1.5, borderRadius: 2 }}>
-                          <Typography variant="body2">Ensemble (Meta-learner)</Typography>
+                          <Typography variant="body2">Hybrid Ensemble (v2.0)</Typography>
                           <Typography variant="body2" fontWeight="bold" sx={{ color: isDark ? '#00ff88' : '#2e7d32' }}>
-                            {(result.interaction_probability * 100).toFixed(1)}%
+                            {(result.final_prob * 100).toFixed(1)}%
                           </Typography>
                         </Box>
                       </Stack>
                     </Box>
                   )}
 
-                  <Box>
-                    <Typography variant="subtitle2" color="text.secondary" gutterBottom>Explainability (SHAP)</Typography>
-                    <Stack spacing={1}>
-                      {Object.entries(result.explanation).map(([key, value]) => (
-                        <Box key={key} sx={{ display: 'flex', justifyContent: 'space-between', bgcolor: isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(0, 0, 0, 0.03)', p: 1, px: 1.5, borderRadius: 1 }}>
-                          <Typography variant="caption" sx={{ textTransform: 'capitalize' }}>
-                            {key.replace('_', ' ')}
-                          </Typography>
-                          <Typography variant="caption" fontWeight="bold" color="text.primary">
-                            {typeof value === 'number' ? value.toFixed(4) : value}
-                          </Typography>
-                        </Box>
-                      ))}
-                    </Stack>
-                  </Box>
+                  {/* Explainability (SHAP) Restored */}
+                  {result.shap_explanations && (
+                    <Box sx={{ p: 2, bgcolor: isDark ? 'rgba(255, 255, 255, 0.02)' : 'rgba(0, 0, 0, 0.02)', borderRadius: 2 }}>
+                      <Typography variant="subtitle2" color="text.secondary" gutterBottom>Feature Attribution (SHAP)</Typography>
+                      <Stack spacing={1}>
+                        {[
+                          { label: 'Seq Evidence', val: result.shap_explanations[0] },
+                          { label: 'Graph Evidence', val: result.shap_explanations[1] },
+                          { label: 'Seq Confidence', val: result.shap_explanations[2] },
+                          { label: 'Graph Confidence', val: result.shap_explanations[3] }
+                        ].map((item, idx) => (
+                          <Box key={idx} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Typography variant="caption" sx={{ minWidth: 100 }}>{item.label}</Typography>
+                            <Box sx={{ flex: 1, height: 4, bgcolor: 'rgba(0,0,0,0.1)', borderRadius: 2, overflow: 'hidden' }}>
+                              <Box sx={{ 
+                                height: '100%', 
+                                width: `${Math.min(100, Math.abs(item.val) * 500)}%`, 
+                                bgcolor: item.val > 0 ? 'success.main' : 'error.main',
+                                ml: item.val < 0 ? 'auto' : 0
+                              }} />
+                            </Box>
+                            <Typography variant="caption" sx={{ minWidth: 30, textAlign: 'right', fontWeight: 'bold' }}>
+                              {item.val > 0 ? '+' : ''}{(item.val * 100).toFixed(1)}%
+                            </Typography>
+                          </Box>
+                        ))}
+                      </Stack>
+                    </Box>
+                  )}
 
                   <Box sx={{ textAlign: 'right' }}>
                     <Typography variant="caption" color="text.secondary">

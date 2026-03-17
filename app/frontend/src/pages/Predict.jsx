@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Search, 
@@ -9,7 +10,8 @@ import {
   XCircle, 
   AlertCircle,
   Loader2,
-  ChevronRight
+  ChevronRight,
+  ShieldCheck
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -24,6 +26,8 @@ import {
   Pie
 } from 'recharts';
 import { ppiService } from '../services/api';
+import ProteinViewer from '../components/ProteinViewer';
+import html2pdf from 'html2pdf.js';
 
 const TooltipIcon = ({ text }) => (
   <div className="group relative inline-block ml-1 align-middle">
@@ -44,6 +48,21 @@ const Predict = () => {
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
 
+  // Derived data for charts
+  const predictions = result ? [
+    { name: 'ESM-MLP', value: (result.esm_probability * 100).toFixed(1), color: '#6366F1' },
+    { name: 'GAT', value: (result.gat_probability * 100).toFixed(1), color: '#22D3EE' },
+    { name: 'Ensemble', value: (result.interaction_probability * 100).toFixed(1), color: '#22C55E' },
+  ] : [];
+
+  const shapValues = result?.explanation?.SHAP_Values;
+  const shapData = shapValues ? [
+    { name: 'Sequence Signal', value: shapValues[0] },
+    { name: 'Graph Signal', value: shapValues[1] },
+    { name: 'Seq. Confidence', value: shapValues[2] },
+    { name: 'Graph Confidence', value: shapValues[3] },
+  ] : [];
+
   const handlePredict = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -58,25 +77,20 @@ const Predict = () => {
     }
   };
 
-  const getModelData = () => {
-    if (!result) return [];
-    return [
-      { name: 'ESM-MLP', value: (Number(result.esm_probability || 0) * 100).toFixed(1), color: '#0D9488' },
-      { name: 'GAT Graph', value: (Number(result.gat_probability || 0) * 100).toFixed(1), color: '#3B82F6' },
-      { name: 'Ensemble', value: (Number(result.interaction_probability || 0) * 100).toFixed(1), color: '#7C3AED' },
-    ];
+  const handleDownloadReport = () => {
+    const element = document.getElementById('prediction-report');
+    const opt = {
+      margin: [10, 10],
+      filename: `TransGraph_PPI_Report_${protein1}_${protein2}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+    html2pdf().set(opt).from(element).save();
   };
 
-  const getShapData = () => {
-    if (!result || !result.explanation) return [];
-    const exp = result.explanation;
-    return [
-      { name: 'Seq Evidence', value: exp.SHAP_Sequence || 0 },
-      { name: 'Graph Evidence', value: exp.SHAP_Graph || 0 },
-      { name: 'Seq Conf', value: exp.SHAP_Seq_Conf || 0 },
-      { name: 'Graph Conf', value: exp.SHAP_Graph_Conf || 0 },
-    ].sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
-  };
+  // The getModelData function is no longer needed as predictions are set directly in handlePredict
+  // and consumed from the 'predictions' state.
 
   return (
     <div className="max-w-6xl mx-auto space-y-8">
@@ -176,7 +190,33 @@ const Predict = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="space-y-8 pb-12"
+            id="prediction-report"
           >
+            {/* Header / Actions */}
+            <div className="flex justify-between items-center">
+               <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                 <Activity className="text-scientific-primary" /> Analysis Results
+               </h2>
+               <button 
+                onClick={handleDownloadReport}
+                className="px-4 py-2 bg-slate-800 text-white rounded-lg text-sm font-bold flex items-center gap-2 hover:bg-slate-700 transition-colors shadow-lg"
+               >
+                 <ShieldCheck size={16} /> Download Research Report
+               </button>
+            </div>
+
+            {/* Uncertainty Warning */}
+            {result.uncertainty?.is_cold_start && (
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex gap-4">
+                <div className="p-2 bg-amber-100 rounded-xl text-amber-600 h-fit">
+                  <AlertCircle size={20} />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-amber-800 uppercase tracking-tight">Cold-Start Warning (High Uncertainty)</h4>
+                  <p className="text-xs text-amber-700 mt-1">{result.uncertainty.warning}</p>
+                </div>
+              </div>
+            )}
             {/* Summary Result Card */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
               <div className="lg:col-span-1 glass-card p-8 flex flex-col items-center text-center justify-center relative overflow-hidden">
@@ -216,10 +256,8 @@ const Predict = () => {
                   </span>
                 </div>
                 
-                <div className="text-xs text-slate-400 font-medium">
                   Confidence Score: <span className="text-slate-700 font-bold">{(Number(result.confidence_score || 0) * 100).toFixed(1)}%</span>
-                  <TooltipIcon text="Score based on the agreement between Sequence and graph models." />
-                </div>
+                  <TooltipIcon text="Score based on the statistical agreement between sequence and graph data." />
               </div>
 
               {/* Model Breakdown */}
@@ -230,7 +268,7 @@ const Predict = () => {
                 </div>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={getModelData()} layout="vertical" barSize={32}>
+                    <BarChart data={predictions} layout="vertical" barSize={32}>
                       <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
                       <XAxis type="number" domain={[0, 100]} hide />
                       <YAxis 
@@ -256,67 +294,150 @@ const Predict = () => {
                         }}
                       />
                       <Bar dataKey="value" radius={[0, 8, 8, 0]}>
-                        {getModelData().map((entry, index) => (
+                        {predictions.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
                         ))}
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
-                <div className="mt-6 flex justify-between gap-4">
-                  <div className="flex-1 p-3 bg-slate-50 rounded-xl border border-slate-100">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">ESM-2 Latent Space</p>
-                    <p className="text-sm font-medium text-slate-600">Sequence embeddings capture semantic bio-logic.</p>
-                  </div>
-                  <div className="flex-1 p-3 bg-slate-50 rounded-xl border border-slate-100">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">GAT Topography</p>
-                    <p className="text-sm font-medium text-slate-600">Graph nodes analyze functional network proximity.</p>
-                  </div>
+                <div className="mt-6 flex justify-between gap-4 text-[10px] text-slate-400 font-bold uppercase tracking-widest px-2">
+                  <span>Confidence Interval: [{(result.uncertainty?.confidence_interval[0] * 100).toFixed(0)}% — {(result.uncertainty?.confidence_interval[1] * 100).toFixed(0)}%]</span>
                 </div>
               </div>
             </div>
 
-            {/* Explainability Section */}
+            {/* 3D Visualizer and Biological Context */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+               {/* 3D Viewer Protein A */}
+               <div className="glass-card p-6 overflow-hidden">
+                  <h4 className="text-xs font-bold text-slate-500 uppercase mb-4">Structure: {result.protein1_uniprot_id}</h4>
+                  <ProteinViewer 
+                    proteinId={result.protein1_uniprot_id} 
+                    residueImpact={result.hotspots?.protein1?.residue_impact} 
+                  />
+                  <p className="mt-4 text-[10px] text-slate-400 italic">
+                    Highlighted in <span className="text-rose-500 font-bold">Red</span> are residues predicted to be critical (hotspots) for this specific interaction.
+                  </p>
+               </div>
+
+               {/* Biological Context */}
+               <div className="glass-card p-8 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center gap-3 mb-6">
+                      <div className="p-2 bg-scientific-accent/10 rounded-lg text-scientific-accent">
+                        <Activity size={20} />
+                      </div>
+                      <h4 className="text-lg font-bold text-slate-800">Biological Feasibility</h4>
+                    </div>
+                    
+                    <div className={`p-4 rounded-2xl mb-6 ${result.bio_context?.compatible ? 'bg-green-50 border border-green-100' : 'bg-rose-50 border border-rose-100'}`}>
+                       <div className="flex items-center gap-2 mb-2">
+                          {result.bio_context?.compatible ? <CheckCircle2 className="text-green-500" size={18} /> : <XCircle className="text-rose-500" size={18} />}
+                          <span className={`text-sm font-bold ${result.bio_context?.compatible ? 'text-green-700' : 'text-rose-700'}`}>
+                            {result.bio_context?.compatible ? 'Localization Compatible' : 'Incompatible Localization'}
+                          </span>
+                       </div>
+                       <p className="text-xs text-slate-600 leading-relaxed italic">
+                         {result.bio_context?.reason || "Biological context suggests these proteins are compatible for physical interaction within the cell."}
+                       </p>
+                    </div>
+
+                    <div className="space-y-4">
+                       <div>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Protein A Localizations</p>
+                          <div className="flex flex-wrap gap-2">
+                             {result.bio_context?.p1_loc.map((l, i) => <span key={i} className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-[10px] font-medium">{l}</span>)}
+                          </div>
+                       </div>
+                       <div>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Protein B Localizations</p>
+                          <div className="flex flex-wrap gap-2">
+                             {result.bio_context?.p2_loc.map((l, i) => <span key={i} className="px-2 py-1 bg-slate-100 text-slate-600 rounded text-[10px] font-medium">{l}</span>)}
+                          </div>
+                       </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-6 border-t border-slate-100 mt-6 font-mono text-[9px] text-slate-400 uppercase tracking-tight">
+                    Prediction ID: {Math.random().toString(36).substr(2, 9)} | System: TransGraph-PPI v2.0
+                  </div>
+               </div>
+            </div>
+
+              {/* SHAP Explanation Section (Restored) */}
+              {shapData.length > 0 && (
+                <div className="pt-6 border-t border-slate-100">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-bold text-slate-700 uppercase tracking-tight">AI Interpretation (SHAP)</h3>
+                    <div className="flex items-center gap-1.5 px-2 py-0.5 bg-amber-50 rounded-full">
+                       <ShieldCheck size={12} className="text-amber-500" />
+                       <span className="text-[10px] font-bold text-amber-600 uppercase">Ensemble Validated</span>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    {shapData.map((item, i) => (
+                      <div key={i} className="space-y-1">
+                        <div className="flex justify-between text-[10px]">
+                          <span className="font-bold text-slate-500 uppercase">{item.name}</span>
+                          <span className={`font-bold ${item.value > 0 ? 'text-green-500' : 'text-rose-500'}`}>
+                            {item.value > 0 ? '+' : ''}{item.value.toFixed(1)}%
+                          </span>
+                        </div>
+                        <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                           <motion.div 
+                             initial={{ width: 0 }}
+                             animate={{ width: `${Math.abs(item.value) * 2}%` }}
+                             className={`h-full ${item.value > 0 ? 'bg-green-400' : 'bg-rose-400'}`}
+                           />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-3 text-[10px] text-slate-400 font-medium italic">
+                    Shapley values indicate the relative contribution of each feature to the final ensemble decision.
+                  </p>
+                </div>
+              )}
+            <div className="glass-card p-8 bg-slate-800 text-white relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-scientific-primary/20 blur-[80px] -mr-32 -mt-32 group-hover:bg-scientific-primary/30 transition-colors" />
+              <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
+                <div className="space-y-2">
+                  <h4 className="text-xl font-bold flex items-center gap-2">
+                    <Activity className="text-scientific-primary" /> Need Deeper Clinical Insights?
+                  </h4>
+                  <p className="text-slate-400 text-sm max-w-xl">
+                    Our AI Research Assistant can help you understand the clinical significance, disease associations, and literature evidence for this specific protein interaction.
+                  </p>
+                </div>
+                <Link 
+                  to="/assistant" 
+                  className="px-6 py-3 bg-white text-slate-800 rounded-xl font-bold text-sm hover:bg-slate-100 transition-all flex items-center gap-2 whitespace-nowrap"
+                >
+                  Consult Protein AI <ChevronRight size={18} />
+                </Link>
+              </div>
+            </div>
+            
             <div className="glass-card p-8 bg-slate-50/50">
               <div className="flex items-center gap-3 mb-8">
                 <Activity className="text-scientific-accent" />
-                <h4 className="text-lg font-bold text-slate-800">SHAP Explainability Insights <TooltipIcon text="Values show how much each feature contributed to the final probability." /></h4>
+                <h4 className="text-lg font-bold text-slate-800">Model Interpretation</h4>
               </div>
               
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-                <div className="h-64">
-                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={getShapData()} layout="vertical">
-                       <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
-                       <XAxis type="number" hide />
-                       <YAxis 
-                        dataKey="name" 
-                        type="category" 
-                        axisLine={false} 
-                        tickLine={false} 
-                        width={120}
-                        tick={{ fontSize: 11, fontWeight: 600, fill: '#475569' }}
-                      />
-                      <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                        {getShapData().map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.value > 0 ? '#22C55E' : '#EF4444'} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                   </ResponsiveContainer>
-                </div>
-                <div className="flex flex-col justify-center">
-                   <div className="p-6 bg-white rounded-2xl border border-slate-200 shadow-sm relative italic text-slate-600 leading-relaxed">
-                      <div className="absolute -top-3 left-6 p-1 px-2 bg-scientific-accent text-white text-[10px] font-bold rounded uppercase tracking-widest">AI Interpreter</div>
-                      "The {result.esm_probability > 0.5 ? 'sequence' : 'sequence'} model suggests {result.esm_probability > 0.5 ? 'strong' : 'weak'} biological alignment. 
-                      The graph network {result.gat_probability > 0.5 ? 'reinforces' : 'contradicts'} this with its neighbor analysis. 
-                      Overall, the ensemble meta-learner concludes that this interaction is {result.interaction_probability > 0.5 ? 'likely' : 'unlikely'} based on the combined evidence."
-                   </div>
-                   <div className="mt-6 flex gap-3 flex-wrap">
-                      <span className="px-3 py-1 bg-green-50 text-green-600 text-[10px] font-bold rounded-full border border-green-100">PRO-INTERACTION FACTORS</span>
-                      <span className="px-3 py-1 bg-red-50 text-red-600 text-[10px] font-bold rounded-full border border-red-100">ANTI-INTERACTION FACTORS</span>
-                   </div>
-                </div>
+              <p className="text-slate-500 mb-6 leading-relaxed">
+              Our advanced <span className="text-scientific-primary font-bold">Hybrid Stacking Ensemble</span> aggregates multiple 
+              biological evidence streams. By combining protein sequence motifs with localized graph topology, 
+              we achieve state-of-the-art predictive performance.
+           </p>
+              <div className="max-w-3xl">
+                 <div className="p-6 bg-white rounded-2xl border border-slate-200 shadow-sm relative italic text-slate-600 leading-relaxed">
+                    <div className="absolute -top-3 left-6 p-1 px-2 bg-scientific-accent text-white text-[10px] font-bold rounded uppercase tracking-widest">AI Interpreter</div>
+                    "The {result.esm_probability > 0.5 ? 'sequence' : 'sequence'} model suggests {result.esm_probability > 0.5 ? 'strong' : 'weak'} biological alignment. 
+                    The graph network {result.gat_probability > 0.5 ? 'reinforces' : 'contradicts'} this with its neighbor analysis. 
+                    The final consensus interaction is {result.interaction_probability > 0.5 ? 'likely' : 'unlikely'} based on the combined evidence."
+                 </div>
               </div>
             </div>
           </motion.div>

@@ -6,6 +6,7 @@ import MutationAnalysis from './pages/MutationAnalysis';
 import StructureViewer from './pages/StructureViewer';
 import NetworkExplorer from './pages/NetworkExplorer';
 import DrugInsights from './pages/DrugInsights';
+import Assistant from './pages/Assistant';
 import About from './pages/About';
 
 function App() {
@@ -19,6 +20,7 @@ function App() {
                     <Route path="/structure" element={<StructureViewer />} />
                     <Route path="/network" element={<NetworkExplorer />} />
                     <Route path="/drug-targets" element={<DrugInsights />} />
+                    <Route path="/assistant" element={<Assistant />} />
                     <Route path="/about" element={<About />} />
                 </Routes>
             </Layout>

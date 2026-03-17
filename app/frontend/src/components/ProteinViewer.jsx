@@ -1,8 +1,9 @@
 import React, { useEffect, useRef } from 'react';
 import { Box, Typography, Skeleton, useTheme } from '@mui/material';
 
-const ProteinViewer = ({ proteinId }) => {
+const ProteinViewer = ({ proteinId, hotspotData, residueImpact }) => {
     const viewerRef = useRef(null);
+    const viewerInstanceRef = useRef(null);
     const isMounted = useRef(true);
     const theme = useTheme();
     const isDark = theme.palette.mode === 'dark';
@@ -11,40 +12,60 @@ const ProteinViewer = ({ proteinId }) => {
         isMounted.current = true;
         if (!proteinId || proteinId === "Protein A" || proteinId === "Protein B") return;
 
-        // Dynamically load the correct CSS based on theme
+        // Dynamically load CSS and JS if not present (logic already exists in previous version)
         const linkId = 'pdbe-molstar-css';
         let link = document.getElementById(linkId);
         if (!link) {
             link = document.createElement('link');
             link.id = linkId;
             link.rel = 'stylesheet';
+            link.href = 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.2.0/build/pdbe-molstar-light.css';
             document.head.appendChild(link);
         }
-        link.href = isDark
-            ? 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.2.0/build/pdbe-molstar-light.css' // We might use custom background anyway, but load standard css
-            : 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.2.0/build/pdbe-molstar-light.css';
 
-        // Dynamically load JS
         const scriptId = 'pdbe-molstar-js';
         let script = document.getElementById(scriptId);
 
+        const applyColors = () => {
+            if (!viewerInstanceRef.current || !residueImpact) return;
+            
+            // Map residueImpact (0-1) to colors (Blue to Red)
+            const colorData = residueImpact.map((impact, i) => {
+                if (impact < 0.05) return null; // Ignore low impact
+                
+                // Red for high impact, Yellow for medium
+                const color = impact > 0.2 ? { r: 255, g: 0, b: 0 } : { r: 255, g: 165, b: 0 };
+                return {
+                    residue_number: i + 1,
+                    color: color
+                };
+            }).filter(x => x !== null);
+
+            if (colorData.length > 0) {
+                viewerInstanceRef.current.visual.select({
+                    data: colorData,
+                    nonSelectedColor: { r: 200, g: 200, b: 200 }
+                });
+            }
+        };
+
         const renderViewer = async () => {
             if (viewerRef.current && window.PDBeMolstarPlugin && isMounted.current) {
-                viewerRef.current.innerHTML = ''; // Clear previous
+                viewerRef.current.innerHTML = ''; 
 
-                let realPdbUrl = `https://alphafold.ebi.ac.uk/files/AF-${proteinId.toUpperCase()}-F1-model_v4.pdb`;
+                let realPdbUrl = `https://alphafold.ebi.ac.uk/files/AF-${proteinId.toUpperCase()}-F1-model_v6.pdb`;
                 try {
-                    // Try to fetch the accurate URL from AlphaFold's API directly
                     const res = await fetch(`https://alphafold.ebi.ac.uk/api/prediction/${proteinId.toUpperCase()}`);
                     const data = await res.json();
                     if (data && data.length > 0 && data[0].pdbUrl) {
                         realPdbUrl = data[0].pdbUrl;
                     }
-                } catch (e) { } // Fallback to v4 string
+                } catch (e) { } 
 
                 const viewerInstance = new window.PDBeMolstarPlugin();
+                viewerInstanceRef.current = viewerInstance;
 
-                const bgColor = isDark ? { r: 10, g: 25, b: 47 } : { r: 244, g: 246, b: 248 };
+                const bgColor = isDark ? { r: 15, g: 23, b: 42 } : { r: 248, g: 250, b: 252 };
 
                 const options = {
                     customData: {
@@ -53,15 +74,18 @@ const ProteinViewer = ({ proteinId }) => {
                     },
                     alphafoldView: true,
                     bgColor: bgColor,
-                    hideControls: false,
+                    hideControls: true,
                     hideLog: true,
                     hideSequencePanels: true,
                     visualStyle: 'cartoon',
-                    lighting: 'plastic'
+                    lighting: 'glossy'
                 };
 
                 try {
                     viewerInstance.render(viewerRef.current, options);
+                    
+                    // Apply hotspot colors after a short delay to ensure model is loaded
+                    setTimeout(applyColors, 2000);
                 } catch (e) {
                     console.error("Molstar rendering error:", e);
                 }
@@ -73,7 +97,6 @@ const ProteinViewer = ({ proteinId }) => {
             if (window.PDBeMolstarPlugin) {
                 renderViewer();
             } else {
-                // Poll every 100ms until the script is fully parsed
                 setTimeout(checkPluginAndRender, 100);
             }
         };
@@ -84,19 +107,15 @@ const ProteinViewer = ({ proteinId }) => {
             script.src = 'https://cdn.jsdelivr.net/npm/pdbe-molstar@3.2.0/build/pdbe-molstar-plugin.js';
             script.async = true;
             document.body.appendChild(script);
-            checkPluginAndRender(); // Start polling
+            checkPluginAndRender();
         } else {
-            // Already added to DOM, start polling in case it's still downloading
             checkPluginAndRender();
         }
 
         return () => {
             isMounted.current = false;
-            if (viewerRef.current) {
-                viewerRef.current.innerHTML = '';
-            }
         };
-    }, [proteinId, isDark]);
+    }, [proteinId, isDark, residueImpact]);
 
     return (
         <Box sx={{
