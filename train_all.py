@@ -222,7 +222,17 @@ def train_graph_model(epochs=100, lr=0.001, patience=30):
         return
 
     data = torch.load(graph_path, weights_only=False).to(device)
-    print(f"  Graph: {data.x.shape[0]} nodes, {data.edge_index.shape[1]} edges")
+    
+    # --- NEW: Topological Feature Injection ---
+    # Calculate degree for each node to give the model structural context
+    from torch_geometric.utils import degree
+    print("  Injecting Topological Features (Node Degree)...")
+    deg = degree(data.edge_index[0], data.x.shape[0]).view(-1, 1)
+    # Normalize degree
+    deg_norm = (deg - deg.mean()) / (deg.std() + 1e-6)
+    data.x = torch.cat([data.x, deg_norm], dim=-1)
+    
+    print(f"  Graph: {data.x.shape[0]} nodes, {data.edge_index.shape[1]} edges, {data.x.shape[1]} features")
 
     # Load splits & node mapping
     train_df = pd.read_csv(PROCESSED_DATA_DIR / "train.csv")
@@ -253,11 +263,16 @@ def train_graph_model(epochs=100, lr=0.001, patience=30):
     val_edge_label_index = val_edge_label_index.to(device)
     val_labels = val_labels.to(device)
 
-    # Model
-    model = GATLinkPredictor(in_channels=data.x.shape[1], hidden_channels=64, heads=4).to(device)
-    optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-3)
+    # Model: Increased to 128 channels for stability
+    model = GATLinkPredictor(in_channels=data.x.shape[1], hidden_channels=128, heads=4).to(device)
+    optimizer = optim.AdamW(model.parameters(), lr=lr * 0.5, weight_decay=1e-2)
     criterion = nn.BCEWithLogitsLoss()
-    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-5)
+    
+    # More conservative OneCycle config
+    scheduler = optim.lr_scheduler.OneCycleLR(
+        optimizer, max_lr=lr * 0.5, total_steps=epochs, 
+        pct_start=0.3, anneal_strategy='cos', div_factor=10, final_div_factor=100
+    )
 
     # Resume from checkpoint
     checkpoint_path = CHECKPOINT_DIR / "graph_checkpoint.pt"
@@ -378,10 +393,17 @@ def train_ensemble_model():
 
     # Graph Model
     graph_data = torch.load(graph_data_path, weights_only=False).to(device)
-    graph_model = GATLinkPredictor(in_channels=graph_data.x.shape[1], hidden_channels=64, heads=4).to(device)
+    
+    # Inject topology (must match training Phase 2)
+    from torch_geometric.utils import degree
+    deg = degree(graph_data.edge_index[0], graph_data.x.shape[0]).view(-1, 1)
+    deg_norm = (deg - deg.mean()) / (deg.std() + 1e-6)
+    graph_data.x = torch.cat([graph_data.x, deg_norm], dim=-1)
+
+    graph_model = GATLinkPredictor(in_channels=graph_data.x.shape[1], hidden_channels=128, heads=4).to(device)
     graph_model.load_state_dict(torch.load(graph_model_path, map_location=device))
     graph_model.eval()
-    print(f"  Loaded Graph Model from {graph_model_path}")
+    print(f"  Loaded Hybrid Graph Model from {graph_model_path}")
 
     # Load support files
     emb_path = PROCESSED_DATA_DIR / "embeddings.pt"
@@ -403,9 +425,15 @@ def train_ensemble_model():
 
     print(f"  Generating predictions on {len(filtered_df)} validation samples...")
 
+    # --- NEW: Biological Coincidence Features ---
+    print("  Extracting Biological Features (Localization)...")
+    bio_path = PROCESSED_DATA_DIR / "bio_metadata_cache.csv"
+    bio_df = pd.read_csv(bio_path).set_index("protein_id")["localization"].to_dict() if bio_path.exists() else {}
+
     batch_emb1, batch_emb2 = [], []
     g_src, g_dst = [], []
     final_labels = []
+    val_bio_features = []
 
     for _, row in tqdm(filtered_df.iterrows(), total=len(filtered_df), desc="  Aligning Data"):
         p1, p2, label = row["protein1"], row["protein2"], row["label"]
@@ -416,6 +444,12 @@ def train_ensemble_model():
         g_src.append(node_mapping[p1])
         g_dst.append(node_mapping[p2])
         final_labels.append(label)
+
+        # 1 if same localization, 0 otherwise
+        loc1, loc2 = bio_df.get(p1, "unk1"), bio_df.get(p2, "unk2")
+        val_bio_features.append([1.0 if loc1 == loc2 and loc1 != "unk1" else 0.0])
+
+    val_bio_features = np.array(val_bio_features)
 
     # Sequence predictions
     print("  Predicting with Sequence Model...")
@@ -448,9 +482,9 @@ def train_ensemble_model():
     seq_preds_np = np.array(final_seq_preds)
     graph_preds_np = np.array(final_graph_preds)
 
-    # Train ensemble
+    # Train ensemble with bio features
     ensemble = PPIEnsemble()
-    ensemble.train_stacking(seq_preds_np, graph_preds_np, val_labels_np)
+    ensemble.train_stacking(seq_preds_np, graph_preds_np, val_labels_np, bio_features=val_bio_features)
 
     out_path = MODELS_DIR / "ensemble_model.pkl"
     ensemble.save(out_path)
@@ -487,7 +521,14 @@ def evaluate_all():
 
     # Graph Model
     graph_data = torch.load(graph_data_path, weights_only=False).to(device)
-    graph_model = GATLinkPredictor(in_channels=graph_data.x.shape[1], hidden_channels=64, heads=4).to(device)
+    
+    # Inject topology for evaluation
+    from torch_geometric.utils import degree
+    deg = degree(graph_data.edge_index[0], graph_data.x.shape[0]).view(-1, 1)
+    deg_norm = (deg - deg.mean()) / (deg.std() + 1e-6)
+    graph_data.x = torch.cat([graph_data.x, deg_norm], dim=-1)
+
+    graph_model = GATLinkPredictor(in_channels=graph_data.x.shape[1], hidden_channels=128, heads=4).to(device)
     graph_model.load_state_dict(torch.load(graph_model_path, map_location=device))
     graph_model.eval()
 
@@ -514,6 +555,12 @@ def evaluate_all():
 
     print(f"  Evaluating on {len(filtered_df)} test samples...")
 
+    # Bio Features for Test
+    print("  Extracting Bio Features for Test...")
+    bio_path = PROCESSED_DATA_DIR / "bio_metadata_cache.csv"
+    bio_df = pd.read_csv(bio_path).set_index("protein_id")["localization"].to_dict() if bio_path.exists() else {}
+    test_bio_features = []
+
     batch_emb1, batch_emb2 = [], []
     g_src, g_dst = [], []
     final_labels = []
@@ -527,6 +574,12 @@ def evaluate_all():
         g_src.append(node_mapping[p1])
         g_dst.append(node_mapping[p2])
         final_labels.append(label)
+        
+        # Localization match
+        loc1, loc2 = bio_df.get(p1, "unk1"), bio_df.get(p2, "unk2")
+        test_bio_features.append([1.0 if loc1 == loc2 and loc1 != "unk1" else 0.0])
+
+    test_bio_features = np.array(test_bio_features)
 
     # Sequence predictions on test
     batch_emb1_t = torch.stack(batch_emb1)
@@ -557,8 +610,8 @@ def evaluate_all():
     seq_preds_np = np.array(seq_preds)
     graph_preds_np = np.array(graph_preds)
 
-    # Ensemble predictions
-    ensemble_preds = ensemble.predict(seq_preds_np, graph_preds_np, method="stacking")
+    # Ensemble predictions with test bio features
+    ensemble_preds = ensemble.predict(seq_preds_np, graph_preds_np, bio_features=test_bio_features, method="stacking")
 
     # Report metrics using the project's metrics reporter
     report_all_metrics(

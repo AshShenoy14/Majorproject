@@ -89,7 +89,8 @@ async def load_system():
     if graph_data_path.exists():
         data_cache["graph"] = torch.load(graph_data_path, weights_only=False).to(device)
         in_channels = data_cache["graph"].x.shape[1]
-        models["graph_model"] = GATLinkPredictor(in_channels=in_channels, hidden_channels=64).to(device)
+        # Use 128 hidden channels to match the new architecture
+        models["graph_model"] = GATLinkPredictor(in_channels=in_channels, hidden_channels=128).to(device)
         if graph_path.exists():
             try:
                 models["graph_model"].load_state_dict(torch.load(graph_path, map_location=device))
@@ -216,43 +217,36 @@ async def predict_interaction(pair: ProteinPair):
                 g_out = models["graph_model"](data_cache["graph"].x, data_cache["graph"].edge_index, edge_label_index)
                 graph_prob = torch.sigmoid(g_out).item()
         
-        # 6. Integrated Analysis (Novel Features)
-        
-        # 6a. Cold-Start / Uncertainty Detection
-        is_p1_in_graph = "mapping" in data_cache and p1 in data_cache["mapping"]
-        is_p2_in_graph = "mapping" in data_cache and p2 in data_cache["mapping"]
-        
-        uncertainty = {
-            "is_cold_start": not (is_p1_in_graph and is_p2_in_graph),
-            "p1_seen": is_p1_in_graph,
-            "p2_seen": is_p2_in_graph,
-            "warning": "One or both proteins are missing from the functional graph network. Relying primarily on sequence semantics." if not (is_p1_in_graph and is_p2_in_graph) else None,
-            "confidence_interval": [max(0, final_prob - 0.15), min(1, final_prob + 0.15)] if not (is_p1_in_graph and is_p2_in_graph) else [max(0, final_prob - 0.08), min(1, final_prob + 0.08)]
-        }
-        
-        # 6b. Automatic Hotspot Attribution
-        hotspots = None
-        if "hotspot" in analyzers:
-            try:
-                hotspots = analyzers["hotspot"].identify_hotspots(p1, sequences[p1], p2, sequences[p2])
-            except Exception as e:
-                print(f"Hotspot analysis failed: {e}")
+        # 5. Final Prediction (Ensemble or Simple Average)
+        final_prob = (seq_prob + graph_prob) / 2.0
+        model_used = "Average"
+        shap_values = None
 
-        # 6c. Bio Compatibility
-        bio_context = None
-        if "bio" in managers:
+        if "ensemble" in models and models["ensemble"] is not None and explainer is not None:
             try:
-                feasibility = managers["bio"].check_localization_compatibility(p1, p2)
-                bio_context = {
-                    "compatible": feasibility.get("compatible", True),
-                    "reason": feasibility.get("reason", "Unknown"),
-                    "p1_loc": feasibility.get("p1_locs", []),
-                    "p2_loc": feasibility.get("p2_locs", [])
-                }
+                # Enhanced features: [seq, graph, |seq-0.5|, |graph-0.5|]
+                conf_seq = abs(seq_prob - 0.5)
+                conf_graph = abs(graph_prob - 0.5)
+                
+                ens_prob = models["ensemble"].predict(
+                    np.array([seq_prob]), 
+                    np.array([graph_prob]), 
+                    method="stacking"
+                )[0]
+                
+                final_prob = float(ens_prob)
+                model_used = "XGBoost Ensemble"
+                
+                # Generate SHAP explanation
+                shap_val = explainer.explain_prediction(seq_prob, graph_prob, conf_seq, conf_graph)
+                shap_values = shap_val.tolist()[0] # [seq, graph, conf_seq, conf_graph]
             except Exception as e:
-                print(f"Bio context check failed: {e}")
-
-        # 7. Explanation Wrapper
+                print(f"Ensemble prediction/SHAP failed: {e}")
+                # Fallback to simple average if ensemble fails
+                final_prob = (seq_prob + graph_prob) / 2.0
+                model_used = "Average (Ensemble Failed)"
+        
+        # 6. Explanation
         explanation = {
             "Sequence_Model_Contribution": seq_prob,
             "Graph_Model_Contribution": graph_prob,
@@ -260,7 +254,7 @@ async def predict_interaction(pair: ProteinPair):
             "SHAP_Values": shap_values
         }
 
-        # 8. Uniprot ID Mapping for 3D Visuals
+        # 7. Uniprot ID Mapping for 3D Visuals
         uniprot_maps = {}
         if "id_mapper" in managers:
             uniprot_maps = managers["id_mapper"].ensp_to_uniprot([p1, p2])
@@ -274,10 +268,7 @@ async def predict_interaction(pair: ProteinPair):
             "protein1_uniprot_id": uniprot_maps.get(p1, p1),
             "protein2_uniprot_id": uniprot_maps.get(p2, p2),
             "protein1_seq": sequences[p1],
-            "protein2_seq": sequences[p2],
-            "hotspots": hotspots,
-            "uncertainty": uncertainty,
-            "bio_context": bio_context
+            "protein2_seq": sequences[p2]
         }
 
     except HTTPException as he:
@@ -629,6 +620,27 @@ async def get_chat_greeting():
         raise HTTPException(status_code=503, detail="Protein Assistant not initialized")
     return analyzers["assistant"].get_greeting()
 
+
+@app.post("/chat",
+          response_model=ChatResponse,
+          summary="Chat with Protein AI Assistant",
+          description="Ask questions about proteins, diseases, drug targets, and biology concepts.",
+          tags=["AI Assistant"])
+async def chat_with_assistant(request: ChatRequest):
+    if "assistant" not in analyzers:
+        raise HTTPException(status_code=503, detail="Protein Assistant not initialized")
+    
+    try:
+        result = analyzers["assistant"].answer(request.message)
+        return result
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+if __name__ == "__main__":
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
 
 @app.post("/chat",
           response_model=ChatResponse,

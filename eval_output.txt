@@ -1,0 +1,39 @@
+﻿python : Traceback (most recent call 
+last):
+At line:1 char:1
++ python train_all.py --eval-only 2>&1 
+| Out-File -FilePath eval_output ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecif 
+   ied: (Traceback (most recent call l  
+  ast)::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCom 
+   mandError
+ 
+  File "E:\majorproject\train_all.py", 
+line 594, in <module>
+    print("\u2554\u2550\u2550\u2550\u255
+0\u2550\u2550\u2550\u2550\u2550\u2550\u2
+550\u2550\u2550\u2550\u2550\u2550\u2550\
+u2550\u2550\u2550\u2550\u2550\u2550\u255
+0\u2550\u2550\u2550\u2550\u2550\u2550\u2
+550\u2550\u2550\u2550\u2550\u2550\u2550\
+u2550\u2550\u2550\u2550\u2550\u2550\u255
+0\u2550\u2550\u2550\u2550\u2550\u2550\u2
+550\u2550\u2550\u2550\u2550\u2550\u2550\
+u2550\u2550\u2550\u2550\u2550\u2550\u255
+0\u2550\u2550\u2550\u2550\u2550\u2550\u2
+557")
+    ~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^
+  File 
+"C:\Python313\Lib\encodings\cp1252.py", 
+line 19, in encode
+    return codecs.charmap_encode(input,s
+elf.errors,encoding_table)[0]
+           ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec 
+can't encode characters in position 
+0-71: character maps to <undefined>

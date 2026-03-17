@@ -18,38 +18,50 @@ class PPIEnsemble:
                 print("Could not load meta-learner. Path might be invalid or not exist yet.")
 
     @staticmethod
-    def _build_features(base_preds_1: np.ndarray, base_preds_2: np.ndarray) -> np.ndarray:
+    def _build_features(base_preds_1: np.ndarray, base_preds_2: np.ndarray, bio_features: np.ndarray = None) -> np.ndarray:
         """
         Build enhanced feature matrix for the meta-learner.
-        Adds |p - 0.5| confidence features for both models.
+        Combines model probabilities, confidence scores, and optional bio-metadata.
         """
         conf_1 = np.abs(base_preds_1 - 0.5)
         conf_2 = np.abs(base_preds_2 - 0.5)
-        return np.column_stack((base_preds_1, base_preds_2, conf_1, conf_2))
+        
+        base_stack = np.column_stack((base_preds_1, base_preds_2, conf_1, conf_2))
+        
+        if bio_features is not None:
+            # Ensure bio_features is a 2D array matching the number of samples
+            if bio_features.ndim == 1:
+                bio_features = bio_features.reshape(-1, 1)
+            return np.hstack((base_stack, bio_features))
+        
+        return base_stack
 
-    def train_stacking(self, base_preds_1: np.ndarray, base_preds_2: np.ndarray, labels: np.ndarray):
+    def train_stacking(self, base_preds_1: np.ndarray, base_preds_2: np.ndarray, labels: np.ndarray, bio_features: np.ndarray = None):
         """
-        Trains the XGBoost meta-learner with enhanced features.
+        Trains the XGBoost meta-learner.
         args:
-            base_preds_1: Predictions from Sequence Model (N,)
-            base_preds_2: Predictions from Graph Model (N,)
-            labels: True labels (N,)
+            base_preds_1: Predictions from Sequence Model
+            base_preds_2: Predictions from Graph Model
+            labels: True labels
+            bio_features: Optional additional biological features (tabular)
         """
-        X = self._build_features(base_preds_1, base_preds_2)
+        X = self._build_features(base_preds_1, base_preds_2, bio_features)
         
         print(f"Training XGBoost Meta-Learner with {X.shape[1]} features...")
         self.meta_model = xgb.XGBClassifier(
+            n_estimators=100,
+            max_depth=4,
+            learning_rate=0.1,
             objective='binary:logistic',
             eval_metric='logloss',
-            use_label_encoder=False
+            random_state=42
         )
         self.meta_model.fit(X, labels)
         print("Meta-learner training complete.")
 
-    def predict(self, base_preds_1: np.ndarray, base_preds_2: np.ndarray, method: str = "stacking") -> np.ndarray:
+    def predict(self, base_preds_1: np.ndarray, base_preds_2: np.ndarray, bio_features: np.ndarray = None, method: str = "stacking") -> np.ndarray:
         """
         Predicts final probability.
-        method: 'stacking' or 'soft_voting'
         """
         if method == "soft_voting":
             return (base_preds_1 + base_preds_2) / 2.0
@@ -58,10 +70,9 @@ class PPIEnsemble:
             if self.meta_model is None:
                 raise ValueError("Meta-learner not trained/loaded.")
             
-            X = self._build_features(base_preds_1, base_preds_2)
-            # Predict probabilities
+            X = self._build_features(base_preds_1, base_preds_2, bio_features)
             return self.meta_model.predict_proba(X)[:, 1]
-            
+        
         else:
             raise ValueError(f"Unknown method: {method}")
 

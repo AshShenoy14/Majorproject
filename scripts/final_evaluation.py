@@ -52,7 +52,7 @@ def main():
     seq_model.load_state_dict(torch.load(MODELS_DIR / "sequence_model_best.pth", map_location=device))
     seq_model.eval()
 
-    graph_model = GATLinkPredictor(in_channels=graph_data.x.shape[1], hidden_channels=64).to(device)
+    graph_model = GATLinkPredictor(in_channels=graph_data.x.shape[1], hidden_channels=128).to(device)
     graph_model.load_state_dict(torch.load(MODELS_DIR / "graph_model_best.pth", map_location=device))
     graph_model.eval()
 

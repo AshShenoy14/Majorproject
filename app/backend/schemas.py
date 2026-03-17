@@ -17,9 +17,6 @@ class PredictionResponse(BaseModel):
     protein2_uniprot_id: Optional[str] = Field(None, description="Mapped UniProt ID for protein 2", example="Q67890")
     protein1_seq: Optional[str] = Field(None, description="Sequence used for protein 1")
     protein2_seq: Optional[str] = Field(None, description="Sequence used for protein 2")
-    hotspots: Optional[Dict[str, Any]] = Field(None, description="Residue-level importance hotspots")
-    uncertainty: Optional[Dict[str, Any]] = Field(None, description="Uncertainty quantification and warnings")
-    bio_context: Optional[Dict[str, Any]] = Field(None, description="Biological localization and compatibility")
     
 class NetworkRequest(BaseModel):
     threshold: float = Field(0.5, description="Interaction probability threshold for network inclusion", ge=0, le=1)

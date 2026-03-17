@@ -1,95 +1,79 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch_geometric.nn import GATv2Conv
+from torch_geometric.nn import GATv2Conv, SAGEConv, LayerNorm as GNNLayerNorm
 
 class GATLinkPredictor(nn.Module):
-    def __init__(self, in_channels: int, hidden_channels: int = 64, heads: int = 4, dropout: float = 0.3):
+    def __init__(self, in_channels: int, hidden_channels: int = 128, heads: int = 4, dropout: float = 0.4):
+        """
+        Refined Hybrid GNN Link Predictor.
+        Increased capacity to 128 channels for better ESM feature preservation.
+        """
         super().__init__()
-        # Refined capacity for stability
-        self.conv1 = GATv2Conv(in_channels, hidden_channels, heads=heads, dropout=dropout)
-        self.ln1 = nn.LayerNorm(hidden_channels * heads)
         
-        self.conv2 = GATv2Conv(hidden_channels * heads, hidden_channels, heads=heads, dropout=dropout)
-        self.ln2 = nn.LayerNorm(hidden_channels * heads)
+        # 1. Feature Encoding Layers
+        self.conv1 = SAGEConv(in_channels, hidden_channels)
+        self.ln1 = GNNLayerNorm(hidden_channels)
         
-        self.conv3 = GATv2Conv(hidden_channels * heads, hidden_channels, heads=1, concat=False, dropout=dropout)
-        self.ln3 = nn.LayerNorm(hidden_channels)
+        self.conv2 = GATv2Conv(hidden_channels, hidden_channels // heads, heads=heads, dropout=dropout)
+        self.ln2 = GNNLayerNorm(hidden_channels)
         
-        self.res_proj1 = nn.Linear(in_channels, hidden_channels * heads)
+        self.conv3 = SAGEConv(hidden_channels, hidden_channels)
+        self.ln3 = GNNLayerNorm(hidden_channels)
         
-        # Skip connection for raw signal
-        self.skip_proj1 = nn.Linear(in_channels, hidden_channels)
+        # Strong Residual Skips
+        self.res_proj = nn.Linear(in_channels, hidden_channels)
         
         self.dropout = dropout
         
-        # Aligned Link Prediction Classifier
-        # Input: h_u, h_v, |h_u - h_v|, h_u * h_v → (hidden_channels) × 4
-        pair_dim = hidden_channels * 4
-        classifier_hidden = 512
-        
+        # 2. Link Prediction Classifier
         self.classifier = nn.Sequential(
-            nn.Linear(pair_dim, classifier_hidden),
-            nn.BatchNorm1d(classifier_hidden),
+            nn.Linear(hidden_channels * 4, 512),
+            nn.BatchNorm1d(512),
             nn.GELU(),
             nn.Dropout(dropout),
             
-            nn.Linear(classifier_hidden, classifier_hidden // 2),
-            nn.BatchNorm1d(classifier_hidden // 2),
+            nn.Linear(512, 256),
+            nn.BatchNorm1d(256),
             nn.GELU(),
             nn.Dropout(dropout / 2),
-            nn.Linear(classifier_hidden // 2, 1)
+            
+            nn.Linear(256, 1)
         )
 
     def encode(self, x, edge_index):
-        # Layer 1
-        identity = x
-        x = self.conv1(x, edge_index)
-        x = self.ln1(x)
-        x = F.elu(x)
-        x = F.dropout(x, p=self.dropout, training=self.training)
+        # Layer 1: Global Context
+        identity = self.res_proj(x)
+        h = self.conv1(x, edge_index)
+        h = self.ln1(h)
+        h = F.gelu(h)
+        h = F.dropout(h, p=self.dropout, training=self.training)
+        h = h + identity
         
-        x = x + self.res_proj1(identity)
+        # Layer 2: Attention based Refinement
+        identity = h
+        h = self.conv2(h, edge_index)
+        h = self.ln2(h)
+        h = F.gelu(h)
+        h = F.dropout(h, p=self.dropout, training=self.training)
+        h = h + identity # Residual
         
-        # Layer 2
-        identity = x
-        x = self.conv2(x, edge_index)
-        x = self.ln2(x)
-        x = F.elu(x)
-        x = F.dropout(x, p=self.dropout, training=self.training)
+        # Layer 3: Aggregation
+        h = self.conv3(h, edge_index)
+        h = self.ln3(h)
+        h = F.gelu(h)
         
-        x = x + identity
-        
-        # Layer 3
-        x = self.conv3(x, edge_index)
-        x = self.ln3(x)
-        x = F.elu(x)
-        
-        return x
+        return h
 
     def forward(self, x, edge_index, edge_label_index):
-        """
-        Args:
-            x: Node features (batch_nodes, in_channels)
-            edge_index: Graph connectivity (2, num_edges)
-            edge_label_index: Pairs to predict (2, num_pairs)
-        Returns:
-            Raw logits (no sigmoid). Apply sigmoid yourself during inference.
-        """
         z = self.encode(x, edge_index)
         
-        # Project raw features for skip connection
-        z_raw = self.skip_proj1(x)
-        
         src, dst = edge_label_index
+        h_u, h_v = z[src], z[dst]
         
-        # Combine GAT learned features with raw projected features
-        h_u = z[src] + z_raw[src]
-        h_v = z[dst] + z_raw[dst]
-        
+        # Feature engineering for pairs
         abs_diff = torch.abs(h_u - h_v)
         hadamard = h_u * h_v
         
-        emb_pair = torch.cat([h_u, h_v, abs_diff, hadamard], dim=1)
-        
-        return self.classifier(emb_pair)
+        pair_repr = torch.cat([h_u, h_v, abs_diff, hadamard], dim=1)
+        return self.classifier(pair_repr)
