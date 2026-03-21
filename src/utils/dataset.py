@@ -1,18 +1,31 @@
+# -*- coding: utf-8 -*-
 import torch
 from torch.utils.data import Dataset
 import pandas as pd
-from typing import Dict
+from typing import Dict, Union
+
+from src.utils.bio_encoder import BioFeatureEncoder
 
 class PPIDataset(Dataset):
-    def __init__(self, data_path: str, embeddings: Dict[str, torch.Tensor]):
+    def __init__(self, data: Union[str, pd.DataFrame], embeddings: Dict[str, torch.Tensor], bio_mapping: Dict[str, torch.Tensor] = None):
         """
         Args:
-            data_path: Path to the csv file (protein1, protein2, label).
+            data: Path to the csv file OR a pandas DataFrame (protein1, protein2, label).
             embeddings: Dictionary mapping ProteinID -> Embedding.
+            bio_mapping: Dictionary mapping ProteinID -> Biological Feature Vector.
         """
-        self.df = pd.read_csv(data_path)
+        if isinstance(data, pd.DataFrame):
+            self.df = data
+        else:
+            self.df = pd.read_csv(data)
+            
         self.embeddings = embeddings
-        
+        self.bio_mapping = bio_mapping or {}
+        self.bio_dim = 0
+        if self.bio_mapping:
+            first_val = next(iter(self.bio_mapping.values()))
+            self.bio_dim = first_val.shape[0]
+
         # Filter out pairs where embeddings are missing
         valid_indices = []
         for idx, row in self.df.iterrows():
@@ -32,14 +45,21 @@ class PPIDataset(Dataset):
         p2 = row["protein2"]
         label = row["label"]
         
-        # Convert to float32 on-the-fly (embeddings may be stored as float16 to save RAM)
+        # Convert to float32 on-the-fly
         emb1 = self.embeddings[p1].float()
         emb2 = self.embeddings[p2].float()
         
-        # Mean-pool per-residue embeddings to fixed-size vectors
+        # Mean-pool per-residue embeddings
         if emb1.dim() > 1:
             emb1 = emb1.mean(dim=0)
         if emb2.dim() > 1:
             emb2 = emb2.mean(dim=0)
+            
+        # Append Bio-Features if available
+        if self.bio_mapping:
+            bio1 = self.bio_mapping.get(p1, torch.zeros(self.bio_dim))
+            bio2 = self.bio_mapping.get(p2, torch.zeros(self.bio_dim))
+            emb1 = torch.cat([emb1, bio1])
+            emb2 = torch.cat([emb2, bio2])
         
         return emb1, emb2, torch.tensor(label, dtype=torch.float32)

@@ -6,8 +6,14 @@ from transformers import AutoTokenizer, AutoModel
 class ResidueGraphGenerator:
     def __init__(self, model_name: str = "facebook/esm2_t6_8M_UR50D", device: str = "cpu"):
         self.device = device
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.model = AutoModel.from_pretrained(model_name).to(device)
+        print(f"Loading ESM-2 model: {model_name} on {device}...")
+        try:
+            self.tokenizer = AutoTokenizer.from_pretrained(model_name, local_files_only=True)
+            self.model = AutoModel.from_pretrained(model_name, local_files_only=True).to(device)
+        except Exception as e:
+            print(f"Offline load failed ({e}), attempting regular load...")
+            self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+            self.model = AutoModel.from_pretrained(model_name).to(device)
         self.model.eval()
 
     def generate_rig(self, sequence: str, threshold: float = 0.85, max_residues: int = 500) -> Dict[str, Any]:

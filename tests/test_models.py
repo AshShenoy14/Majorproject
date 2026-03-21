@@ -6,13 +6,14 @@ from src.models.graph_model import GATLinkPredictor
 from src.models.ensemble_model import PPIEnsemble
 
 def test_sequence_model_forward():
-    input_dim = 320
+    input_dim = 480
     batch_size = 4
+    total_dim = input_dim + 10 # Default bio_dim is 10
     model = SequencePPIModel(input_dim=input_dim)
     model.eval()
     
-    emb1 = torch.randn(batch_size, input_dim)
-    emb2 = torch.randn(batch_size, input_dim)
+    emb1 = torch.randn(batch_size, total_dim)
+    emb2 = torch.randn(batch_size, total_dim)
     
     with torch.no_grad():
         output = model(emb1, emb2)
@@ -22,15 +23,16 @@ def test_sequence_model_forward():
     assert not torch.isnan(output).any()
 
 def test_graph_model_forward():
-    in_channels = 320
+    in_channels = 480
     num_nodes = 10
     num_edges = 20
     num_pairs = 5
     
-    model = GATLinkPredictor(in_channels=in_channels, hidden_channels=64)
+    total_dim = in_channels # GNN model uses raw x as input, no bio concat inside forward
+    model = GATLinkPredictor(in_channels=in_channels, hidden_channels=128)
     model.eval()
     
-    x = torch.randn(num_nodes, in_channels)
+    x = torch.randn(num_nodes, total_dim)
     edge_index = torch.randint(0, num_nodes, (2, num_edges))
     edge_label_index = torch.randint(0, num_nodes, (2, num_pairs))
     

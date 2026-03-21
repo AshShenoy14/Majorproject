@@ -16,32 +16,32 @@ class PPIExplainer:
             print(f"Warning: SHAP initialization failed due to XGBoost compatibility issue: {e}")
             self.explainer = None
 
-    def explain_prediction(self, seq_prob: float, graph_prob: float, conf_seq: float, conf_graph: float):
+    def explain_prediction(self, seq_prob: float, graph_prob: float, conf_seq: float, conf_graph: float, bio_match: float):
         """
-        Explains a single prediction made by the ensemble using the 4 enhanced features.
+        Explains a single prediction made by the ensemble using the 5 features.
+        Features: [seq, graph, conf_seq, conf_graph, bio_match]
         """
         if self.explainer is None:
-            return np.array([[0.0, 0.0, 0.0, 0.0]])
+            return np.array([[0.0, 0.0, 0.0, 0.0, 0.0]])
             
-        # SHAP expects a matrix matching the 4 features the model was trained on
-        X = np.array([[seq_prob, graph_prob, conf_seq, conf_graph]])
+        # Matrix matching the features the meta-learner was trained on
+        X = np.array([[seq_prob, graph_prob, conf_seq, conf_graph, bio_match]])
+        
+        # Handle legacy 4-feature models
+        n_expected = getattr(self.model, "n_features_in_", 4)
+        if n_expected == 4:
+            X = X[:, :4]
+            
         shap_values = self.explainer.shap_values(X)
         
-        # Plotting
-        # shap.force_plot(...)
-        # For now, return values
-        # SHAP returns (1, n_features)
-        # Check instance type to handle different SHAP versions or Model types
         if isinstance(shap_values, list):
-             # For some classifiers SHAP returns list of arrays (one per class)
-             # We want positive class (index 1) usually, but XGBoost binary might return just one matrix
              if len(shap_values) == 2:
                   return shap_values[1]
              return shap_values[0]
              
         return shap_values
 
-    def save_summary_plot(self, X: np.ndarray, feature_names=["ESM-MLP", "GAT", "|ESM-0.5|", "|GAT-0.5|"], title="SHAP Summary Plot", output_path="shap_summary.png"):
+    def save_summary_plot(self, X: np.ndarray, feature_names=["ESM-MLP", "GAT", "|ESM-0.5|", "|GAT-0.5|", "Bio Localization"], title="SHAP Summary Plot", output_path="shap_summary.png"):
         """
         Generates and saves a SHAP summary plot for a batch of predictions.
         """

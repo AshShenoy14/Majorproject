@@ -58,6 +58,7 @@ const Predict = () => {
     { name: 'Graph Signal', value: shapValues[1] },
     { name: 'Seq. Confidence', value: shapValues[2] },
     { name: 'Graph Confidence', value: shapValues[3] },
+    { name: 'Bio Localization', value: shapValues[4] || 0 },
   ] : [];
 
   const handlePredict = async (e) => {
@@ -215,6 +216,13 @@ const Predict = () => {
                   </span>
                 </div>
 
+                <div className={`flex items-center gap-2 px-6 py-2 rounded-full mb-4 ${result.explanation?.Biological_Match ? 'bg-indigo-50 text-indigo-600 border border-indigo-100' : 'bg-slate-50 text-slate-400 border border-slate-100'}`}>
+                  <ShieldCheck size={18} />
+                  <span className="font-bold uppercase tracking-wider text-[10px]">
+                    {result.explanation?.Biological_Match ? 'Bio-Match: Compatible' : 'Bio-Match: Unverified'}
+                  </span>
+                </div>
+
                 Confidence Score: <span className="text-slate-700 font-bold">{(Number(result.confidence_score || 0) * 100).toFixed(1)}%</span>
                 <TooltipIcon text="Score based on the statistical agreement between sequence and graph data." />
               </div>
@@ -332,37 +340,6 @@ const Predict = () => {
         )}
       </AnimatePresence>
     </div>
-  );
-};
-
-export default Predict;
-              </div >
-            </div >
-
-  <div className="glass-card p-8 bg-slate-50/50">
-    <div className="flex items-center gap-3 mb-8">
-      <Activity className="text-scientific-accent" />
-      <h4 className="text-lg font-bold text-slate-800">Model Interpretation</h4>
-    </div>
-
-    <p className="text-slate-500 mb-6 leading-relaxed">
-      Our advanced <span className="text-scientific-primary font-bold">Hybrid Stacking Ensemble</span> aggregates multiple
-      biological evidence streams. By combining protein sequence motifs with localized graph topology,
-      we achieve state-of-the-art predictive performance.
-    </p>
-    <div className="max-w-3xl">
-      <div className="p-6 bg-white rounded-2xl border border-slate-200 shadow-sm relative italic text-slate-600 leading-relaxed">
-        <div className="absolute -top-3 left-6 p-1 px-2 bg-scientific-accent text-white text-[10px] font-bold rounded uppercase tracking-widest">AI Interpreter</div>
-        "The {result.esm_probability > 0.5 ? 'sequence' : 'sequence'} model suggests {result.esm_probability > 0.5 ? 'strong' : 'weak'} biological alignment.
-        The graph network {result.gat_probability > 0.5 ? 'reinforces' : 'contradicts'} this with its neighbor analysis.
-        The final consensus interaction is {result.interaction_probability > 0.5 ? 'likely' : 'unlikely'} based on the combined evidence."
-      </div>
-    </div>
-  </div>
-          </motion.div >
-        )}
-      </AnimatePresence >
-    </div >
   );
 };
 

@@ -27,6 +27,7 @@ from src.analysis.network_analysis import NetworkAnalyzer
 from src.analysis.mutation_analyzer import MutationAnalyzer
 from src.analysis.biological_managers import BiologicalManager
 from src.analysis.protein_assistant import ProteinAssistant
+from src.utils.bio_encoder import BioFeatureEncoder
 from app.backend.schemas import (
     ProteinPair, PredictionResponse, NetworkResponse, BatchPredictionRequest,
     MutationRequest, MutationAnalysisResponse, BioMetaResponse, FeasibilityResponse,
@@ -59,100 +60,108 @@ explainer = None # Global explainer instance
 
 @app.on_event("startup")
 async def load_system():
-    print("Loading TransGraph-PPI System...")
-    
-    # 1. Managers
-    managers["sequence"] = SequenceManager()
-    managers["target"] = TargetManager()
-    managers["id_mapper"] = IDMapper()
-    
-    # 2. Base Models
-    device = "cuda:0" if torch.cuda.is_available() else "cpu"
-    print(f"Using device: {device}")
-    
-    # Feature Extractor
-    models["esm"] = ESMFeatureExtractor(device=device)
-    
-    # Sequence Model
-    seq_path = PROJECT_ROOT / "models" / "sequence_model_best.pth"
-    models["seq_model"] = SequencePPIModel(input_dim=320).to(device)
-    if seq_path.exists():
-        models["seq_model"].load_state_dict(torch.load(seq_path, map_location=device))
-        print("Sequence Model loaded.")
-    else:
-        print("Warning: Sequence Model weights not found. Using randomly initialized weights.")
-    models["seq_model"].eval()
-
-    # Graph Model
-    graph_path = PROJECT_ROOT / "models" / "graph_model_best.pth"
-    graph_data_path = PROCESSED_DATA_DIR / "ppi_graph.pt"
-    if graph_data_path.exists():
-        data_cache["graph"] = torch.load(graph_data_path, weights_only=False).to(device)
-        in_channels = data_cache["graph"].x.shape[1]
-        # Use 128 hidden channels to match the new architecture
-        models["graph_model"] = GATLinkPredictor(in_channels=in_channels, hidden_channels=128).to(device)
-        if graph_path.exists():
-            try:
-                models["graph_model"].load_state_dict(torch.load(graph_path, map_location=device))
-                print("Graph Model loaded.")
-            except Exception as e:
-                print(f"Warning: Could not load Graph Model weights ({e}). Graph predictions will use defaults.")
+    try:
+        print("Loading TransGraph-PPI System...")
+        
+        # 1. Managers
+        managers["sequence"] = SequenceManager()
+        managers["target"] = TargetManager()
+        managers["id_mapper"] = IDMapper()
+        managers["bio"] = BiologicalManager()
+        managers["bio_encoder"] = BioFeatureEncoder()
+        
+        # 2. Base Models
+        device = "cuda:0" if torch.cuda.is_available() else "cpu"
+        print(f"Using device: {device}")
+        
+        # Feature Extractor
+        models["esm"] = ESMFeatureExtractor(device=device)
+        
+        # Sequence Model
+        seq_path = PROJECT_ROOT / "models" / "sequence_model_best.pth"
+        models["seq_model"] = SequencePPIModel(input_dim=480).to(device)
+        if seq_path.exists():
+            models["seq_model"].load_state_dict(torch.load(seq_path, map_location=device))
+            print("Sequence Model loaded.")
         else:
-            print("Warning: Graph Model weights not found. Using randomly initialized weights.")
-        models["graph_model"].eval()
-        
-        map_path = PROCESSED_DATA_DIR / "ppi_graph_mapping.pt"
-        if map_path.exists():
-             data_cache["mapping"] = torch.load(map_path, weights_only=False)
-    else:
-        print("Warning: PPI Graph data not found.")
+            print("Warning: Sequence Model weights not found. Using randomly initialized weights.")
+        models["seq_model"].eval()
 
-    # 3. Load Ensemble model
-    ensemble_path = PROJECT_ROOT / "models" / "ensemble_model.pkl"
-    global explainer # Declare explainer as global to modify it
-    if ensemble_path.exists():
-        models["ensemble"] = PPIEnsemble(str(ensemble_path))
-        print("Loaded Hybrid Ensemble meta-learner.")
-        
-        # Initialize Explainer
-        print("Initializing SHAP explainer...")
-        explainer = PPIExplainer(str(ensemble_path))
-    else:
-        print("Ensemble model not found. Using simple average fallback.")
+        # Graph Model
+        graph_path = PROJECT_ROOT / "models" / "graph_model_best.pth"
+        graph_data_path = PROCESSED_DATA_DIR / "ppi_graph.pt"
+        if graph_data_path.exists():
+            data_cache["graph"] = torch.load(graph_data_path, weights_only=False).to(device)
+            in_channels = data_cache["graph"].x.shape[1]
+            # Use 128 hidden channels to match the new architecture
+            models["graph_model"] = GATLinkPredictor(in_channels=in_channels, hidden_channels=128).to(device)
+            if graph_path.exists():
+                try:
+                    models["graph_model"].load_state_dict(torch.load(graph_path, map_location=device))
+                    print("Graph Model loaded.")
+                except Exception as e:
+                    print(f"Warning: Could not load Graph Model weights ({e}). Graph predictions will use defaults.")
+            else:
+                print("Warning: Graph Model weights not found. Using randomly initialized weights.")
+            models["graph_model"].eval()
+            
+            map_path = PROCESSED_DATA_DIR / "ppi_graph_mapping.pt"
+            if map_path.exists():
+                 data_cache["mapping"] = torch.load(map_path, weights_only=False)
+        else:
+            print("Warning: PPI Graph data not found.")
 
-    # Network Analyzer
-    train_path = PROCESSED_DATA_DIR / "train.csv"
-    if train_path.exists():
-        print("Initializing Network Analyzer...")
-        df = pd.read_csv(train_path)
-        # Filter only positive interactions for analysis graph
-        df_pos = df[df['label'] == 1]
-        analyzers["network"] = NetworkAnalyzer()
-        analyzers["network"].build_from_dataframe(df_pos)
-        print("Network Analyzer Ready.")
+        # 3. Load Ensemble model
+        ensemble_path = PROJECT_ROOT / "models" / "ensemble_model.pkl"
+        global explainer # Declare explainer as global to modify it
+        if ensemble_path.exists():
+            models["ensemble"] = PPIEnsemble(str(ensemble_path))
+            print("Loaded Hybrid Ensemble meta-learner.")
+            
+            # Initialize Explainer
+            print("Initializing SHAP explainer...")
+            explainer = PPIExplainer(str(ensemble_path))
+        else:
+            print("Ensemble model not found. Using simple average fallback.")
 
-    # 4. Mutation and Novel Analyzers
-    if "seq_model" in models and "esm" in models:
-        from src.analysis.hotspot_analyzer import HotspotAnalyzer
-        from src.analysis.residue_graph_generator import ResidueGraphGenerator
-        
-        analyzers["mutation"] = MutationAnalyzer(models["seq_model"], models["esm"])
-        analyzers["hotspot"] = HotspotAnalyzer(models["seq_model"], models["esm"])
-        analyzers["residue_graph"] = ResidueGraphGenerator(device=device)
-        print("Mutation and Novel Analyzers Ready.")
+        # Network Analyzer
+        train_path = PROCESSED_DATA_DIR / "train.csv"
+        if train_path.exists():
+            print("Initializing Network Analyzer...")
+            df = pd.read_csv(train_path)
+            # Filter only positive interactions for analysis graph
+            df_pos = df[df['label'] == 1]
+            analyzers["network"] = NetworkAnalyzer()
+            analyzers["network"].build_from_dataframe(df_pos)
+            print("Network Analyzer Ready.")
 
-    # 5. Biological Manager
-    managers["bio"] = BiologicalManager()
-    print("Biological Manager Ready.")
+        # 4. Mutation and Novel Analyzers
+        if "seq_model" in models and "esm" in models:
+            from src.analysis.hotspot_analyzer import HotspotAnalyzer
+            from src.analysis.residue_graph_generator import ResidueGraphGenerator
+            
+            analyzers["mutation"] = MutationAnalyzer(models["seq_model"], models["esm"], managers["bio"], managers["bio_encoder"])
+            analyzers["hotspot"] = HotspotAnalyzer(models["seq_model"], models["esm"], managers["bio"], managers["bio_encoder"])
+            analyzers["residue_graph"] = ResidueGraphGenerator(device=device)
+            print("Mutation and Novel Analyzers Ready.")
 
-    # 6. Protein Assistant
-    analyzers["assistant"] = ProteinAssistant(
-        sequence_manager=managers.get("sequence"),
-        target_manager=managers.get("target")
-    )
-    print("Protein Assistant Ready.")
+        # 5. Biological Manager Ready (already initialized above)
+        print("Biological Manager Ready (Bio + Cache).")
 
-    print("System Loaded.")
+        # 6. Protein Assistant
+        analyzers["assistant"] = ProteinAssistant(
+            sequence_manager=managers.get("sequence"),
+            target_manager=managers.get("target")
+        )
+        print("Protein Assistant Ready.")
+
+        print("System Loaded.")
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"FATAL ERROR during startup: {e}")
+        # Optionally exit, but for debugging we'll see the print
+        sys.exit(1)
 
 @app.post("/predict", 
           response_model=PredictionResponse,
@@ -202,8 +211,23 @@ async def predict_interaction(pair: ProteinPair):
         
         # 3. Sequence Prediction
         with torch.no_grad():
+            # Add Biological Features to Sequence Input if available
+            bio_meta = managers["bio"].get_bio_metadata([p1, p2])
+            
+            # Helper to get encoded vector for an ID from the fetched metadata
+            def get_encoded(pid):
+                row = bio_meta[bio_meta["protein_id"] == pid]
+                loc_str = row.iloc[0]["localization"] if not row.empty else ""
+                return managers["bio_encoder"].encode_protein(loc_str).to(models["esm"].device).float()
+
+            b1 = get_encoded(p1).unsqueeze(0)
+            b2 = get_encoded(p2).unsqueeze(0)
+            
+            e1_final = torch.cat([e1, b1], dim=1)
+            e2_final = torch.cat([e2, b2], dim=1)
+            
             # Apply sigmoid to raw logits (model outputs logits, not probabilities)
-            seq_prob = torch.sigmoid(models["seq_model"](e1, e2)).item()
+            seq_prob = torch.sigmoid(models["seq_model"](e1_final, e2_final)).item()
             
         # 4. Graph Prediction
         graph_prob = 0.5 
@@ -221,28 +245,33 @@ async def predict_interaction(pair: ProteinPair):
         final_prob = (seq_prob + graph_prob) / 2.0
         model_used = "Average"
         shap_values = None
+        bio_match = 0.0 # Default
 
         if "ensemble" in models and models["ensemble"] is not None and explainer is not None:
             try:
-                # Enhanced features: [seq, graph, |seq-0.5|, |graph-0.5|]
+                # Get Biological Match Feature (1 if compatible, 0 otherwise)
+                bio_comp = managers["bio"].check_localization_compatibility(p1, p2)
+                bio_match = 1.0 if bio_comp.get("compatible", False) else 0.0
+
+                # Enhanced features: [seq, graph, |seq-0.5|, |graph-0.5|, bio_match]
                 conf_seq = abs(seq_prob - 0.5)
                 conf_graph = abs(graph_prob - 0.5)
                 
                 ens_prob = models["ensemble"].predict(
                     np.array([seq_prob]), 
                     np.array([graph_prob]), 
+                    bio_features=np.array([[bio_match]]),
                     method="stacking"
                 )[0]
                 
                 final_prob = float(ens_prob)
                 model_used = "XGBoost Ensemble"
                 
-                # Generate SHAP explanation
-                shap_val = explainer.explain_prediction(seq_prob, graph_prob, conf_seq, conf_graph)
-                shap_values = shap_val.tolist()[0] # [seq, graph, conf_seq, conf_graph]
+                # Generate SHAP explanation with 5 features
+                shap_val = explainer.explain_prediction(seq_prob, graph_prob, conf_seq, conf_graph, bio_match)
+                shap_values = shap_val.tolist()[0] 
             except Exception as e:
                 print(f"Ensemble prediction/SHAP failed: {e}")
-                # Fallback to simple average if ensemble fails
                 final_prob = (seq_prob + graph_prob) / 2.0
                 model_used = "Average (Ensemble Failed)"
         
@@ -251,7 +280,8 @@ async def predict_interaction(pair: ProteinPair):
             "Sequence_Model_Contribution": seq_prob,
             "Graph_Model_Contribution": graph_prob,
             "Model_Used": model_used,
-            "SHAP_Values": shap_values
+            "SHAP_Values": shap_values,
+            "Biological_Match": bio_match > 0.5
         }
 
         # 7. Uniprot ID Mapping for 3D Visuals
@@ -642,23 +672,3 @@ async def chat_with_assistant(request: ChatRequest):
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
 
-@app.post("/chat",
-          response_model=ChatResponse,
-          summary="Chat with Protein AI Assistant",
-          description="Ask questions about proteins, diseases, drug targets, and biology concepts.",
-          tags=["AI Assistant"])
-async def chat_with_assistant(request: ChatRequest):
-    if "assistant" not in analyzers:
-        raise HTTPException(status_code=503, detail="Protein Assistant not initialized")
-    
-    try:
-        result = analyzers["assistant"].answer(request.message)
-        return result
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

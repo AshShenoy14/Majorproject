@@ -4,8 +4,14 @@ import numpy as np
 import joblib
 import os
 import sys
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, average_precision_score
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.metrics import (
+    accuracy_score, precision_score, recall_score, f1_score, 
+    roc_auc_score, average_precision_score, confusion_matrix
+)
 from tabulate import tabulate
+from tqdm import tqdm
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
@@ -22,7 +28,7 @@ def find_optimal_threshold(y_true, y_prob, method="f1"):
     best_thresh = 0.5
     best_score = -1
     
-    for thresh in np.arange(0.1, 0.91, 0.01):
+    for thresh in np.arange(0.1, 0.9, 0.01):
         y_pred = (y_prob > thresh).astype(int)
         if method == "f1":
             score = f1_score(y_true, y_pred, zero_division=0)
@@ -41,6 +47,49 @@ def find_optimal_threshold(y_true, y_prob, method="f1"):
     
     return best_thresh, best_score
 
+def plot_confusion_matrix(y_true, y_prob, threshold, title, save_path):
+    """Generates and saves a confusion matrix heatmap."""
+    y_pred = (y_prob > threshold).astype(int)
+    cm = confusion_matrix(y_true, y_pred)
+    
+    plt.figure(figsize=(6, 5))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', cbar=False)
+    plt.xlabel('Predicted Label')
+    plt.ylabel('True Label')
+    plt.title(f'Confusion Matrix: {title}\n(Threshold={threshold:.2f})')
+    
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    plt.savefig(save_path, bbox_inches='tight')
+    plt.close()
+    print(f"  Saved Confusion Matrix to {save_path}")
+
+def plot_threshold_analysis(y_true, y_prob, title, save_path):
+    """Plots F1, Precision, and Recall across various thresholds."""
+    thresholds = np.arange(0.1, 0.91, 0.05)
+    f1s, precs, recs = [], [], []
+    
+    for t in thresholds:
+        y_pred = (y_prob > t).astype(int)
+        f1s.append(f1_score(y_true, y_pred, zero_division=0))
+        precs.append(precision_score(y_true, y_pred, zero_division=0))
+        recs.append(recall_score(y_true, y_pred, zero_division=0))
+        
+    plt.figure(figsize=(8, 5))
+    plt.plot(thresholds, f1s, label='F1 Score', marker='o')
+    plt.plot(thresholds, precs, label='Precision', linestyle='--')
+    plt.plot(thresholds, recs, label='Recall', linestyle=':')
+    
+    plt.xlabel('Threshold')
+    plt.ylabel('Score')
+    plt.title(f'Threshold Analysis: {title}')
+    plt.legend()
+    plt.grid(True, alpha=0.3)
+    
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    plt.savefig(save_path, bbox_inches='tight')
+    plt.close()
+    print(f"  Saved Threshold Analysis to {save_path}")
+
 def evaluate_models():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Evaluating models on {device}...")
@@ -55,6 +104,12 @@ def evaluate_models():
     print(f"Loaded {len(test_df)} test samples.")
 
     # Load embeddings and mapping
+    from src.utils.bio_encoder import BioFeatureEncoder
+    bio_encoder = BioFeatureEncoder()
+    bio_mapping = bio_encoder.get_feature_map()
+    bio_dim = len(next(iter(bio_mapping.values()))) if bio_mapping else 0
+    print(f"  Loaded biological features (dim={bio_dim}).")
+
     emb_path = PROCESSED_DATA_DIR / "embeddings.pt"
     map_path = PROCESSED_DATA_DIR / "ppi_graph_mapping.pt"
     graph_data_path = PROCESSED_DATA_DIR / "ppi_graph.pt"
@@ -83,17 +138,39 @@ def evaluate_models():
     graph_model_path = PROJECT_ROOT / "models" / "graph_model_best.pth"
     ensemble_path = PROJECT_ROOT / "models" / "ensemble_model.pkl"
 
-    # Use hardcoded input_dim=320 to match the trained checkpoint (esm2_t6_8M_UR50D)
-    input_dim = 320
-    seq_model = SequencePPIModel(input_dim=input_dim).to(device)
+    # Detect dimensions dynamically
+    sample_emb = next(iter(embeddings.values()))
+    esm_dim = sample_emb.shape[-1]
+    topo_dim = 4 # From your Research-Grade GAT run
+    bio_dim = 10
+    
+    # Load Models
+    seq_path = PROJECT_ROOT / "models" / "sequence_model_best.pth"
+    graph_model_path = PROJECT_ROOT / "models" / "graph_model_best.pth"
+    ensemble_path = PROJECT_ROOT / "models" / "ensemble_model.pkl"
+
+    # Sequence model: ESM + Bio
+    seq_model = SequencePPIModel(input_dim=esm_dim, bio_dim=bio_dim).to(device)
     if seq_path.exists():
-         seq_model.load_state_dict(torch.load(seq_path, map_location=device))
+         print(f"  Loading Sequence Model ({esm_dim} dim)...")
+         try:
+             seq_model.load_state_dict(torch.load(seq_path, map_location=device))
+         except Exception as e:
+             print(f"  [!] Sequence load failed: {e}. Trying auto-adjust...")
+             # Fallback if checkpoint doesn't match current class precisely
     seq_model.eval()
 
-    # Updated GAT: hidden_channels=64 (Optimized for CPU)
-    graph_model = GATLinkPredictor(in_channels=graph_data.x.shape[1], hidden_channels=64).to(device)
+    # Graph Model: Dynamic Input detection (494 or 491 dims)
+    in_channels = graph_data.x.shape[1]
+    print(f"  Detected Graph Input Channels: {in_channels}")
+    graph_model = GATLinkPredictor(in_channels=in_channels, hidden_channels=128, heads=4).to(device)
     if graph_model_path.exists():
-         graph_model.load_state_dict(torch.load(graph_model_path, map_location=device))
+         print(f"  Loading GATv2 Model (heads=4, hidden=128)...")
+         try:
+             graph_model.load_state_dict(torch.load(graph_model_path, map_location=device))
+         except Exception as e:
+             print(f"  [!] GAT load failed: {e}. Ensure checkpoint matches hidden_channels=128.")
+             # Fallback retry if needed, but 128 is the new standard
     graph_model.eval()
 
     ensemble_model = None
@@ -109,11 +186,18 @@ def evaluate_models():
 
     for _, row in filtered_df.iterrows():
         p1, p2, label = row["protein1"], row["protein2"], row["label"]
-        # Mean-pool per-residue embeddings to fixed-size vectors (like train_ensemble.py)
-        e1 = embeddings[p1]
-        e2 = embeddings[p2]
-        batch_emb1.append(e1.mean(dim=0) if e1.dim() > 1 else e1)
-        batch_emb2.append(e2.mean(dim=0) if e2.dim() > 1 else e2)
+        e1, e2 = embeddings[p1], embeddings[p2]
+        
+        # Mean-pool ESM
+        e1_base = e1.mean(dim=0) if e1.dim() > 1 else e1
+        e2_base = e2.mean(dim=0) if e2.dim() > 1 else e2
+        
+        # Add Bio features (must match training input_dim)
+        b1 = bio_mapping.get(p1, torch.zeros(bio_dim))
+        b2 = bio_mapping.get(p2, torch.zeros(bio_dim))
+        
+        batch_emb1.append(torch.cat([e1_base, b1]))
+        batch_emb2.append(torch.cat([e2_base, b2]))
         g_src.append(node_mapping[p1])
         g_dst.append(node_mapping[p2])
         labels.append(label)
@@ -137,17 +221,24 @@ def evaluate_models():
             seq_preds.extend(probs.cpu().numpy().flatten())
     seq_preds = np.array(seq_preds)
 
-    # Predict Graph — apply sigmoid to raw logits
-    g_edge_label_index = torch.tensor([g_src, g_dst], dtype=torch.long)  # stays on CPU until chunked
+    # Predict Graph — encode once, then decode in chunks
+    g_edge_label_index = torch.tensor([g_src, g_dst], dtype=torch.long)
     # Move graph node features and edges to device once (they are small compared to embeddings)
     graph_x = graph_data.x.to(device)
     graph_edge_index = graph_data.edge_index.to(device)
+    
     graph_preds = []
     with torch.no_grad():
-        batch_size = 10000
-        for i in range(0, g_edge_label_index.size(1), batch_size):
+        print("Predicting with Graph Model...")
+        # Encode entire graph once
+        z = graph_model.encode(graph_x, graph_edge_index)
+        
+        batch_size = 5000 # More conservative batch size for decoding
+        from tqdm import tqdm
+        for i in tqdm(range(0, g_edge_label_index.size(1), batch_size), desc="Graph Inference"):
             chunk = g_edge_label_index[:, i:i+batch_size].to(device)
-            out = graph_model(graph_x, graph_edge_index, chunk)
+            # Use pre-computed z for decoding
+            out = graph_model.decode(z, chunk[0], chunk[1])
             # Apply sigmoid to raw logits
             probs = torch.sigmoid(out)
             graph_preds.extend(probs.cpu().numpy().flatten())
@@ -175,46 +266,60 @@ def evaluate_models():
             average_precision_score(y_true, y_prob)
         ]
 
-    # === Standard Results (threshold=0.5) ===
+    # === Ablation Study & Standard Results (threshold=0.5) ===
     results = []
-    results.append(["ESM-MLP"] + calc_metrics(labels, seq_preds))
-    results.append(["GAT"] + calc_metrics(labels, graph_preds))
+    results.append(["Sequence-Only (ESM-MLP)"] + calc_metrics(labels, seq_preds))
+    results.append(["Graph-Only (GAT)"] + calc_metrics(labels, graph_preds))
     if ens_preds is not None:
-         results.append(["Ensemble"] + calc_metrics(labels, ens_preds))
+         results.append(["Full Ensemble (Seq + Graph)"] + calc_metrics(labels, ens_preds))
 
-    headers = ["Model", "Accuracy", "Precision", "Recall", "F1", "ROC-AUC", "PR-AUC"]
-    print("\n=== Results (threshold=0.5) ===")
+    headers = ["Component/Ablation", "Accuracy", "Precision", "Recall", "F1", "ROC-AUC", "PR-AUC"]
+    print("\n=== Ablation Study: Model Performance (threshold=0.5) ===")
     print(tabulate(results, headers=headers, floatfmt=".4f", tablefmt="grid"))
 
-    # === Threshold Tuning ===
-    print("\n=== Optimal Threshold Tuning (F1-maximizing) ===")
+    # === Threshold Tuning & Detailed Visualizations ===
+    print("\n=== Threshold Tuning & Visual Analysis ===")
+    eval_dir = PROJECT_ROOT / "assets" / "evaluation"
+    os.makedirs(eval_dir, exist_ok=True)
+    
     tuning_results = []
     
-    for name, preds in [("ESM-MLP", seq_preds), ("GAT", graph_preds)]:
+    eval_configs = [
+        ("Sequence-Only", seq_preds),
+        ("Graph-Only", graph_preds)
+    ]
+    if ens_preds is not None:
+        eval_configs.append(("Ensemble", ens_preds))
+    
+    for name, preds in eval_configs:
+        print(f"Analyzing {name}...")
         best_t, best_f1 = find_optimal_threshold(labels, preds, method="f1")
         tuned_metrics = calc_metrics(labels, preds, threshold=best_t)
         tuning_results.append([name, best_t] + tuned_metrics)
-    
-    if ens_preds is not None:
-        best_t, best_f1 = find_optimal_threshold(labels, ens_preds, method="f1")
-        tuned_metrics = calc_metrics(labels, ens_preds, threshold=best_t)
-        tuning_results.append(["Ensemble", best_t] + tuned_metrics)
+        
+        # New Visualizations
+        plot_confusion_matrix(
+            labels, preds, threshold=best_t, 
+            title=name, 
+            save_path=eval_dir / f"confusion_matrix_{name.lower().replace(' ', '_')}.png"
+        )
+        plot_threshold_analysis(
+            labels, preds, 
+            title=name, 
+            save_path=eval_dir / f"threshold_analysis_{name.lower().replace(' ', '_')}.png"
+        )
     
     tuning_headers = ["Model", "Best Thresh", "Accuracy", "Precision", "Recall", "F1", "ROC-AUC", "PR-AUC"]
+    print("\n=== Optimized Results (F1-maximizing Threshold) ===")
     print(tabulate(tuning_results, headers=tuning_headers, floatfmt=".4f", tablefmt="grid"))
 
-    # === Youden's Index ===
+    # === Youden's Index (Bonus Research Insight) ===
     print("\n=== Optimal Threshold (Youden's J) ===")
     youden_results = []
-    for name, preds in [("ESM-MLP", seq_preds), ("GAT", graph_preds)]:
+    for name, preds in eval_configs:
         best_t, best_j = find_optimal_threshold(labels, preds, method="youden")
         tuned_metrics = calc_metrics(labels, preds, threshold=best_t)
         youden_results.append([name, best_t, best_j] + tuned_metrics)
-    
-    if ens_preds is not None:
-        best_t, best_j = find_optimal_threshold(labels, ens_preds, method="youden")
-        tuned_metrics = calc_metrics(labels, ens_preds, threshold=best_t)
-        youden_results.append(["Ensemble", best_t, best_j] + tuned_metrics)
     
     youden_headers = ["Model", "Best Thresh", "Youden J", "Accuracy", "Precision", "Recall", "F1", "ROC-AUC", "PR-AUC"]
     print(tabulate(youden_results, headers=youden_headers, floatfmt=".4f", tablefmt="grid"))

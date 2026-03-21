@@ -28,7 +28,7 @@ def explain_prediction(protein1_id: str, protein2_id: str):
     
     # ── Load Model ─────────────────────────────────────────────────
     model_path = PROJECT_ROOT / "models" / "graph_model_best.pth"
-    model = GATLinkPredictor(in_channels=data.x.shape[1], hidden_channels=64, heads=4).to(device)
+    model = GATLinkPredictor(in_channels=data.x.shape[1], hidden_channels=128, heads=4).to(device)
     if model_path.exists():
         model.load_state_dict(torch.load(model_path, map_location=device))
     model.eval()

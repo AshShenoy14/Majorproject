@@ -81,12 +81,12 @@ def run_p_test(n_iterations=10):
     seq_path = PROJECT_ROOT / "models" / "sequence_model_best.pth"
     graph_model_path = PROJECT_ROOT / "models" / "graph_model_best.pth"
 
-    seq_model = SequencePPIModel(input_dim=320).to(device)
+    seq_model = SequencePPIModel(input_dim=480).to(device)
     if seq_path.exists():
         seq_model.load_state_dict(torch.load(seq_path, map_location=device))
     seq_model.eval()
 
-    graph_model = GATLinkPredictor(in_channels=graph_data.x.shape[1], hidden_channels=64, heads=4).to(device)
+    graph_model = GATLinkPredictor(in_channels=graph_data.x.shape[1], hidden_channels=128, heads=4).to(device)
     if graph_model_path.exists():
         graph_model.load_state_dict(torch.load(graph_model_path, map_location=device))
     graph_model.eval()

@@ -3,12 +3,14 @@ import copy
 from typing import Dict, Any, List
 
 class MutationAnalyzer:
-    def __init__(self, sequence_model, esm_extractor):
+    def __init__(self, sequence_model, esm_extractor, bio_manager=None, bio_encoder=None):
         """
-        Initialize with existing models.
+        Initialize with existing models and bio managers.
         """
         self.seq_model = sequence_model
         self.esm_extractor = esm_extractor
+        self.bio_manager = bio_manager
+        self.bio_encoder = bio_encoder
         self.device = next(sequence_model.parameters()).device
 
     def project_mutation_impact(self, 
@@ -27,6 +29,20 @@ class MutationAnalyzer:
             base_embs = self.esm_extractor.get_embeddings({p1_id: p1_seq, p2_id: p2_seq}, batch_size=2)
             e1_base = base_embs[p1_id].unsqueeze(0).to(self.device).float()
             e2_base = base_embs[p2_id].unsqueeze(0).to(self.device).float()
+            
+            # Add Bio Features
+            if self.bio_manager and self.bio_encoder:
+                meta = self.bio_manager.get_bio_metadata([p1_id, p2_id])
+                def get_bio(pid):
+                    row = meta[meta["protein_id"] == pid]
+                    loc = row.iloc[0]["localization"] if not row.empty else ""
+                    return self.bio_encoder.encode_protein(loc).to(self.device).float().unsqueeze(0)
+                
+                b1 = get_bio(p1_id)
+                b2 = get_bio(p2_id)
+                e1_base = torch.cat([e1_base, b1], dim=1)
+                e2_base = torch.cat([e2_base, b2], dim=1)
+            
             base_score = torch.sigmoid(self.seq_model(e1_base, e2_base)).item()
 
         # 2. Mutated Scores
@@ -46,15 +62,18 @@ class MutationAnalyzer:
             # Create mutated sequence
             mut_seq = target_seq[:pos] + mut['mut'] + target_seq[pos+1:]
             
-            # Recalculate embeddings and score
             with torch.no_grad():
                 if mut['protein'] == 1:
                     mut_embs = self.esm_extractor.get_embeddings({p1_id: mut_seq}, batch_size=1)
                     e1_mut = mut_embs[p1_id].unsqueeze(0).to(self.device).float()
+                    if self.bio_manager and self.bio_encoder:
+                        e1_mut = torch.cat([e1_mut, b1], dim=1)
                     mut_score = torch.sigmoid(self.seq_model(e1_mut, e2_base)).item()
                 else:
                     mut_embs = self.esm_extractor.get_embeddings({p2_id: mut_seq}, batch_size=1)
                     e2_mut = mut_embs[p2_id].unsqueeze(0).to(self.device).float()
+                    if self.bio_manager and self.bio_encoder:
+                        e2_mut = torch.cat([e2_mut, b2], dim=1)
                     mut_score = torch.sigmoid(self.seq_model(e1_base, e2_mut)).item()
             
             impact = mut_score - base_score
@@ -82,7 +101,7 @@ class MutationAnalyzer:
         """
         # 1. First, find hotspots to narrow search space
         from src.analysis.hotspot_analyzer import HotspotAnalyzer
-        ha = HotspotAnalyzer(self.seq_model, self.esm_extractor)
+        ha = HotspotAnalyzer(self.seq_model, self.esm_extractor, self.bio_manager, self.bio_encoder)
         hotspots = ha.identify_hotspots(p1_id, p1_seq, p2_id, p2_seq)
         
         # 2. Pick top positions based on impact
@@ -98,6 +117,20 @@ class MutationAnalyzer:
             base_embs = self.esm_extractor.get_embeddings({p1_id: p1_seq, p2_id: p2_seq}, batch_size=2)
             e1_base = base_embs[p1_id].unsqueeze(0).to(self.device).float()
             e2_base = base_embs[p2_id].unsqueeze(0).to(self.device).float()
+            
+            # Add Bio Features
+            if self.bio_manager and self.bio_encoder:
+                meta = self.bio_manager.get_bio_metadata([p1_id, p2_id])
+                def get_bio(pid):
+                    row = meta[meta["protein_id"] == pid]
+                    loc = row.iloc[0]["localization"] if not row.empty else ""
+                    return self.bio_encoder.encode_protein(loc).to(self.device).float().unsqueeze(0)
+                
+                b1 = get_bio(p1_id)
+                b2 = get_bio(p2_id)
+                e1_base = torch.cat([e1_base, b1], dim=1)
+                e2_base = torch.cat([e2_base, b2], dim=1)
+            
             base_score = torch.sigmoid(self.seq_model(e1_base, e2_base)).item()
 
             for pos in top_positions:
@@ -109,6 +142,10 @@ class MutationAnalyzer:
                     mut_seq = p1_seq[:pos] + mut_aa + p1_seq[pos+1:]
                     mut_embs = self.esm_extractor.get_embeddings({p1_id: mut_seq}, batch_size=1)
                     e1_mut = mut_embs[p1_id].unsqueeze(0).to(self.device).float()
+                    
+                    if self.bio_manager and self.bio_encoder:
+                        e1_mut = torch.cat([e1_mut, b1], dim=1)
+                        
                     mut_score = torch.sigmoid(self.seq_model(e1_mut, e2_base)).item()
                     
                     candidates.append({

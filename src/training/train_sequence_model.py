@@ -6,6 +6,7 @@ import argparse
 from tqdm import tqdm
 import os
 import sys
+import time
 
 # Add project root to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
@@ -13,9 +14,45 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'
 from src.models.sequence_model import SequencePPIModel
 from src.utils.dataset import PPIDataset
 from src.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT, CHECKPOINT_DIR, MODELS_DIR
+from src.utils.bio_encoder import BioFeatureEncoder
 
 
-def train(epochs: int = 30, batch_size: int = 64, lr: float = 1e-3, embedding_path: str = None):
+def configure_runtime(force_cpu: bool = False, cpu_threads: int = None):
+    """Configure runtime device and CPU thread counts for thermally stable training."""
+    use_cpu = force_cpu or (not torch.cuda.is_available())
+    device = torch.device("cpu" if use_cpu else "cuda:0")
+
+    if device.type == "cpu":
+        if cpu_threads is None:
+            cpu_threads = max(1, (os.cpu_count() or 2) // 2)
+        cpu_threads = max(1, int(cpu_threads))
+        try:
+            torch.set_num_threads(cpu_threads)
+            torch.set_num_interop_threads(max(1, min(4, cpu_threads // 2)))
+        except RuntimeError:
+            # Parallel work already started, cannot change threads
+            pass
+        print(f"Runtime: CPU | torch threads={torch.get_num_threads()} | inter-op={torch.get_num_interop_threads()}")
+    else:
+        print("Runtime: CUDA")
+
+    return device
+
+
+def cooldown_if_needed(seconds: float):
+    if seconds and seconds > 0:
+        time.sleep(seconds)
+
+
+def train(
+    epochs: int = 30,
+    batch_size: int = 64,
+    lr: float = 1e-3,
+    embedding_path: str = None,
+    force_cpu: bool = False,
+    cpu_threads: int = None,
+    cooldown_seconds: float = 0.0,
+):
     """
     Train the Sequence PPI Model with advanced techniques:
     - BCEWithLogitsLoss (numerically stable)
@@ -26,7 +63,7 @@ def train(epochs: int = 30, batch_size: int = 64, lr: float = 1e-3, embedding_pa
     Checkpoint saved to: checkpoints/sequence_checkpoint.pt  (overwritten each epoch)
     Best model saved to: models/sequence_model_best.pth      (lowest validation loss)
     """
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = configure_runtime(force_cpu=force_cpu, cpu_threads=cpu_threads)
     print(f"Training Sequence Model on {device}...")
 
     # ── Load Embeddings ──────────────────────────────────────────────────
@@ -38,9 +75,14 @@ def train(epochs: int = 30, batch_size: int = 64, lr: float = 1e-3, embedding_pa
         print("No embedding file provided/found. Cannot proceed without embeddings.")
         return
 
+    # ── Load Biological Features ──────────────────────────────────────────
+    bio_encoder = BioFeatureEncoder()
+    bio_mapping = bio_encoder.get_feature_map()
+    print(f"Loaded biological features for {len(bio_mapping)} proteins.")
+
     # ── Datasets & DataLoaders ───────────────────────────────────────────
-    train_dataset = PPIDataset(PROCESSED_DATA_DIR / "train.csv", embeddings)
-    val_dataset   = PPIDataset(PROCESSED_DATA_DIR / "val.csv", embeddings)
+    train_dataset = PPIDataset(PROCESSED_DATA_DIR / "train.csv", embeddings, bio_mapping=bio_mapping)
+    val_dataset   = PPIDataset(PROCESSED_DATA_DIR / "val.csv", embeddings, bio_mapping=bio_mapping)
 
     train_loader = DataLoader(
         train_dataset,
@@ -55,10 +97,13 @@ def train(epochs: int = 30, batch_size: int = 64, lr: float = 1e-3, embedding_pa
     print(f"Batch size: {batch_size} | Total train batches/epoch: {len(train_loader)}")
 
     # ── Model, Optimizer, Loss ───────────────────────────────────────────
-    # Use hardcoded input_dim=320 for esm2_t6_8M_UR50D embeddings (after mean-pooling)
-    input_dim = 320
+    # Dynamically detect input dimensions
+    sample_emb = next(iter(embeddings.values()))
+    input_dim = sample_emb.shape[-1]
+    bio_dim = train_dataset.bio_dim
+    print(f"Feature Dimensions: Sequence={input_dim}, Biology={bio_dim}")
 
-    model     = SequencePPIModel(input_dim=input_dim).to(device)
+    model     = SequencePPIModel(input_dim=input_dim, bio_dim=bio_dim).to(device)
     optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=1e-4)
     # BCEWithLogitsLoss combines sigmoid + BCE for numerical stability
     criterion = nn.BCEWithLogitsLoss()
@@ -181,6 +226,8 @@ def train(epochs: int = 30, batch_size: int = 64, lr: float = 1e-3, embedding_pa
             print(f"\n  ✗ Early stopping triggered after {patience} epochs without improvement.")
             break
 
+        cooldown_if_needed(cooldown_seconds)
+
     print(f"\nSequence Model training complete. Best val loss: {best_val_loss:.4f}")
 
 
@@ -189,8 +236,37 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=30)
     parser.add_argument("--batch_size", type=int, default=64)
     parser.add_argument("--lr", type=float, default=1e-3)
+    parser.add_argument("--force-cpu", action="store_true",
+                        help="Force CPU even if CUDA is available")
+    parser.add_argument("--cpu-threads", type=int, default=None,
+                        help="Maximum PyTorch CPU threads (default: half logical cores)")
+    parser.add_argument("--cooldown-seconds", type=float, default=0.0,
+                        help="Optional sleep between epochs to reduce thermal load")
+    parser.add_argument("--cpu-friendly", action="store_true",
+                        help="Enable low-heat CPU preset")
     parser.add_argument("--embedding_path", type=str, required=True,
                         help="Path to dictionary of protein embeddings (.pt)")
     args = parser.parse_args()
 
-    train(args.epochs, args.batch_size, args.lr, args.embedding_path)
+    if args.cpu_friendly:
+        args.force_cpu = True
+        if args.cpu_threads is None:
+            args.cpu_threads = max(1, (os.cpu_count() or 2) // 2)
+        if args.batch_size == 64:
+            args.batch_size = 16
+        if args.cooldown_seconds == 0.0:
+            args.cooldown_seconds = 0.25
+
+        print("CPU-friendly preset enabled:")
+        print(f"  force_cpu={args.force_cpu} | cpu_threads={args.cpu_threads}")
+        print(f"  batch_size={args.batch_size} | cooldown_seconds={args.cooldown_seconds}")
+
+    train(
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        lr=args.lr,
+        embedding_path=args.embedding_path,
+        force_cpu=args.force_cpu,
+        cpu_threads=args.cpu_threads,
+        cooldown_seconds=args.cooldown_seconds,
+    )

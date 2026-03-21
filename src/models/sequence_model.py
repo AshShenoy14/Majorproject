@@ -3,19 +3,23 @@ import torch.nn as nn
 
 
 class SequencePPIModel(nn.Module):
-    def __init__(self, input_dim: int = 320, hidden_dim: int = 512, dropout: float = 0.3):
+    def __init__(self, input_dim: int = 480, bio_dim: int = 10, hidden_dim: int = 512, dropout: float = 0.3):
         """
-        Enhanced MLP model for PPI prediction using protein embeddings.
-        Uses concat + |diff| + hadamard for richer pair representations.
-        Outputs raw logits (use BCEWithLogitsLoss during training).
+        Enhanced MLP model with Biological Feature integration.
+        input_dim: ESM embedding dimension.
+        bio_dim: Biological feature dimension (e.g. localization).
         """
         super().__init__()
-        # Input: [emb1, emb2, |emb1-emb2|, emb1*emb2] → input_dim * 4
-        pair_dim = input_dim * 4
-
+        # Total dimension per protein: ESM + Bio
+        total_prot_dim = input_dim + bio_dim
+        
+        # Input: [emb1, emb2, |emb1-emb2|, emb1*emb2] → total_prot_dim * 4
+        pair_dim = total_prot_dim * 4
+        
         self.input_proj = nn.Sequential(
             nn.Linear(pair_dim, hidden_dim),
-            nn.BatchNorm1d(hidden_dim),
+            # Use LayerNorm for better stability when combining disparate features
+            nn.LayerNorm(hidden_dim),
             nn.GELU(),
             nn.Dropout(dropout),
         )
@@ -28,7 +32,7 @@ class SequencePPIModel(nn.Module):
             nn.Dropout(dropout),
         )
 
-        # Residual block 2
+        # Residual block 2 (Dimension Reduction)
         self.res2 = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim // 2),
             nn.BatchNorm1d(hidden_dim // 2),
@@ -36,7 +40,6 @@ class SequencePPIModel(nn.Module):
             nn.Dropout(dropout),
         )
 
-        # Projection for residual skip (hidden_dim → hidden_dim // 2)
         self.skip_proj = nn.Linear(hidden_dim, hidden_dim // 2)
 
         # Output head
@@ -45,17 +48,9 @@ class SequencePPIModel(nn.Module):
             nn.GELU(),
             nn.Dropout(dropout / 2),
             nn.Linear(hidden_dim // 4, 1),
-            # No Sigmoid — use BCEWithLogitsLoss for training
         )
 
     def forward(self, emb1, emb2):
-        """
-        Args:
-            emb1: Tensor of shape (batch, input_dim)
-            emb2: Tensor of shape (batch, input_dim)
-        Returns:
-            Raw logits of shape (batch, 1). Apply sigmoid yourself at inference.
-        """
         # Rich pair features
         concat = torch.cat([emb1, emb2], dim=1)
         abs_diff = torch.abs(emb1 - emb2)
@@ -63,9 +58,9 @@ class SequencePPIModel(nn.Module):
         x = torch.cat([concat, abs_diff, hadamard], dim=1)
 
         # Forward with residual connections
-        x = self.input_proj(x)              # → hidden_dim
-        x = x + self.res1(x)                # residual block 1
-        x = self.skip_proj(x) + self.res2(x)  # residual block 2 with dim reduction
-        x = self.head(x)                    # → 1
+        x = self.input_proj(x)
+        x = x + self.res1(x)
+        x = self.skip_proj(x) + self.res2(x)
+        x = self.head(x)
 
         return x

@@ -58,33 +58,79 @@ def load_sequences(fasta_file: str) -> dict:
         seqs[seq_id] = str(record.seq)
     return seqs
 
+def generate_hard_negatives(positive_df: pd.DataFrame, all_proteins: List[str], ratio: float = 0.5) -> pd.DataFrame:
+    """
+    Generates 'hard' negative samples using Common Neighbors strategy.
+    Pairs that share neighbors but don't interact are harder to distinguish.
+    """
+    print("Generating hard negative samples (Common Neighbors)...")
+    from collections import defaultdict
+    adj = defaultdict(set)
+    for u, v in zip(positive_df["protein1"], positive_df["protein2"]):
+        adj[u].add(v)
+        adj[v].add(u)
+    
+    positive_pairs = set(zip(positive_df["protein1"], positive_df["protein2"]))
+    hard_negatives = set()
+    num_needed = int(len(positive_df) * ratio)
+    
+    # Stratified sampling: for each protein, look at its neighbors' neighbors
+    p_list = list(adj.keys())
+    np.random.shuffle(p_list)
+    
+    for u in p_list:
+        if len(hard_negatives) >= num_needed: break
+        
+        neighbors = adj[u]
+        for neighbor in neighbors:
+            # Look at neighbor's neighbors (potential hard negatives for u)
+            for v in adj[neighbor]:
+                if u == v: continue
+                
+                # Canonical order
+                u_c, v_c = (u, v) if u < v else (v, u)
+                
+                if (u_c, v_c) not in positive_pairs and (u_c, v_c) not in hard_negatives:
+                    hard_negatives.add((u_c, v_c))
+                    if len(hard_negatives) >= num_needed:
+                        break
+            if len(hard_negatives) >= num_needed: break
+            
+    print(f"Generated {len(hard_negatives)} hard negatives.")
+    return pd.DataFrame(list(hard_negatives), columns=["protein1", "protein2"])
+
 def generate_negative_samples(positive_df: pd.DataFrame, all_proteins: List[str], ratio: float = 1.0) -> pd.DataFrame:
     """
-    Generates negative samples (non-interacting pairs) by random sampling.
+    Generates negative samples by mixing random (easy) and common-neighbor (hard) pairs.
     """
-    print("Generating negative samples...")
+    # 50% Random, 50% Hard Negatives
+    hard_ratio = 0.5
+    num_hard = int(len(positive_df) * ratio * hard_ratio)
+    num_easy = int(len(positive_df) * ratio) - num_hard
+    
+    hard_df = generate_hard_negatives(positive_df, all_proteins, ratio=hard_ratio)
+    
+    print(f"Generating {num_easy} easy (random) negative samples...")
     positive_pairs = set(zip(positive_df["protein1"], positive_df["protein2"]))
+    hard_pairs = set(zip(hard_df["protein1"], hard_df["protein2"]))
     negative_pairs = set()
     
-    num_negatives = int(len(positive_df) * ratio)
     all_proteins_arr = np.array(all_proteins)
-    
-    while len(negative_pairs) < num_negatives:
-        # Sample random pairs
-        p1 = np.random.choice(all_proteins_arr, num_negatives, replace=True)
-        p2 = np.random.choice(all_proteins_arr, num_negatives, replace=True)
+    while len(negative_pairs) < num_easy:
+        p1 = np.random.choice(all_proteins_arr, num_easy, replace=True)
+        p2 = np.random.choice(all_proteins_arr, num_easy, replace=True)
         
         for u, v in zip(p1, p2):
             if u == v: continue
-            if u > v: u, v = v, u # canonical order
+            if u > v: u, v = v, u
             
-            if (u, v) not in positive_pairs and (u, v) not in negative_pairs:
+            if (u, v) not in positive_pairs and (u, v) not in hard_pairs and (u, v) not in negative_pairs:
                 negative_pairs.add((u, v))
-                if len(negative_pairs) >= num_negatives:
+                if len(negative_pairs) >= num_easy:
                     break
                     
-    neg_df = pd.DataFrame(list(negative_pairs), columns=["protein1", "protein2"])
-    return neg_df
+    easy_df = pd.DataFrame(list(negative_pairs), columns=["protein1", "protein2"])
+    return pd.concat([easy_df, hard_df], ignore_index=True)
 
 def preprocess_data(min_score: int = 900):
     # 1. Load Interactions

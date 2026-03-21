@@ -12,6 +12,7 @@ from src.models.sequence_model import SequencePPIModel
 from src.models.graph_model import GATLinkPredictor
 from src.models.ensemble_model import PPIEnsemble
 from src.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT
+from src.utils.bio_encoder import BioFeatureEncoder
 
 import matplotlib.pyplot as plt
 from sklearn.metrics import roc_curve, auc, precision_recall_curve, average_precision_score
@@ -23,9 +24,24 @@ def train_ensemble(seq_model_path, graph_model_path, graph_data_path):
     # 1. Load Base Models
     print("Loading base models...")
     
+    # Load Bio-Features
+    bio_encoder = BioFeatureEncoder()
+    bio_mapping = bio_encoder.get_feature_map()
+    bio_dim = len(next(iter(bio_mapping.values()))) if bio_mapping else 0
+    print(f"Loaded biological features for {len(bio_mapping)} proteins (dim={bio_dim}).")
+
+    # Load support files for dimension detection
+    emb_path = PROCESSED_DATA_DIR / "embeddings.pt"
+    if not emb_path.exists():
+         print(f"Embeddings not found at {emb_path}")
+         return
+    embeddings = torch.load(emb_path, weights_only=False)
+    sample_emb = next(iter(embeddings.values()))
+    input_dim = sample_emb.shape[-1]
+    print(f"Detected input_dim={input_dim}")
+
     # Sequence Model
-    input_dim = 320 
-    seq_model = SequencePPIModel(input_dim=input_dim).to(device)
+    seq_model = SequencePPIModel(input_dim=input_dim, bio_dim=bio_dim).to(device)
     try:
         if os.path.exists(seq_model_path):
             seq_model.load_state_dict(torch.load(seq_model_path, map_location=device))
@@ -44,7 +60,7 @@ def train_ensemble(seq_model_path, graph_model_path, graph_data_path):
         return
     
     graph_data = torch.load(graph_data_path, weights_only=False).to(device)
-    graph_model = GATLinkPredictor(in_channels=graph_data.x.shape[1], hidden_channels=64).to(device)
+    graph_model = GATLinkPredictor(in_channels=graph_data.x.shape[1], hidden_channels=128).to(device)
     try:
         if os.path.exists(graph_model_path):
             graph_model.load_state_dict(torch.load(graph_model_path, map_location=device))
@@ -101,10 +117,20 @@ def train_ensemble(seq_model_path, graph_model_path, graph_data_path):
         p1, p2, label = row["protein1"], row["protein2"], row["label"]
         
         # Seq components — mean-pool per-residue embeddings to fixed-size vectors
-        e1 = embeddings[p1]
-        e2 = embeddings[p2]
-        batch_emb1.append(e1.mean(dim=0) if e1.dim() > 1 else e1)
-        batch_emb2.append(e2.mean(dim=0) if e2.dim() > 1 else e2)
+        e1 = embeddings[p1].float()
+        e2 = embeddings[p2].float()
+        e1_v = e1.mean(dim=0) if e1.dim() > 1 else e1
+        e2_v = e2.mean(dim=0) if e2.dim() > 1 else e2
+        
+        # Append Bio-Features
+        if bio_mapping:
+            b1 = bio_mapping.get(p1, torch.zeros(bio_dim))
+            b2 = bio_mapping.get(p2, torch.zeros(bio_dim))
+            e1_v = torch.cat([e1_v, b1])
+            e2_v = torch.cat([e2_v, b2])
+
+        batch_emb1.append(e1_v)
+        batch_emb2.append(e2_v)
         
         # Graph components
         g_src.append(node_mapping[p1])
@@ -128,16 +154,22 @@ def train_ensemble(seq_model_path, graph_model_path, graph_data_path):
             probs = torch.sigmoid(out)
             final_seq_preds.extend(probs.cpu().numpy().flatten())
             
-    # Run Graph Model — apply sigmoid to raw logits
+    # Run Graph Model — encode once, then decode in chunks
     print("Predicting with Graph Model...")
     g_edge_label_index = torch.tensor([g_src, g_dst], dtype=torch.long).to(device)
     
     final_graph_preds = []
     with torch.no_grad():
-        chunk_size = 10000
-        for i in range(0, g_edge_label_index.size(1), chunk_size):
+        # Encode entire graph once
+        z = graph_model.encode(graph_data.x, graph_data.edge_index)
+        
+        chunk_size = 1000  # Increased chunk size for efficiency since we only decode
+        num_chunks = (g_edge_label_index.size(1) + chunk_size - 1) // chunk_size
+        
+        for i in tqdm(range(0, g_edge_label_index.size(1), chunk_size), total=num_chunks, desc="Graph Inference"):
             chunk = g_edge_label_index[:, i:i+chunk_size]
-            out = graph_model(graph_data.x, graph_data.edge_index, chunk)
+            # Use pre-computed z for decoding
+            out = graph_model.decode(z, chunk[0], chunk[1])
             # Apply sigmoid to raw logits
             probs = torch.sigmoid(out)
             final_graph_preds.extend(probs.cpu().numpy().flatten())

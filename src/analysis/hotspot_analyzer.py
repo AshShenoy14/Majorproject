@@ -3,9 +3,11 @@ from typing import Dict, List, Any
 import numpy as np
 
 class HotspotAnalyzer:
-    def __init__(self, sequence_model, esm_extractor):
+    def __init__(self, sequence_model, esm_extractor, bio_manager=None, bio_encoder=None):
         self.seq_model = sequence_model
         self.esm_extractor = esm_extractor
+        self.bio_manager = bio_manager
+        self.bio_encoder = bio_encoder
         self.device = next(sequence_model.parameters()).device
 
     def identify_hotspots(self, 
@@ -22,6 +24,20 @@ class HotspotAnalyzer:
             base_embs = self.esm_extractor.get_embeddings({p1_id: p1_seq, p2_id: p2_seq}, batch_size=2)
             e1_base = base_embs[p1_id].unsqueeze(0).to(self.device).float()
             e2_base = base_embs[p2_id].unsqueeze(0).to(self.device).float()
+            
+            # Add Bio Features
+            if self.bio_manager and self.bio_encoder:
+                meta = self.bio_manager.get_bio_metadata([p1_id, p2_id])
+                def get_bio(pid):
+                    row = meta[meta["protein_id"] == pid]
+                    loc = row.iloc[0]["localization"] if not row.empty else ""
+                    return self.bio_encoder.encode_protein(loc).to(self.device).float().unsqueeze(0)
+                
+                b1 = get_bio(p1_id)
+                b2 = get_bio(p2_id)
+                e1_base = torch.cat([e1_base, b1], dim=1)
+                e2_base = torch.cat([e2_base, b2], dim=1)
+            
             base_score = torch.sigmoid(self.seq_model(e1_base, e2_base)).item()
 
         # 2. Perturb Protein 1
@@ -33,6 +49,11 @@ class HotspotAnalyzer:
             with torch.no_grad():
                 mut_embs = self.esm_extractor.get_embeddings({p1_id: masked_seq}, batch_size=1)
                 e1_mut = mut_embs[p1_id].unsqueeze(0).to(self.device).float()
+                
+                # Re-add bio features to mutated input (protein 1 bio doesn't change with sequence)
+                if self.bio_manager and self.bio_encoder:
+                    e1_mut = torch.cat([e1_mut, b1], dim=1)
+                
                 mut_score = torch.sigmoid(self.seq_model(e1_mut, e2_base)).item()
                 scores_p1.append(mut_score)
         
@@ -44,6 +65,11 @@ class HotspotAnalyzer:
             with torch.no_grad():
                 mut_embs = self.esm_extractor.get_embeddings({p2_id: masked_seq}, batch_size=1)
                 e2_mut = mut_embs[p2_id].unsqueeze(0).to(self.device).float()
+                
+                # Re-add bio features to mutated input (protein 2 bio doesn't change with sequence)
+                if self.bio_manager and self.bio_encoder:
+                    e2_mut = torch.cat([e2_mut, b2], dim=1)
+                
                 mut_score = torch.sigmoid(self.seq_model(e1_base, e2_mut)).item()
                 scores_p2.append(mut_score)
 

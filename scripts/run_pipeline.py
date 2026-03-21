@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import sys
 import os
 import torch
@@ -91,49 +92,50 @@ def run_pipeline(limit_data: int = None):
             torch.save(embeddings, emb_path)
             print("Embeddings saved.")
     
-    # 4. Build Graph
+    # 4. Build Graph (GATv2 Ready)
     print("--- Building PPI Graph ---")
-    # Map proteins to indices
     valid_proteins = sorted(list(embeddings.keys()))
     node_mapping = {p: i for i, p in enumerate(valid_proteins)}
     
-    # Edges
-    src = []
-    dst = []
+    # Edges (Undirected)
+    src, dst = [], []
     for _, row in df.iterrows():
         if row["protein1"] in node_mapping and row["protein2"] in node_mapping:
-            # Undirected graph usually? Or strictly from dataset
-            # PPI is usually undirected.
             u, v = node_mapping[row["protein1"]], node_mapping[row["protein2"]]
-            src.append(u)
-            dst.append(v)
-            # Add reverse for undirected message passing
-            src.append(v)
-            dst.append(u)
+            src.extend([u, v])
+            dst.extend([v, u])
             
     edge_index = torch.tensor([src, dst], dtype=torch.long)
     
-    # Node Features (float32 for model compatibility)
-    # ESM-2 t6_8M_UR50D has embedding dimension 320
-    embedding_dim = 320
-    x = torch.empty(len(valid_proteins), embedding_dim, dtype=torch.float32)
+    # 5. Extract Features for nodes
+    from src.utils.bio_encoder import BioFeatureEncoder
+    from src.utils.topo_features import TopologicalFeatureExtractor
+    
+    bio_encoder = BioFeatureEncoder()
+    bio_mapping = bio_encoder.get_feature_map()
+    bio_dim = len(next(iter(bio_mapping.values()))) if bio_mapping else 0
+    print(f"  Injecting {bio_dim} biological features.")
+    
+    topo_extractor = TopologicalFeatureExtractor(df)
+    topo_mapping = topo_extractor.get_features(valid_proteins)
+    topo_dim = 4 # PR, Deg, Hub, Auth
+    print(f"  Injecting {topo_dim} topological features.")
+
+    # Node Features: ESM (Mean-pool) + Bio + Topo
+    sample_emb = next(iter(embeddings.values()))
+    embedding_dim = sample_emb.shape[-1]
+    
+    # Initialize node feature tensor x
+    x = torch.empty(len(valid_proteins), embedding_dim + bio_dim + topo_dim, dtype=torch.float32)
 
     for i, p in enumerate(valid_proteins):
         emb = embeddings[p].float()
-        # If per-residue embeddings are provided [seq_len, 320], mean pool them
         if emb.dim() > 1:
             emb = emb.mean(dim=0)
         
-        # Safety check: if for some reason the dimension is wrong (e.g. if emb was already 1D but not 320)
-        if emb.shape[0] != embedding_dim:
-             # This should only happen if sequences are very short or something is corrupted
-             # but we'll pad/truncate just in case to prevent crash
-             new_emb = torch.zeros(embedding_dim)
-             copy_size = min(emb.shape[0], embedding_dim)
-             new_emb[:copy_size] = emb[:copy_size]
-             emb = new_emb
-             
-        x[i] = emb
+        bio = bio_mapping.get(p, torch.zeros(bio_dim))
+        topo = topo_mapping.get(p, torch.zeros(topo_dim))
+        x[i] = torch.cat([emb, bio, topo])
     
     data = Data(x=x, edge_index=edge_index)
     
@@ -167,25 +169,29 @@ def run_pipeline(limit_data: int = None):
         graph_model_path = PROJECT_ROOT / "models" / "graph_model_test.pth"
         
     print("Training Sequence Model...")
-    # We need to ensure we pass the embeddings we just generated
-    # The training script loads embeddings from file usually, but we can Modify it or 
-    # Just save it temporarily if limit_data
-    if limit_data:
-        temp_emb_path = PROCESSED_DATA_DIR / "temp_embeddings.pt"
-        train_seq(epochs=2, embedding_path=str(temp_emb_path))
+    if seq_model_path.exists():
+        print(f"Skipping Sequence Training: {seq_model_path.name} already exists.")
     else:
-        train_seq(epochs=50, embedding_path=str(emb_path))
+        if limit_data:
+            temp_emb_path = PROCESSED_DATA_DIR / "temp_embeddings.pt"
+            train_seq(epochs=2, embedding_path=str(temp_emb_path))
+        else:
+            train_seq(epochs=50, embedding_path=str(emb_path))
         
     # Train Graph Model
     print("Training Graph Model...")
-    if limit_data:
-        temp_graph_path = PROCESSED_DATA_DIR / "temp_graph.pt"
-        # Graph training script expects mapping file next to graph
-        train_graph(epochs=10, graph_path=str(temp_graph_path))
+    if graph_model_path.exists() and not limit_data:
+         print(f"Skipping Graph Training: {graph_model_path.name} already exists (70% best).")
     else:
-        train_graph(epochs=100, graph_path=str(graph_path))
+        if limit_data:
+            temp_graph_path = PROCESSED_DATA_DIR / "temp_graph.pt"
+            # Graph training script expects mapping file next to graph
+            train_graph(epochs=10, graph_path=str(temp_graph_path))
+        else:
+            train_graph(epochs=100, graph_path=str(graph_path))
         
-        # --- Phase 4: Ensemble Meta-Learner ---
+    # --- Phase 4: Ensemble Meta-Learner ---
+    if not limit_data:
         print("\n=== Phase 4: Training Ensemble Meta-Learner (XGBoost) ===")
         seq_model_path = MODELS_DIR / "sequence_model_best.pth"
         graph_model_path = MODELS_DIR / "graph_model_best.pth"

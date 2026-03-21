@@ -3,7 +3,6 @@ import pandas as pd
 import numpy as np
 import os
 import sys
-from tqdm import tqdm
 
 # Add project root
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
@@ -12,31 +11,25 @@ from src.models.sequence_model import SequencePPIModel
 from src.models.graph_model import GATLinkPredictor
 from src.models.ensemble_model import PPIEnsemble
 from src.evaluation.metrics_reporter import report_all_metrics
-from src.utils.paths import PROCESSED_DATA_DIR, MODELS_DIR, PROJECT_ROOT
+from src.utils.paths import PROCESSED_DATA_DIR, MODELS_DIR
 from src.utils.bio_encoder import BioFeatureEncoder
 
 def main():
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Running Final Evaluation on {device}...")
-
-    # 1. Load Data & Supports
+    device = torch.device("cpu") # Keep on CPU for stability in this script
+    
     val_path = PROCESSED_DATA_DIR / "val.csv"
     emb_path = PROCESSED_DATA_DIR / "embeddings.pt"
     map_path = PROCESSED_DATA_DIR / "ppi_graph_mapping.pt"
     graph_path = PROCESSED_DATA_DIR / "ppi_graph.pt"
-
-    if not all(p.exists() for p in [val_path, emb_path, map_path, graph_path]):
-        print("Missing required data files (val.csv, embeddings.pt, mapping, or graph).")
-        return
+    bio_path = PROCESSED_DATA_DIR / "bio_metadata_cache.csv"
 
     val_df = pd.read_csv(val_path)
     embeddings = torch.load(emb_path, weights_only=False)
-    # Convert half to float
     embeddings = {k: v.float().cpu() if v.dtype == torch.float16 else v.cpu() for k, v in embeddings.items()}
     node_mapping = torch.load(map_path, weights_only=False)
     graph_data = torch.load(graph_path, weights_only=False).to(device)
+    bio_df = pd.read_csv(bio_path).set_index("protein_id")["localization"].to_dict() if bio_path.exists() else {}
 
-    # Filter val_df
     filtered_df = val_df[
         val_df["protein1"].isin(embeddings) & 
         val_df["protein2"].isin(embeddings) &
@@ -46,24 +39,20 @@ def main():
     
     y_true = filtered_df["label"].values
     
-    # 2. Load Models
-    print("Loading Models...")
-    
-    # Dynamically detect input_dim
-    sample_emb = next(iter(embeddings.values()))
-    input_dim = sample_emb.shape[-1]
-    
     # Load bio-features for dimension detection
     bio_encoder = BioFeatureEncoder()
     bio_mapping = bio_encoder.get_feature_map()
     bio_dim = len(next(iter(bio_mapping.values()))) if bio_mapping else 0
+    
+    # Dynamically detect input_dim
+    sample_emb = next(iter(embeddings.values()))
+    input_dim = sample_emb.shape[-1]
     print(f"Detected Dimensions: Sequence={input_dim}, Biology={bio_dim}")
 
     seq_model = SequencePPIModel(input_dim=input_dim, bio_dim=bio_dim).to(device)
     seq_model.load_state_dict(torch.load(MODELS_DIR / "sequence_model_best.pth", map_location=device))
     seq_model.eval()
 
-    # --- TOPOLOGICAL INJECTION (Node Degree) ---
     from torch_geometric.utils import degree
     deg = degree(graph_data.edge_index[0], graph_data.x.shape[0]).view(-1, 1)
     deg_norm = (deg - deg.mean()) / (deg.std() + 1e-6)
@@ -75,28 +64,19 @@ def main():
 
     ensemble = PPIEnsemble(str(MODELS_DIR / "ensemble_model.pkl"))
 
-    # 3. Generate Predictions
-    print("Generating predictions...")
-    
-    # --- BIOLOGICAL INJECTION (Localization Match) ---
-    bio_path = PROCESSED_DATA_DIR / "bio_metadata_cache.csv"
-    bio_df = pd.read_csv(bio_path).set_index("protein_id")["localization"].to_dict() if bio_path.exists() else {}
-
     batch_emb1 = []
     batch_emb2 = []
     g_src = []
     g_dst = []
     bio_features = []
     
-    for _, row in tqdm(filtered_df.iterrows(), total=len(filtered_df), desc="Preparing Data"):
+    for _, row in filtered_df.iterrows():
         p1, p2 = row["protein1"], row["protein2"]
         e1, e2 = embeddings[p1], embeddings[p2]
         batch_emb1.append(e1.mean(dim=0) if e1.dim() > 1 else e1)
         batch_emb2.append(e2.mean(dim=0) if e2.dim() > 1 else e2)
         g_src.append(node_mapping[p1])
         g_dst.append(node_mapping[p2])
-
-        # Localization match feature
         loc1, loc2 = bio_df.get(p1, "unk1"), bio_df.get(p2, "unk2")
         bio_features.append([1.0 if loc1 == loc2 and loc1 != "unk1" else 0.0])
 
@@ -113,7 +93,6 @@ def main():
             seq_probs.extend(torch.sigmoid(out).cpu().numpy().flatten())
     seq_probs = np.array(seq_probs)
 
-    # Graph Model
     g_edge_index = torch.tensor([g_src, g_dst], dtype=torch.long).to(device)
     graph_probs = []
     with torch.no_grad():
@@ -123,15 +102,13 @@ def main():
             graph_probs.extend(torch.sigmoid(out).cpu().numpy().flatten())
     graph_probs = np.array(graph_probs)
 
-    # Ensemble
     ensemble_probs = ensemble.predict(seq_probs, graph_probs, bio_features=bio_features, method="stacking")
 
-    # 4. Report
-    report_all_metrics(
-        ["ESM-MLP", "GAT", "Ensemble"],
-        [y_true, y_true, y_true],
-        [seq_probs, graph_probs, ensemble_probs]
-    )
+    from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
+    print(f"RESULTS_ACC: {accuracy_score(y_true, ensemble_probs.round())}")
+    print(f"RESULTS_F1: {f1_score(y_true, ensemble_probs.round())}")
+    print(f"RESULTS_AUC: {roc_auc_score(y_true, ensemble_probs)}")
+    print(f"GRAPH_F1: {f1_score(y_true, graph_probs.round())}")
 
 if __name__ == "__main__":
     main()

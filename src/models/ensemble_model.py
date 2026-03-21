@@ -70,6 +70,11 @@ class PPIEnsemble:
             if self.meta_model is None:
                 raise ValueError("Meta-learner not trained/loaded.")
             
+            # Check model feature size to handle legacy 4-feature models
+            n_expected = getattr(self.meta_model, "n_features_in_", 4)
+            if n_expected == 4:
+                bio_features = None
+                
             X = self._build_features(base_preds_1, base_preds_2, bio_features)
             return self.meta_model.predict_proba(X)[:, 1]
         
