@@ -1,6 +1,6 @@
 import React, { useRef, useMemo, useState, useEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { Float, MeshDistortMaterial, Text, PerspectiveCamera, OrbitControls } from '@react-three/drei';
+import { PerspectiveCamera, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -8,21 +8,21 @@ const Helix = ({ count = 40, radius = 2, height = 8 }) => {
   const points = useMemo(() => {
     const p = [];
     for (let i = 0; i < count; i++) {
-        const angle = (i / count) * Math.PI * 4; // 2 full turns
-        const x = Math.cos(angle) * radius;
-        const z = Math.sin(angle) * radius;
-        const y = (i / count) * height - height / 2;
-        p.push(new THREE.Vector3(x, y, z));
+      const angle = (i / count) * Math.PI * 4;
+      const x = Math.cos(angle) * radius;
+      const z = Math.sin(angle) * radius;
+      const y = (i / count) * height - height / 2;
+      p.push(new THREE.Vector3(x, y, z));
     }
     return p;
   }, [count, radius, height]);
 
   const groupRef = useRef();
 
-  useFrame((state) => {
+  useFrame(() => {
     if (groupRef.current) {
-        groupRef.current.rotation.y += 0.01;
-        groupRef.current.rotation.z += 0.005;
+      groupRef.current.rotation.y += 0.01;
+      groupRef.current.rotation.z += 0.005;
     }
   });
 
@@ -32,22 +32,23 @@ const Helix = ({ count = 40, radius = 2, height = 8 }) => {
         <group key={i} position={point}>
           <mesh>
             <sphereGeometry args={[0.2, 16, 16]} />
-            <meshStandardMaterial 
-              color={i % 2 === 0 ? "#0D9488" : "#7C3AED"} 
+            <meshStandardMaterial
+              color={i % 2 === 0 ? "#0D9488" : "#7C3AED"}
               emissive={i % 2 === 0 ? "#0D9488" : "#7C3AED"}
               emissiveIntensity={0.5}
             />
           </mesh>
-          {/* Connector line to next point */}
           {i < points.length - 1 && (
-             <mesh position={point.clone().lerp(points[i+1], 0.5).sub(point)} 
-                   quaternion={new THREE.Quaternion().setFromUnitVectors(
-                      new THREE.Vector3(0, 1, 0), 
-                      points[i+1].clone().sub(point).normalize()
-                   )}>
-               <cylinderGeometry args={[0.05, 0.05, point.distanceTo(points[i+1]), 8]} />
-               <meshStandardMaterial color="#64748b" transparent opacity={0.3} />
-             </mesh>
+            <mesh
+              position={point.clone().lerp(points[i + 1], 0.5).sub(point)}
+              quaternion={new THREE.Quaternion().setFromUnitVectors(
+                new THREE.Vector3(0, 1, 0),
+                points[i + 1].clone().sub(point).normalize()
+              )}
+            >
+              <cylinderGeometry args={[0.05, 0.05, point.distanceTo(points[i + 1]), 8]} />
+              <meshStandardMaterial color="#64748b" transparent opacity={0.3} />
+            </mesh>
           )}
         </group>
       ))}
@@ -62,7 +63,7 @@ const ProteinPreloader = ({ progress, onComplete }) => {
     if (progress >= 100) {
       const timer = setTimeout(() => {
         setExit(true);
-        setTimeout(onComplete, 1000); // Wait for fade out
+        setTimeout(onComplete, 1000);
       }, 1000);
       return () => clearTimeout(timer);
     }
@@ -72,40 +73,32 @@ const ProteinPreloader = ({ progress, onComplete }) => {
     <AnimatePresence>
       {!exit && (
         <motion.div
-           initial={{ opacity: 1 }}
-           exit={{ opacity: 0 }}
-           transition={{ duration: 0.8, ease: "easeInOut" }}
-           className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-slate-950 overflow-hidden"
+          initial={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.8, ease: "easeInOut" }}
+          className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-slate-950 overflow-hidden"
         >
-          {/* Background Glow */}
-          <div className="absolute inset-0 z-0">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] height-[600px] bg-teal-500/10 blur-[120px] rounded-full" />
-            <div className="absolute top-1/4 left-1/4 w-[300px] height-[300px] bg-purple-500/10 blur-[100px] rounded-full" />
-          </div>
-
-          <div className="relative z-10 w-full h-[60vh]">
+          <div className="relative z-10 w-full flex-1 min-h-0">
             <Canvas dpr={[1, 2]}>
-              <PerspectiveCamera makeDefault position={[0, 0, 10]} />
+              <PerspectiveCamera makeDefault position={[0, 0, 14]} />
               <ambientLight intensity={0.5} />
               <pointLight position={[10, 10, 10]} intensity={1} />
               <spotLight position={[-10, 10, 10]} angle={0.15} penumbra={1} intensity={1} />
-              
               <Helix />
-              
               <OrbitControls enableZoom={false} enablePan={false} autoRotate autoRotateSpeed={0.5} />
             </Canvas>
           </div>
 
-          <div className="relative z-10 flex flex-col items-center gap-4 -mt-10">
-            <motion.h1 
-               initial={{ y: 20, opacity: 0 }}
-               animate={{ y: 0, opacity: 1 }}
-               transition={{ delay: 0.2 }}
-               className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-teal-400 to-purple-400 tracking-tight"
+          <div className="relative z-10 flex flex-col items-center gap-4 flex-shrink-0 pb-10">
+            <motion.h1
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-teal-400 to-purple-400 tracking-tight"
             >
               TransGraph-PPI
             </motion.h1>
-            
+
             <motion.p
               initial={{ opacity: 0 }}
               animate={{ opacity: 0.6 }}
@@ -114,14 +107,14 @@ const ProteinPreloader = ({ progress, onComplete }) => {
               Initializing Neural Interactome
             </motion.p>
 
-            <div className="mt-8 w-64 h-1.5 bg-slate-800 rounded-full overflow-hidden">
-               <motion.div 
-                 initial={{ width: 0 }}
-                 animate={{ width: `${progress}%` }}
-                 className="h-full bg-gradient-to-r from-teal-500 to-purple-500 shadow-[0_0_10px_rgba(20,184,166,0.5)]"
-               />
+            <div className="mt-4 w-64 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: `${progress}%` }}
+                className="h-full bg-gradient-to-r from-teal-500 to-purple-500 shadow-[0_0_10px_rgba(20,184,166,0.5)]"
+              />
             </div>
-            
+
             <div className="text-slate-500 font-mono text-xs tabular-nums mt-1">
               {Math.round(progress)}%
             </div>
@@ -132,4 +125,4 @@ const ProteinPreloader = ({ progress, onComplete }) => {
   );
 };
 
-export default ProteinPreloader;
+export default ProteinPreloader
