@@ -164,7 +164,8 @@ def evaluate_models():
     if ensemble_model:
         conf_seq = np.abs(seq_preds - 0.5)
         conf_gat = np.abs(graph_preds - 0.5)
-        X = np.column_stack((seq_preds, graph_preds, conf_seq, conf_gat))
+        disagreement = np.abs(seq_preds - graph_preds)
+        X = np.column_stack((seq_preds, graph_preds, conf_seq, conf_gat, disagreement))
         ens_preds = ensemble_model.predict_proba(X)[:, 1]
 
     # Metrics helper
@@ -230,7 +231,8 @@ def evaluate_models():
             explainer = PPIExplainer(str(ensemble_path))
             conf_seq = np.abs(seq_preds - 0.5)
             conf_gat = np.abs(graph_preds - 0.5)
-            X_shap = np.column_stack((seq_preds, graph_preds, conf_seq, conf_gat))
+            disagreement = np.abs(seq_preds - graph_preds)
+            X_shap = np.column_stack((seq_preds, graph_preds, conf_seq, conf_gat, disagreement))
             explainer.save_summary_plot(
                 X_shap,
                 title=f"SHAP Summary Plot ({EVAL_LABEL})",
