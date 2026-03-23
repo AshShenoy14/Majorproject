@@ -99,12 +99,10 @@ def generate_hard_negatives(positive_df: pd.DataFrame, all_proteins: List[str], 
     print(f"Generated {len(hard_negatives)} hard negatives.")
     return pd.DataFrame(list(hard_negatives), columns=["protein1", "protein2"])
 
-def generate_negative_samples(positive_df: pd.DataFrame, all_proteins: List[str], ratio: float = 1.0) -> pd.DataFrame:
+def generate_negative_samples(positive_df: pd.DataFrame, all_proteins: List[str], ratio: float = 1.0, hard_ratio: float = 0.5) -> pd.DataFrame:
     """
     Generates negative samples by mixing random (easy) and common-neighbor (hard) pairs.
     """
-    # 50% Random, 50% Hard Negatives
-    hard_ratio = 0.5
     num_hard = int(len(positive_df) * ratio * hard_ratio)
     num_easy = int(len(positive_df) * ratio) - num_hard
     
@@ -132,12 +130,10 @@ def generate_negative_samples(positive_df: pd.DataFrame, all_proteins: List[str]
     easy_df = pd.DataFrame(list(negative_pairs), columns=["protein1", "protein2"])
     return pd.concat([easy_df, hard_df], ignore_index=True)
 
-def preprocess_data(min_score: int = 900):
+def preprocess_data(min_score: int = 900, hard_ratio: float = 0.5):
     # 1. Load Interactions
     if not STRING_FILE.exists():
         print(f"Error: {STRING_FILE} not found. Please run collect_ppi.py first.")
-        # Create a dummy file for demonstration if it doesn't exist?
-        # No, better to fail and inform.
         return
 
     inte_df = load_string_interactions(STRING_FILE, min_score=min_score)
@@ -146,12 +142,8 @@ def preprocess_data(min_score: int = 900):
     unique_proteins = set(inte_df["protein1"]).union(set(inte_df["protein2"]))
     print(f"Found {len(unique_proteins)} unique proteins in positive set.")
     
-    # 3. Load Sequences (Optional for now, but crucial for model)
-    # seqs = load_sequences(UNIPROT_FILE)
-    # For now, we proceed without checking sequence existence to allow logic verification
-    
     # 4. Generate Negatives
-    neg_df = generate_negative_samples(inte_df, list(unique_proteins), ratio=1.0)
+    neg_df = generate_negative_samples(inte_df, list(unique_proteins), ratio=1.0, hard_ratio=hard_ratio)
     
     # 5. Labeling
     inte_df["label"] = 1
@@ -172,4 +164,9 @@ def preprocess_data(min_score: int = 900):
     print("Preprocessing complete.")
 
 if __name__ == "__main__":
-    preprocess_data()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--min_score", type=int, default=900)
+    parser.add_argument("--hard_ratio", type=float, default=0.5)
+    args = parser.parse_args()
+    preprocess_data(min_score=args.min_score, hard_ratio=args.hard_ratio)

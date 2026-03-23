@@ -20,7 +20,7 @@ class BiologicalManager:
     def _save_cache(self):
         self.cache_df.to_csv(self.cache_path, index=False)
 
-    def get_bio_metadata(self, protein_ids: List[str]) -> pd.DataFrame:
+    def get_bio_metadata(self, protein_ids: List[str], fetch_missing: bool = True) -> pd.DataFrame:
         """
         Fetches localization and pathway info for proteins.
         protein_ids: List of ENSP IDs.
@@ -29,7 +29,7 @@ class BiologicalManager:
         found_ids = set(existing["protein_id"].unique())
         missing_ids = [p for p in protein_ids if p not in found_ids]
 
-        if not missing_ids:
+        if not missing_ids or not fetch_missing:
             return existing
 
         # Map ENSP -> UniProt
@@ -37,7 +37,7 @@ class BiologicalManager:
         
         # Fallback: Search UniProt for missing mappings (e.g. if TSV is incomplete)
         unmapped = [p for p in missing_ids if p not in mapping]
-        if unmapped:
+        if unmapped and fetch_missing:
             print(f"Fallback: Searching UniProt for {len(unmapped)} unmapped IDs...")
             for p in unmapped:
                 try:
@@ -98,13 +98,16 @@ class BiologicalManager:
 
         return self.cache_df[self.cache_df["protein_id"].isin(protein_ids)]
 
-    def check_localization_compatibility(self, p1_id: str, p2_id: str) -> Dict[str, Any]:
+    def check_localization_compatibility(self, p1_id: str, p2_id: str, fetch_missing: bool = True) -> Dict[str, Any]:
         """
-        Checks if two proteins have overlapping subcellular localizations.
+        Checks if two proteins have overlapping subcellular localizations and returns a score.
+        Score 1.0: Clear overlap
+        Score 0.5: Missing data or weak overlap (e.g. Nucleus vs Nucleolus)
+        Score 0.1: No overlap
         """
-        meta = self.get_bio_metadata([p1_id, p2_id])
+        meta = self.get_bio_metadata([p1_id, p2_id], fetch_missing=fetch_missing)
         if len(meta) < 2:
-            return {"compatible": True, "reason": "Insufficient localization data", "p1_locs": [], "p2_locs": []}
+            return {"compatible": True, "score": 0.5, "reason": "Insufficient localization data", "p1_locs": [], "p2_locs": []}
         
         row1 = meta[meta["protein_id"] == p1_id].iloc[0]
         row2 = meta[meta["protein_id"] == p2_id].iloc[0]
@@ -113,20 +116,42 @@ class BiologicalManager:
         l2 = set([x.strip().lower() for x in str(row2["localization"]).split(";") if x.strip()])
         
         if not l1 or not l2:
-            return {"compatible": True, "reason": "Missing localization for one or both proteins", "p1_locs": list(l1), "p2_locs": list(l2)}
+            return {"compatible": True, "score": 0.5, "reason": "Missing localization for one or both proteins", "p1_locs": list(l1), "p2_locs": list(l2)}
         
         intersection = l1.intersection(l2)
         
-        # Heuristic: If they share at least one location, they are compatible.
-        # This is a simple logic gate that can be refined.
-        compatible = len(intersection) > 0
+        # High-level compatibility: Shared location
+        if len(intersection) > 0:
+            # Granular Check: Nucleus vs Nucleolus
+            # If one is ONLY in the nucleolus and the other is in the nucleus but NOT nucleolus
+            is_p1_nucleolar = any("nucleolus" in loc for loc in l1)
+            is_p2_nucleolar = any("nucleolus" in loc for loc in l2)
+            
+            if is_p1_nucleolar != is_p2_nucleolar:
+                # One is nucleolar, the other isn't. Weakened compatibility.
+                return {
+                    "compatible": True, 
+                    "score": 0.7, 
+                    "intersection": list(intersection),
+                    "reason": "One protein is nucleolar-specific; partial overlap in nucleus.",
+                    "p1_locs": list(l1), "p2_locs": list(l2)
+                }
+            
+            return {
+                "compatible": True, 
+                "score": 1.0, 
+                "intersection": list(intersection),
+                "reason": "Strong shared localization found",
+                "p1_locs": list(l1), "p2_locs": list(l2)
+            }
         
         return {
-            "compatible": compatible,
-            "intersection": list(intersection),
+            "compatible": False,
+            "score": 0.1,
+            "intersection": [],
             "p1_locs": list(l1),
             "p2_locs": list(l2),
-            "reason": "Shared localization found" if compatible else "No shared subcellular localization found"
+            "reason": "No shared subcellular localization found"
         }
     def calculate_pathway_vulnerability(self, p1_id: str, p2_id: str, delta_score: float) -> Dict[str, Any]:
         """

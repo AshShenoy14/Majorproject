@@ -63,14 +63,18 @@ def main():
     seq_model.load_state_dict(torch.load(MODELS_DIR / "sequence_model_best.pth", map_location=device))
     seq_model.eval()
 
-    # --- TOPOLOGICAL INJECTION (Node Degree) ---
-    from torch_geometric.utils import degree
-    deg = degree(graph_data.edge_index[0], graph_data.x.shape[0]).view(-1, 1)
-    deg_norm = (deg - deg.mean()) / (deg.std() + 1e-6)
-    graph_data.x = torch.cat([graph_data.x, deg_norm], dim=-1)
+    # Graph features are already injected properly by extract_topo in run_pipeline.py
 
-    graph_model = GATLinkPredictor(in_channels=graph_data.x.shape[1], hidden_channels=128).to(device)
-    graph_model.load_state_dict(torch.load(MODELS_DIR / "graph_model_best.pth", map_location=device))
+    from src.models.graph_model import GINLinkPredictor
+    state_dict = torch.load(MODELS_DIR / "graph_model_best.pth", map_location=device)
+    is_gin = any("convs" in k for k in state_dict.keys())
+    
+    if is_gin:
+        graph_model = GINLinkPredictor(in_channels=graph_data.x.shape[1], hidden_channels=128).to(device)
+    else:
+        graph_model = GATLinkPredictor(in_channels=graph_data.x.shape[1], hidden_channels=128, heads=4).to(device)
+        
+    graph_model.load_state_dict(state_dict)
     graph_model.eval()
 
     ensemble = PPIEnsemble(str(MODELS_DIR / "ensemble_model.pkl"))
@@ -91,8 +95,17 @@ def main():
     for _, row in tqdm(filtered_df.iterrows(), total=len(filtered_df), desc="Preparing Data"):
         p1, p2 = row["protein1"], row["protein2"]
         e1, e2 = embeddings[p1], embeddings[p2]
-        batch_emb1.append(e1.mean(dim=0) if e1.dim() > 1 else e1)
-        batch_emb2.append(e2.mean(dim=0) if e2.dim() > 1 else e2)
+        e1_mean = e1.mean(dim=0) if e1.dim() > 1 else e1
+        e2_mean = e2.mean(dim=0) if e2.dim() > 1 else e2
+        
+        if bio_mapping:
+            b1 = bio_mapping.get(p1, torch.zeros(bio_dim))
+            b2 = bio_mapping.get(p2, torch.zeros(bio_dim))
+            e1_mean = torch.cat([e1_mean, b1])
+            e2_mean = torch.cat([e2_mean, b2])
+            
+        batch_emb1.append(e1_mean)
+        batch_emb2.append(e2_mean)
         g_src.append(node_mapping[p1])
         g_dst.append(node_mapping[p2])
 

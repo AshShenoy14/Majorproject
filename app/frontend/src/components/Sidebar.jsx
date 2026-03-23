@@ -10,7 +10,8 @@ import {
   Info,
   Database,
   Activity,
-  Bot
+  Bot,
+  Globe
 } from 'lucide-react';
 
 const Sidebar = () => {
@@ -22,6 +23,7 @@ const Sidebar = () => {
     { name: 'Network Explorer', icon: <Share2 size={20} />, path: '/network' },
     { name: 'Drug Target Insights', icon: <ShieldAlert size={20} />, path: '/drug-targets' },
     { name: 'AI Assistant', icon: <Bot size={20} />, path: '/assistant' },
+    { name: 'Zero-Shot Evaluation', icon: <Globe size={20} />, path: '/zero-shot' },
     { name: 'About', icon: <Info size={20} />, path: '/about' },
   ];
 

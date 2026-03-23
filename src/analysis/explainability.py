@@ -16,21 +16,21 @@ class PPIExplainer:
             print(f"Warning: SHAP initialization failed due to XGBoost compatibility issue: {e}")
             self.explainer = None
 
-    def explain_prediction(self, seq_prob: float, graph_prob: float, conf_seq: float, conf_graph: float, bio_match: float):
+    def explain_prediction(self, seq_prob: float, graph_prob: float, conf_seq: float, conf_graph: float, disagreement: float, max_conf: float, bio_score: float):
         """
-        Explains a single prediction made by the ensemble using the 5 features.
-        Features: [seq, graph, conf_seq, conf_graph, bio_match]
+        Explains a single prediction made by the ensemble using the 7 features.
+        Features: [seq, graph, conf_seq, conf_graph, disagreement, max_conf, bio_score]
         """
         if self.explainer is None:
-            return np.array([[0.0, 0.0, 0.0, 0.0, 0.0]])
+            return np.array([[0.0] * 7])
             
         # Matrix matching the features the meta-learner was trained on
-        X = np.array([[seq_prob, graph_prob, conf_seq, conf_graph, bio_match]])
+        X = np.array([[seq_prob, graph_prob, conf_seq, conf_graph, disagreement, max_conf, bio_score]])
         
-        # Handle legacy 4-feature models
-        n_expected = getattr(self.model, "n_features_in_", 4)
-        if n_expected == 4:
-            X = X[:, :4]
+        # Handle legacy models (4 or 5 features)
+        n_expected = getattr(self.model, "n_features_in_", 7)
+        if n_expected < 7:
+            X = X[:, :n_expected]
             
         shap_values = self.explainer.shap_values(X)
         
@@ -41,7 +41,7 @@ class PPIExplainer:
              
         return shap_values
 
-    def save_summary_plot(self, X: np.ndarray, feature_names=["ESM-MLP", "GAT", "|ESM-0.5|", "|GAT-0.5|", "Bio Localization"], title="SHAP Summary Plot", output_path="shap_summary.png"):
+    def save_summary_plot(self, X: np.ndarray, feature_names=["ESM-MLP", "GAT", "|ESM-0.5|", "|GAT-0.5|", "Disagreement", "Max Conf", "Bio Localization"], title="SHAP Summary Plot", output_path="shap_summary.png"):
         """
         Generates and saves a SHAP summary plot for a batch of predictions.
         """

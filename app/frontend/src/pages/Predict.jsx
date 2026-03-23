@@ -209,10 +209,20 @@ const Predict = () => {
                   </div>
                 </div>
 
-                <div className={`flex items-center gap-2 px-6 py-2 rounded-full mb-4 ${result.interaction_probability > 0.5 ? 'bg-green-50 text-green-600 border border-green-100' : 'bg-orange-50 text-orange-600 border border-orange-100'}`}>
-                  {result.interaction_probability > 0.5 ? <CheckCircle2 size={18} /> : <XCircle size={18} />}
+                <div className={`flex items-center gap-2 px-6 py-2 rounded-full mb-4 ${
+                  result.interaction_probability > 0.5 
+                    ? (Number(result.confidence_score) > 0.3 ? 'bg-green-50 text-green-600 border border-green-100' : 'bg-amber-50 text-amber-600 border border-amber-100')
+                    : 'bg-orange-50 text-orange-600 border border-orange-100'
+                }`}>
+                  {result.interaction_probability > 0.5 
+                    ? (Number(result.confidence_score) > 0.3 ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />)
+                    : <XCircle size={18} />
+                  }
                   <span className="font-bold uppercase tracking-wider">
-                    {result.interaction_probability > 0.5 ? 'Strong Interaction' : 'No Interaction'}
+                    {result.interaction_probability > 0.5 
+                      ? (Number(result.confidence_score) > 0.3 ? 'Strong Interaction' : 'Interaction (Unverified)')
+                      : 'No Interaction'
+                    }
                   </span>
                 </div>
 
@@ -223,8 +233,22 @@ const Predict = () => {
                   </span>
                 </div>
 
-                Confidence Score: <span className="text-slate-700 font-bold">{(Number(result.confidence_score || 0) * 100).toFixed(1)}%</span>
-                <TooltipIcon text="Score based on the statistical agreement between sequence and graph data." />
+                <div className={`p-4 rounded-xl w-full mb-2 ${Number(result.confidence_score) > 0.6 ? 'bg-green-50/50' : Number(result.confidence_score) > 0.3 ? 'bg-amber-50/50' : 'bg-rose-50/50'}`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase">Confidence Score</span>
+                    <span className={`font-extrabold ${(Number(result.confidence_score || 0) * 100) > 60 ? 'text-green-600' : (Number(result.confidence_score || 0) * 100) > 30 ? 'text-amber-600' : 'text-rose-600'}`}>
+                      {(Number(result.confidence_score || 0) * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                  {Number(result.confidence_score) < 0.3 && (
+                    <p className="text-[10px] text-rose-500 font-medium mt-1 leading-tight">
+                      ⚠️ Caution: Low consensus between sequence and graph signals. High risk of false positive.
+                    </p>
+                  )}
+                </div>
+                <div className="text-[10px] text-slate-400 flex items-center justify-center gap-1">
+                  <Info size={10} /> Statistical reliability metric
+                </div>
               </div>
 
               {/* Model Breakdown */}

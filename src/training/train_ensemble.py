@@ -54,23 +54,36 @@ def train_ensemble(seq_model_path, graph_model_path, graph_data_path):
         return
     seq_model.eval()
 
-    # Graph Model — updated to match new architecture (hidden=128)
+    # Graph Model — updated to support auto-detection (GAT/GIN)
     if not os.path.exists(graph_data_path):
         print(f"Graph data not found at {graph_data_path}")
         return
     
+    from src.models.graph_model import GATLinkPredictor, GINLinkPredictor
     graph_data = torch.load(graph_data_path, weights_only=False).to(device)
-    graph_model = GATLinkPredictor(in_channels=graph_data.x.shape[1], hidden_channels=128).to(device)
-    try:
-        if os.path.exists(graph_model_path):
-            graph_model.load_state_dict(torch.load(graph_model_path, map_location=device))
+    in_channels = graph_data.x.shape[1]
+    
+    if os.path.exists(graph_model_path):
+        try:
+            state_dict = torch.load(graph_model_path, map_location=device)
+            is_gin = any("convs" in k for k in state_dict.keys())
+            
+            if is_gin:
+                print("Detected GIN architecture for Graph Model.")
+                graph_model = GINLinkPredictor(in_channels=in_channels, hidden_channels=128).to(device)
+            else:
+                print("Detected GAT architecture for Graph Model.")
+                graph_model = GATLinkPredictor(in_channels=in_channels, hidden_channels=128, heads=4).to(device)
+                
+            graph_model.load_state_dict(state_dict)
             print(f"Loaded Graph Model from {graph_model_path}")
-        else:
-            print(f"Graph model not found at {graph_model_path}")
-            return
-    except Exception as e:
-        print(f"Failed to load graph model state dict: {e}")
-        return
+        except Exception as e:
+            print(f"Failed to detect/load graph model: {e}. Defaulting to GAT.")
+            graph_model = GATLinkPredictor(in_channels=in_channels, hidden_channels=128, heads=4).to(device)
+    else:
+        print(f"Graph model not found at {graph_model_path}. Defaulting to GAT.")
+        graph_model = GATLinkPredictor(in_channels=in_channels, hidden_channels=128, heads=4).to(device)
+    
     graph_model.eval()
 
     # 2. Generate Predictions on Validation Set
@@ -182,12 +195,25 @@ def train_ensemble(seq_model_path, graph_model_path, graph_data_path):
         print("No valid validation samples found.")
         return
 
-    # 3. Train Ensemble with enhanced features
+    # 3. Calculate Biological Compatibility Scores for Ensemble
+    print("Calculating biological compatibility scores...")
+    from src.analysis.biological_managers import BiologicalManager
+    bio_manager = BiologicalManager()
+    
+    bio_scores = []
+    for _, row in tqdm(filtered_df.iterrows(), total=len(filtered_df), desc="Bio Analysis"):
+        p1, p2 = row["protein1"], row["protein2"]
+        comp = bio_manager.check_localization_compatibility(p1, p2, fetch_missing=False)
+        bio_scores.append(comp.get("score", 0.5))
+    
+    bio_scores_np = np.array(bio_scores).reshape(-1, 1)
+
+    # 4. Train Ensemble with enhanced features (7 features total)
     ensemble = PPIEnsemble()
-    ensemble.train_stacking(seq_preds_np, graph_preds_np, val_labels_np)
+    ensemble.train_stacking(seq_preds_np, graph_preds_np, val_labels_np, bio_features=bio_scores_np)
     
     # Generate Ensemble Predictions
-    ensemble_preds = ensemble.predict(seq_preds_np, graph_preds_np, method="stacking")
+    ensemble_preds = ensemble.predict(seq_preds_np, graph_preds_np, bio_features=bio_scores_np, method="stacking")
     
     # Save
     out_path = PROJECT_ROOT / "models" / "ensemble_model.pkl"

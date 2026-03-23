@@ -13,6 +13,7 @@ class PredictionResponse(BaseModel):
     gat_probability: float = Field(..., description="Probability from the GAT graph model", example=0.75)
     confidence_score: float = Field(..., description="Normalized confidence score [0, 1]", example=0.76)
     explanation: Dict[str, Any] = Field(..., description="Feature importance scores (e.g., SHAP values)")
+    gnn_explanation: Optional[Dict[str, Any]] = Field(None, description="Detailed GNN-specific neighbor importance")
     protein1_uniprot_id: Optional[str] = Field(None, description="Mapped UniProt ID for protein 1", example="P12345")
     protein2_uniprot_id: Optional[str] = Field(None, description="Mapped UniProt ID for protein 2", example="Q67890")
     protein1_seq: Optional[str] = Field(None, description="Sequence used for protein 1")

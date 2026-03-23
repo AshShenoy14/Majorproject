@@ -69,6 +69,7 @@ const PredictionForm = () => {
   const [batchResults, setBatchResults] = useState([]);
   const [bioInfo, setBioInfo] = useState(null);
   const [feasibility, setFeasibility] = useState(null);
+  const [aiInsight, setAiInsight] = useState(null);
 
   useEffect(() => {
     const saved = localStorage.getItem('predictionHistory');
@@ -189,7 +190,6 @@ const PredictionForm = () => {
     setBatchResults([]);
 
     try {
-      // Replace with actual API URL
       const payload = {
         protein1_id: id1 || "Protein A",
         protein2_id: id2 || "Protein B",
@@ -200,8 +200,8 @@ const PredictionForm = () => {
       setResult(response.data);
       saveToHistory({ id1: id1 || "Protein A", id2: id2 || "Protein B", result: response.data });
       
-      // Fetch Bio Metadata and Feasibility
       fetchBioData(id1, id2);
+      fetchAiInsight(id1, id2);
     } catch (err) {
       setError('Failed to fetch prediction. Ensure backend is running.');
       console.error(err);
@@ -222,6 +222,16 @@ const PredictionForm = () => {
       }
     } catch (err) {
       console.error("Failed to fetch biological context", err);
+    }
+  };
+
+  const fetchAiInsight = async (p1, p2) => {
+    try {
+      const msg = `Tell me a brief, fascinating biological fact about the interaction between ${p1} and ${p2}. Why is it important in human health? Limit to 2 sentences.`;
+      const res = await axios.post('http://localhost:8000/chat', { message: msg });
+      setAiInsight(res.data.response);
+    } catch (e) {
+      console.error("AI Insight failed", e);
     }
   };
 
@@ -627,6 +637,42 @@ const PredictionForm = () => {
                     </Box>
                   )}
 
+                  {/* GNN Topological Insights (New) */}
+                  {result.gnn_explanation && result.gnn_explanation.top_neighbors && (
+                    <Box sx={{ p: 2, border: `1px solid ${isDark ? 'rgba(0, 229, 255, 0.1)' : 'rgba(0, 105, 92, 0.1)'}`, borderRadius: 2 }}>
+                      <Typography variant="subtitle2" color="primary" gutterBottom display="flex" alignItems="center">
+                        <InfoIcon sx={{ fontSize: '1rem', mr: 1 }} />
+                        Topological Evidence (GNN)
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1.5 }}>
+                        The graph model identified these proteins as critical "bridge" connections justifying this interaction.
+                      </Typography>
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                        {result.gnn_explanation.top_neighbors.map((neighbor, idx) => (
+                          <Chip 
+                            key={idx} 
+                            label={`${neighbor.id} (${(neighbor.importance * 100).toFixed(0)}%)`} 
+                            size="small" 
+                            variant="outlined"
+                            sx={{ fontSize: '0.7rem' }}
+                          />
+                        ))}
+                      </Box>
+                    </Box>
+                  )}
+
+                  {/* Plain English Summary (New) */}
+                  <Box sx={{ p: 2, bgcolor: isDark ? 'rgba(0, 229, 255, 0.1)' : 'rgba(0, 105, 92, 0.05)', borderRadius: 2, borderLeft: '4px solid #00e5ff' }}>
+                    <Typography variant="subtitle2" fontWeight="bold">Quick Insight</Typography>
+                    <Typography variant="body2" sx={{ fontStyle: 'italic', color: 'text.secondary' }}>
+                      {result.interaction_probability > 0.7 
+                        ? `The models are highly confident this is a real interaction. ${result.gnn_explanation?.top_neighbors?.length ? 'Extensive network evidence supports this biological link.' : ''}` 
+                        : result.interaction_probability > 0.4
+                        ? "Potential interaction detected, but some models show skepticism. This may be a context-dependent interaction."
+                        : "Low probability of interaction. The sequence motifs and network topology do not suggest a physical binding pair."}
+                    </Typography>
+                  </Box>
+
                   <Box sx={{ textAlign: 'right' }}>
                     <Typography variant="caption" color="text.secondary">
                       Confidence Score: {(result.confidence_score * 100).toFixed(1)}%
@@ -691,12 +737,20 @@ const PredictionForm = () => {
                     </Alert>
                   )}
 
-                  {/* Novelty 2: Biological Context (Pathways) */}
-                  {bioInfo && bioInfo.length > 0 && (
+                  {/* Novelty 2: Biological Context & AI Insight */}
+                  {(bioInfo || aiInsight) && (
                     <Box sx={{ p: 2, bgcolor: isDark ? 'rgba(0, 229, 255, 0.05)' : 'rgba(0, 105, 92, 0.05)', borderRadius: 2 }}>
-                      <Typography variant="subtitle2" color="secondary" gutterBottom fontWeight="bold">Biological Context</Typography>
-                      {bioInfo.map(info => (
-                        <Box key={info.protein_id} sx={{ mb: 1.5 }}>
+                      <Typography variant="subtitle2" color="secondary" gutterBottom fontWeight="bold" display="flex" alignItems="center">
+                        🧬 AI Assistant Insight
+                      </Typography>
+                      {aiInsight && (
+                        <Typography variant="body2" sx={{ mb: 2, fontStyle: 'italic', borderLeft: '3px solid #7c4dff', pl: 2 }}>
+                          {aiInsight}
+                        </Typography>
+                      )}
+                      <Divider sx={{ my: 1.5, opacity: 0.1 }} />
+                      {bioInfo && bioInfo.map(info => (
+                        <Box key={info.protein_id} sx={{ mb: 1 }}>
                           <Typography variant="caption" fontWeight="bold">{info.protein_id}</Typography>
                           <Typography variant="caption" display="block" color="text.secondary">
                             Pathways: {info.pathways || "Unknown"}

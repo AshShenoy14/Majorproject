@@ -23,6 +23,7 @@ from src.data.sequence_manager import SequenceManager
 from src.data.target_manager import TargetManager
 from src.data.id_mapper import IDMapper
 from src.analysis.explainability import PPIExplainer
+from src.analysis.explain_model import explain_prediction as explain_gnn
 from src.analysis.network_analysis import NetworkAnalyzer
 from src.analysis.mutation_analyzer import MutationAnalyzer
 from src.analysis.biological_managers import BiologicalManager
@@ -40,6 +41,8 @@ app = FastAPI(title="TransGraph-PPI API", description="Hybrid Ensemble PPI Predi
 origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
     "http://localhost:3000",
 ]
 
@@ -88,21 +91,35 @@ async def load_system():
         models["seq_model"].eval()
 
         # Graph Model
+        from src.models.graph_model import GATLinkPredictor, GINLinkPredictor
         graph_path = PROJECT_ROOT / "models" / "graph_model_best.pth"
         graph_data_path = PROCESSED_DATA_DIR / "ppi_graph.pt"
         if graph_data_path.exists():
             data_cache["graph"] = torch.load(graph_data_path, weights_only=False).to(device)
             in_channels = data_cache["graph"].x.shape[1]
-            # Use 128 hidden channels to match the new architecture
-            models["graph_model"] = GATLinkPredictor(in_channels=in_channels, hidden_channels=128).to(device)
+            
             if graph_path.exists():
                 try:
-                    models["graph_model"].load_state_dict(torch.load(graph_path, map_location=device))
+                    state_dict = torch.load(graph_path, map_location=device)
+                    # Auto-detect architecture: GIN uses 'convs', GAT uses 'conv1'
+                    is_gin = any("convs" in k for k in state_dict.keys())
+                    
+                    if is_gin:
+                        print("Detected GIN architecture for Graph Model.")
+                        models["graph_model"] = GINLinkPredictor(in_channels=in_channels, hidden_channels=128).to(device)
+                    else:
+                        print("Detected GAT architecture for Graph Model.")
+                        models["graph_model"] = GATLinkPredictor(in_channels=in_channels, hidden_channels=128, heads=4).to(device)
+                    
+                    models["graph_model"].load_state_dict(state_dict)
                     print("Graph Model loaded.")
                 except Exception as e:
-                    print(f"Warning: Could not load Graph Model weights ({e}). Graph predictions will use defaults.")
+                    print(f"Warning: Could not load Graph Model weights ({e}). Initializing default architecture.")
+                    models["graph_model"] = GATLinkPredictor(in_channels=in_channels, hidden_channels=128, heads=4).to(device)
             else:
-                print("Warning: Graph Model weights not found. Using randomly initialized weights.")
+                print("Warning: Graph Model weights not found. Defaulting to GAT.")
+                models["graph_model"] = GATLinkPredictor(in_channels=in_channels, hidden_channels=128, heads=4).to(device)
+            
             models["graph_model"].eval()
             
             map_path = PROCESSED_DATA_DIR / "ppi_graph_mapping.pt"
@@ -229,17 +246,21 @@ async def predict_interaction(pair: ProteinPair):
             # Apply sigmoid to raw logits (model outputs logits, not probabilities)
             seq_prob = torch.sigmoid(models["seq_model"](e1_final, e2_final)).item()
             
-        # 4. Graph Prediction
+        # 4. Graph Prediction (with Mapping Resilience)
         graph_prob = 0.5 
-        if "mapping" in data_cache and p1 in data_cache["mapping"] and p2 in data_cache["mapping"]:
-            idx1 = data_cache["mapping"][p1]
-            idx2 = data_cache["mapping"][p2]
+        if "mapping" in data_cache:
+            m_p1 = managers["id_mapper"].resolve_to_graph_id(p1, set(data_cache["mapping"].keys()))
+            m_p2 = managers["id_mapper"].resolve_to_graph_id(p2, set(data_cache["mapping"].keys()))
             
-            edge_label_index = torch.tensor([[idx1], [idx2]], dtype=torch.long).to(models["esm"].device)
+            if m_p1 in data_cache["mapping"] and m_p2 in data_cache["mapping"]:
+                idx1 = data_cache["mapping"][m_p1]
+                idx2 = data_cache["mapping"][m_p2]
             
-            with torch.no_grad():
-                g_out = models["graph_model"](data_cache["graph"].x, data_cache["graph"].edge_index, edge_label_index)
-                graph_prob = torch.sigmoid(g_out).item()
+                edge_label_index = torch.tensor([[idx1], [idx2]], dtype=torch.long).to(models["esm"].device)
+                
+                with torch.no_grad():
+                    g_out = models["graph_model"](data_cache["graph"].x, data_cache["graph"].edge_index, edge_label_index)
+                    graph_prob = torch.sigmoid(g_out).item()
         
         # 5. Final Prediction (Ensemble or Simple Average)
         final_prob = (seq_prob + graph_prob) / 2.0
@@ -249,26 +270,35 @@ async def predict_interaction(pair: ProteinPair):
 
         if "ensemble" in models and models["ensemble"] is not None and explainer is not None:
             try:
-                # Get Biological Match Feature (1 if compatible, 0 otherwise)
+                # Get Biological Match Score
                 bio_comp = managers["bio"].check_localization_compatibility(p1, p2)
-                bio_match = 1.0 if bio_comp.get("compatible", False) else 0.0
+                bio_score = bio_comp.get("score", 0.5)
 
-                # Enhanced features: [seq, graph, |seq-0.5|, |graph-0.5|, bio_match]
+                # Enhanced features (7 total): [seq, graph, conf_seq, conf_graph, disagreement, max_conf, bio_score]
                 conf_seq = abs(seq_prob - 0.5)
                 conf_graph = abs(graph_prob - 0.5)
+                disagreement = abs(seq_prob - graph_prob)
+                max_conf = max(conf_seq, conf_graph)
                 
                 ens_prob = models["ensemble"].predict(
                     np.array([seq_prob]), 
                     np.array([graph_prob]), 
-                    bio_features=np.array([[bio_match]]),
+                    bio_features=np.array([[bio_score]]),
                     method="stacking"
                 )[0]
                 
-                final_prob = float(ens_prob)
-                model_used = "XGBoost Ensemble"
+                # --- Zero-Shot Correction (Major Project Polish) ---
+                # If both are likely missing from graph (graph_prob is neutral), 
+                # but sequence is very strong (ESM > 0.9), and bio-score is high,
+                # we should boost the probability to reflect zero-shot confidence.
+                if graph_prob == 0.5 and seq_prob > 0.9 and bio_score > 0.8:
+                    ens_prob = max(ens_prob, seq_prob * 0.9)
                 
-                # Generate SHAP explanation with 5 features
-                shap_val = explainer.explain_prediction(seq_prob, graph_prob, conf_seq, conf_graph, bio_match)
+                final_prob = float(ens_prob)
+                model_used = "XGBoost Ensemble (Zero-Shot Adjusted)"
+                
+                # Generate SHAP explanation with updated features
+                shap_val = explainer.explain_prediction(seq_prob, graph_prob, conf_seq, conf_graph, disagreement, max_conf, bio_score)
                 shap_values = shap_val.tolist()[0] 
             except Exception as e:
                 print(f"Ensemble prediction/SHAP failed: {e}")
@@ -283,6 +313,21 @@ async def predict_interaction(pair: ProteinPair):
             "SHAP_Values": shap_values,
             "Biological_Match": bio_match > 0.5
         }
+        
+        # 6a. GNN Topological Explanation (Research Layer with Mapping Resilience)
+        gnn_explanation = None
+        # Use resolved IDs to ensure topological insights for missing isoforms
+        res_p1 = managers["id_mapper"].resolve_to_graph_id(p1, set(data_cache.get("mapping", {}).keys()))
+        res_p2 = managers["id_mapper"].resolve_to_graph_id(p2, set(data_cache.get("mapping", {}).keys()))
+
+        if "mapping" in data_cache and res_p1 in data_cache["mapping"] and res_p2 in data_cache["mapping"]:
+            try:
+                # This call runs GNNExplainer (epochs=50) using resolved IDs
+                gnn_explanation = explain_gnn(res_p1, res_p2)
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                print(f"GNN Explanation failed: {e}")
 
         # 7. Uniprot ID Mapping for 3D Visuals
         uniprot_maps = {}
@@ -295,6 +340,7 @@ async def predict_interaction(pair: ProteinPair):
             "gat_probability": float(graph_prob),
             "confidence_score": abs(float(final_prob) - 0.5) * 2,
             "explanation": explanation,
+            "gnn_explanation": gnn_explanation,
             "protein1_uniprot_id": uniprot_maps.get(p1, p1),
             "protein2_uniprot_id": uniprot_maps.get(p2, p2),
             "protein1_seq": sequences[p1],

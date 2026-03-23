@@ -8,6 +8,7 @@ from src.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT, CHECKPOINT_DIR, MO
 from src.models.graph_model import GATLinkPredictor
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 import argparse
 from tqdm import tqdm
@@ -75,12 +76,16 @@ def train(
     cpu_threads: int = None,
     edge_batch_size: int = 0,
     cooldown_seconds: float = 0.0,
+    model_type: str = "GAT",
+    structural_penalty: float = 2.0
 ):
     """
-    Train the GAT Link Predictor using full-batch training (Stable Version).
+    Train the GNN Link Predictor using full-batch training (Stable Version).
+    model_type: 'GAT' or 'GIN'
+    structural_penalty: Multiplier for loss on 'hard' negative samples (if identified).
     """
     device = configure_runtime(force_cpu=force_cpu, cpu_threads=cpu_threads)
-    print(f"Training Phase 2/3 GATv2 Model on {device} (Full-Batch)...")
+    print(f"Training Phase 2/3 {model_type} Model on {device} (Full-Batch)...")
 
     # ── Load Graph Data ──────────────────────────────────────────────────
     if graph_path and os.path.exists(graph_path):
@@ -103,33 +108,48 @@ def train(
 
     def get_edge_label_index(df):
         src, dst, labels = [], [], []
+        # Support optional 'is_hard' column from future-proofed preprocessor
+        is_hard = []
         for _, row in df.iterrows():
             if row["protein1"] in node_mapping and row["protein2"] in node_mapping:
                 src.append(node_mapping[row["protein1"]])
                 dst.append(node_mapping[row["protein2"]])
                 labels.append(row["label"])
+                # Heuristic for Phase 2: if label=0 and they appear in 'hard_negatives' (proximal), we weight them more
+                # For now, we use a global structural penalty on all negatives if ratio was high
+                is_hard.append(1.0 if row.get("is_hard", 0) else 0.5) 
         return (torch.tensor([src, dst], dtype=torch.long),
-                torch.tensor(labels, dtype=torch.float32))
+                torch.tensor(labels, dtype=torch.float32),
+                torch.tensor(is_hard, dtype=torch.float32))
 
-    train_edge_label_index, train_labels = get_edge_label_index(train_df)
-    val_edge_label_index,   val_labels   = get_edge_label_index(val_df)
+    train_edge_label_index, train_labels, train_weights = get_edge_label_index(train_df)
+    val_edge_label_index,   val_labels,   _            = get_edge_label_index(val_df)
 
     train_edge_label_index = train_edge_label_index.to(device)
     train_labels           = train_labels.to(device)
+    train_weights          = train_weights.to(device)
     val_edge_label_index   = val_edge_label_index.to(device)
     val_labels             = val_labels.to(device)
 
     # ── Model, Optimizer, Loss ───────────────────────────────────────────
-    # Optimized architecture (3-layer + skip) with GATv3 upgrades (Bottleneck + Bilinear)
-    # hidden_channels=128 + heads=4 provides a deeper structural embedding (512 total)
-    # PHASE 4: Hyper-Stabilization. 
-    # Accuracy reached 70%, now using ultra-low LR to prevent late-stage divergence.
-    model = GATLinkPredictor(in_channels=data.x.shape[1], hidden_channels=128, heads=4).to(device)
-    optimizer = optim.AdamW(model.parameters(), lr=0.000005, weight_decay=1e-1)
+    if model_type == "GIN":
+        from src.models.graph_model import GINLinkPredictor
+        model = GINLinkPredictor(in_channels=data.x.shape[1], hidden_channels=128).to(device)
+    else:
+        model = GATLinkPredictor(in_channels=data.x.shape[1], hidden_channels=128, heads=4).to(device)
     
-    pos_weight = torch.tensor([1.0], device=device)
-    criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+    optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     
+    # Custom weighted BCE for Structural Penalty
+    def structural_bce_loss(input, target, weights):
+        # target=1: Positive, target=0: Negative
+        # we want to penalize negatives more if they are 'hard'
+        loss = F.binary_cross_entropy_with_logits(input, target, reduction='none')
+        # weights: 1.0 for hard negative, 0.5 for easy negative/positive
+        # Apply structural_penalty multiplier specifically to negatives with weight=1.0
+        weighted_loss = loss * weights * structural_penalty
+        return weighted_loss.mean()
+
     # Using CosineAnnealingLR for better convergence on CPU
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-6)
 
@@ -186,7 +206,8 @@ def train(
             
             # Predict for chunk using z_detached
             out_c = model.decode(z_detached, s_c, d_c)
-            loss_c = criterion(out_c.squeeze(), lbl_c)
+            w_c = train_weights[i:i+chunk_size]
+            loss_c = structural_bce_loss(out_c.squeeze(), lbl_c, w_c)
             
             # Scale loss by chunk size relative to total edges
             scaled_loss = loss_c * (len(s_c) / num_train_edges)
@@ -220,7 +241,7 @@ def train(
             
             # Chunked validation to prevent space overflow
             val_outputs = chunked_decode(model, z_val, val_edge_label_index, chunk_size=500)
-            val_loss = criterion(val_outputs.squeeze(), val_labels).item()
+            val_loss = F.binary_cross_entropy_with_logits(val_outputs.squeeze(), val_labels).item()
             val_probs = torch.sigmoid(val_outputs.squeeze()).cpu().numpy()
             y_true = val_labels.cpu().numpy()
 
@@ -275,6 +296,8 @@ if __name__ == "__main__":
     parser.add_argument("--cpu-friendly", action="store_true",
                         help="Enable low-heat CPU preset")
     parser.add_argument("--graph_path", type=str, required=True)
+    parser.add_argument("--model_type", type=str, default="GAT", choices=["GAT", "GIN"])
+    parser.add_argument("--structural-penalty", type=float, default=2.0)
     args = parser.parse_args()
 
     if args.cpu_friendly:
@@ -299,4 +322,6 @@ if __name__ == "__main__":
         cpu_threads=args.cpu_threads,
         edge_batch_size=args.edge_batch_size,
         cooldown_seconds=args.cooldown_seconds,
+        model_type=args.model_type,
+        structural_penalty=args.structural_penalty
     )

@@ -21,15 +21,17 @@ class PPIEnsemble:
     def _build_features(base_preds_1: np.ndarray, base_preds_2: np.ndarray, bio_features: np.ndarray = None) -> np.ndarray:
         """
         Build enhanced feature matrix for the meta-learner.
-        Combines model probabilities, confidence scores, and optional bio-metadata.
+        Features: [seq_prob, gat_prob, conf_seq, conf_gat, disagreement, max_conf, bio_features]
         """
         conf_1 = np.abs(base_preds_1 - 0.5)
         conf_2 = np.abs(base_preds_2 - 0.5)
         
-        base_stack = np.column_stack((base_preds_1, base_preds_2, conf_1, conf_2))
+        disagreement = np.abs(base_preds_1 - base_preds_2)
+        max_conf = np.maximum(conf_1, conf_2)
+        
+        base_stack = np.column_stack((base_preds_1, base_preds_2, conf_1, conf_2, disagreement, max_conf))
         
         if bio_features is not None:
-            # Ensure bio_features is a 2D array matching the number of samples
             if bio_features.ndim == 1:
                 bio_features = bio_features.reshape(-1, 1)
             return np.hstack((base_stack, bio_features))
@@ -47,6 +49,11 @@ class PPIEnsemble:
         """
         X = self._build_features(base_preds_1, base_preds_2, bio_features)
         
+        # Give higher weight to hard negatives: where seq says YES (>0.8) and Graph says NO (<0.5) but label is NO
+        weights = np.ones(len(labels))
+        hard_negatives = (base_preds_1 > 0.8) & (base_preds_2 < 0.5) & (labels == 0)
+        weights[hard_negatives] = 10.0  # Force XGBoost to care 10x more about these specific hard boundaries!
+        
         print(f"Training XGBoost Meta-Learner with {X.shape[1]} features...")
         self.meta_model = xgb.XGBClassifier(
             n_estimators=100,
@@ -56,7 +63,7 @@ class PPIEnsemble:
             eval_metric='logloss',
             random_state=42
         )
-        self.meta_model.fit(X, labels)
+        self.meta_model.fit(X, labels, sample_weight=weights)
         print("Meta-learner training complete.")
 
     def predict(self, base_preds_1: np.ndarray, base_preds_2: np.ndarray, bio_features: np.ndarray = None, method: str = "stacking") -> np.ndarray:

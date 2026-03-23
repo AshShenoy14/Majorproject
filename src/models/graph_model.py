@@ -105,5 +105,75 @@ class GNNLinkPredictor(nn.Module):
         return self.decode(z, src, dst)
 
 
+class GINLinkPredictor(nn.Module):
+    def __init__(self, in_channels: int, hidden_channels: int = 128, num_layers: int = 3, dropout: float = 0.5):
+        """
+        Research-Grade GIN (Graph Isomorphism Network) for Link Prediction.
+        GIN is theoretically more powerful at distinguishing structural motifs.
+        """
+        super().__init__()
+        self.input_norm = nn.LayerNorm(in_channels)
+        
+        self.pre_proj = nn.Sequential(
+            nn.Linear(in_channels, 128),
+            nn.LayerNorm(128),
+            nn.GELU(),
+            nn.Dropout(dropout)
+        )
+        
+        from torch_geometric.nn import GINConv
+        self.convs = nn.ModuleList()
+        self.bns = nn.ModuleList()
+        
+        # GIN layers use an MLP internally
+        for i in range(num_layers):
+            cur_in = 128 if i == 0 else hidden_channels
+            mlp = nn.Sequential(
+                nn.Linear(cur_in, hidden_channels),
+                nn.BatchNorm1d(hidden_channels),
+                nn.GELU(),
+                nn.Linear(hidden_channels, hidden_channels)
+            )
+            self.convs.append(GINConv(mlp, train_eps=True))
+            self.bns.append(GNNBatchNorm(hidden_channels))
+        
+        self.dropout = dropout
+        
+        # Bilinear & Classifier heads
+        self.bilinear = nn.Bilinear(hidden_channels, hidden_channels, 1)
+        classifier_input_dim = (hidden_channels * 4) + 1
+        
+        self.classifier = nn.Sequential(
+            nn.Linear(classifier_input_dim, 512),
+            nn.BatchNorm1d(512),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(512, 1)
+        )
+
+    def encode(self, x, edge_index):
+        x = self.input_norm(x)
+        x = self.pre_proj(x)
+        
+        for conv, bn in zip(self.convs, self.bns):
+            x = conv(x, edge_index)
+            x = bn(x)
+            x = torch.relu(x)
+            x = F.dropout(x, p=self.dropout, training=self.training)
+        return x
+
+    def decode(self, z, src, dst):
+        h_u, h_v = z[src], z[dst]
+        bilinear_out = self.bilinear(h_u, h_v)
+        diff = torch.abs(h_u - h_v)
+        hadamard = h_u * h_v
+        pair_repr = torch.cat([h_u, h_v, diff, hadamard, bilinear_out], dim=1)
+        return self.classifier(pair_repr)
+
+    def forward(self, x, edge_index, edge_label_index):
+        z = self.encode(x, edge_index)
+        src, dst = edge_label_index
+        return self.decode(z, src, dst)
+
 # Backwards compatibility alias
 GATLinkPredictor = GNNLinkPredictor

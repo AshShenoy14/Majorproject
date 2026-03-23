@@ -20,3 +20,5 @@ fastapi
 uvicorn
 xgboost
 python-multipart
+google-generativeai
+python-dotenv

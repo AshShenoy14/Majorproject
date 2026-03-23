@@ -6,7 +6,22 @@ diseases, drug targets, and the TransGraph-PPI system.
 
 import re
 import random
+import os
 from typing import Optional, Dict, List
+import google.generativeai as genai
+from dotenv import load_dotenv
+
+# Load environment variables (for GEMINI_API_KEY)
+load_dotenv()
+
+# Configure Gemini
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
+    MODEL = genai.GenerativeModel('gemini-1.5-pro')
+else:
+    MODEL = None
+    print("Warning: GEMINI_API_KEY not found in .env. Falling back to rule-based assistant.")
 
 
 # --- Curated Protein Knowledge Base ---
@@ -181,20 +196,45 @@ class ProteinAssistant:
 
     def answer(self, question: str) -> dict:
         """
-        Process a user question and return an informative answer.
+        Process a user question using Gemini AI or fallback to rule-based logic.
         """
         q = question.lower().strip()
 
-        # 1. Check for greetings
+        # 1. Check for greetings (keep it snappy)
         if q in ["hi", "hello", "hey", "help", "start"]:
             return self.get_greeting()
 
-        # 2. Check for specific protein queries
+        # 2. Try Gemini AI if configured
+        if MODEL:
+            try:
+                # Prepare context from our curated knowledge
+                context = "You are a Protein Biology Expert for the TransGraph-PPI project. "
+                context += "Use the following curated knowledge if relevant, but answer the user's specific question naturally.\n\n"
+                
+                # Sample some knowledge for context (don't send everything to save tokens/time)
+                relevant_keys = [k for k in PROTEIN_KNOWLEDGE.keys() if k.lower() in q]
+                for k in relevant_keys:
+                    context += f"Protein {k}: {PROTEIN_KNOWLEDGE[k]['function']}\n"
+                
+                prompt = f"{context}\n\nUser Question: {question}\n\nAssistant:"
+                
+                response = MODEL.generate_content(prompt)
+                
+                if response and response.text:
+                    return {
+                        "response": response.text,
+                        "suggestions": random.sample(SUGGESTIONS, 3),
+                        "sources": ["Google Gemini AI", "TransGraph-PPI Knowledge Base"]
+                    }
+            except Exception as e:
+                print(f"Gemini AI Error: {e}")
+                # Fall through to rule-based
+
+        # 3. Rule-based fallback (original logic)
         protein_result = self._search_protein(q)
         if protein_result:
             return protein_result
 
-        # 3. Check general FAQ topics
         faq_result = self._search_faq(q)
         if faq_result:
             return faq_result
