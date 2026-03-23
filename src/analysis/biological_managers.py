@@ -15,7 +15,7 @@ class BiologicalManager:
     def _load_cache(self) -> pd.DataFrame:
         if self.cache_path.exists():
             return pd.read_csv(self.cache_path).fillna("")
-        return pd.DataFrame(columns=["protein_id", "uniprot_id", "localization", "pathways"])
+        return pd.DataFrame(columns=["protein_id", "uniprot_id", "localization", "pathways", "families", "domains"])
 
     def _save_cache(self):
         self.cache_df.to_csv(self.cache_path, index=False)
@@ -25,18 +25,30 @@ class BiologicalManager:
         Fetches localization and pathway info for proteins.
         protein_ids: List of ENSP IDs.
         """
+        # Identify IDs that are either truly missing OR have empty new fields
         existing = self.cache_df[self.cache_df["protein_id"].isin(protein_ids)]
-        found_ids = set(existing["protein_id"].unique())
-        missing_ids = [p for p in protein_ids if p not in found_ids]
-
-        if not missing_ids or not fetch_missing:
+        
+        # A protein needs fetching if it's not in cache OR if its new fields are empty
+        to_fetch_ids = []
+        for pid in protein_ids:
+            row = existing[existing["protein_id"] == pid]
+            if row.empty:
+                to_fetch_ids.append(pid)
+            else:
+                # Re-fetch if family/domain info is missing (migration case)
+                if not str(row.iloc[0].get("families", "")).strip() and not str(row.iloc[0].get("domains", "")).strip():
+                    to_fetch_ids.append(pid)
+                    # Remove from existing so it gets replaced
+                    existing = existing[existing["protein_id"] != pid]
+        
+        if not to_fetch_ids or not fetch_missing:
             return existing
 
         # Map ENSP -> UniProt
-        mapping = self.mapper.ensp_to_uniprot(missing_ids)
+        mapping = self.mapper.ensp_to_uniprot(to_fetch_ids)
         
         # Fallback: Search UniProt for missing mappings (e.g. if TSV is incomplete)
-        unmapped = [p for p in missing_ids if p not in mapping]
+        unmapped = [p for p in to_fetch_ids if p not in mapping]
         if unmapped and fetch_missing:
             print(f"Fallback: Searching UniProt for {len(unmapped)} unmapped IDs...")
             for p in unmapped:
@@ -61,7 +73,7 @@ class BiologicalManager:
                 # Fetch from UniProt
                 params = {
                     "query": f"accession:{uni}",
-                    "fields": "accession,cc_subcellular_location,cc_pathway",
+                    "fields": "accession,cc_subcellular_location,cc_pathway,cc_similarity,cc_domain",
                     "format": "json"
                 }
                 resp = requests.get(self.uniprot_url, params=params, timeout=10)
@@ -76,17 +88,24 @@ class BiologicalManager:
                                 for loc in comment.get("subcellularLocations", []):
                                     locs.append(loc.get("location", {}).get("value", ""))
                         
-                        # Extract Pathways
-                        paths = []
+                        # Extract Pathways, Families, Domains
+                        paths, families, domains = [], [], []
                         for comment in res.get("comments", []):
-                            if comment.get("commentType") == "PATHWAY":
+                            ctype = comment.get("commentType")
+                            if ctype == "PATHWAY":
                                 paths.append(comment.get("note", {}).get("texts", [{}])[0].get("value", ""))
+                            elif ctype == "SIMILARITY":
+                                families.append(comment.get("note", {}).get("texts", [{}])[0].get("value", ""))
+                            elif ctype == "DOMAIN":
+                                domains.append(comment.get("note", {}).get("texts", [{}])[0].get("value", ""))
                         
                         new_data.append({
                             "protein_id": ensp,
                             "uniprot_id": uni,
                             "localization": "; ".join(locs),
-                            "pathways": "; ".join(paths)
+                            "pathways": "; ".join(paths),
+                            "families": "; ".join(families),
+                            "domains": "; ".join(domains)
                         })
             except Exception as e:
                 print(f"Error fetching bio meta for {uni}: {e}")
@@ -98,61 +117,66 @@ class BiologicalManager:
 
         return self.cache_df[self.cache_df["protein_id"].isin(protein_ids)]
 
-    def check_localization_compatibility(self, p1_id: str, p2_id: str, fetch_missing: bool = True) -> Dict[str, Any]:
+    def check_biological_compatibility(self, p1_id: str, p2_id: str, fetch_missing: bool = True) -> Dict[str, Any]:
         """
-        Checks if two proteins have overlapping subcellular localizations and returns a score.
-        Score 1.0: Clear overlap
-        Score 0.5: Missing data or weak overlap (e.g. Nucleus vs Nucleolus)
-        Score 0.1: No overlap
+        Checks if two proteins have compatible subcellular localizations AND 
+        identifies 'Similarity Traps' (e.g. two co-chaperones with similar domains).
         """
         meta = self.get_bio_metadata([p1_id, p2_id], fetch_missing=fetch_missing)
         if len(meta) < 2:
-            return {"compatible": True, "score": 0.5, "reason": "Insufficient localization data", "p1_locs": [], "p2_locs": []}
+            return {"compatible": True, "score": 0.5, "reason": "Insufficient biological data", "p1_locs": [], "p2_locs": []}
         
         row1 = meta[meta["protein_id"] == p1_id].iloc[0]
         row2 = meta[meta["protein_id"] == p2_id].iloc[0]
         
+        # 1. Localization Check
         l1 = set([x.strip().lower() for x in str(row1["localization"]).split(";") if x.strip()])
         l2 = set([x.strip().lower() for x in str(row2["localization"]).split(";") if x.strip()])
         
-        if not l1 or not l2:
-            return {"compatible": True, "score": 0.5, "reason": "Missing localization for one or both proteins", "p1_locs": list(l1), "p2_locs": list(l2)}
+        loc_score = 0.5
+        if l1 and l2:
+            intersection = l1.intersection(l2)
+            if len(intersection) > 0:
+                loc_score = 1.0
+                # Nucleolar bias correction
+                is_p1_nucleolar = any("nucleolus" in loc for loc in l1)
+                is_p2_nucleolar = any("nucleolus" in loc for loc in l2)
+                if is_p1_nucleolar != is_p2_nucleolar: loc_score = 0.7
+            else:
+                loc_score = 0.1
         
-        intersection = l1.intersection(l2)
+        # 2. Similarity Trap Detection (TTC1/DNAJC7 Guard)
+        trap_penalty = 0.0
+        f1, f2 = str(row1.get("families", "")).lower(), str(row2.get("families", "")).lower()
+        d1, d2 = str(row1.get("domains", "")).lower(), str(row2.get("domains", "")).lower()
         
-        # High-level compatibility: Shared location
-        if len(intersection) > 0:
-            # Granular Check: Nucleus vs Nucleolus
-            # If one is ONLY in the nucleolus and the other is in the nucleus but NOT nucleolus
-            is_p1_nucleolar = any("nucleolus" in loc for loc in l1)
-            is_p2_nucleolar = any("nucleolus" in loc for loc in l2)
+        # Rule: If they share "Chaperone" or "TPR" language but aren't in the same complex
+        # Note: This is a heuristical penalty to force the Graph model to be the tie-breaker
+        chaperone_keywords = ["chaperone", "tpr", "tetratricopeptide", "heat shock", "dna j", "hsp"]
+        is_p1_chap = any(k in f1 or k in d1 for k in chaperone_keywords)
+        is_p2_chap = any(k in f2 or k in d2 for k in chaperone_keywords)
+        
+        reason = "Shared localization found" if loc_score > 0.5 else "Localization mismatch"
+        
+        if is_p1_chap and is_p2_chap:
+            # Trap detected! Both are chaperones/TPR proteins. 
+            # We penalize the bio-score to force the ensemble to rely on Graph evidence.
+            trap_penalty = 0.4
+            loc_score = max(0.2, loc_score - trap_penalty)
+            reason = "Potential 'Similarity Trap' detected: both proteins are co-chaperones/TPR proteins. Reducing confidence in absence of strong graph evidence."
             
-            if is_p1_nucleolar != is_p2_nucleolar:
-                # One is nucleolar, the other isn't. Weakened compatibility.
-                return {
-                    "compatible": True, 
-                    "score": 0.7, 
-                    "intersection": list(intersection),
-                    "reason": "One protein is nucleolar-specific; partial overlap in nucleus.",
-                    "p1_locs": list(l1), "p2_locs": list(l2)
-                }
-            
-            return {
-                "compatible": True, 
-                "score": 1.0, 
-                "intersection": list(intersection),
-                "reason": "Strong shared localization found",
-                "p1_locs": list(l1), "p2_locs": list(l2)
-            }
-        
         return {
-            "compatible": False,
-            "score": 0.1,
-            "intersection": [],
+            "compatible": loc_score > 0.3,
+            "score": loc_score,
+            "reason": reason,
             "p1_locs": list(l1),
             "p2_locs": list(l2),
-            "reason": "No shared subcellular localization found"
+            "trap_penalty": trap_penalty
         }
+
+    def check_localization_compatibility(self, p1_id: str, p2_id: str, fetch_missing: bool = True) -> Dict[str, Any]:
+        """Backwards compatibility alias for the new logic"""
+        return self.check_biological_compatibility(p1_id, p2_id, fetch_missing)
     def calculate_pathway_vulnerability(self, p1_id: str, p2_id: str, delta_score: float) -> Dict[str, Any]:
         """
         Estimates the risk to biological pathways if this interaction is disrupted.

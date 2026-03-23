@@ -49,12 +49,14 @@ class PPIEnsemble:
         """
         X = self._build_features(base_preds_1, base_preds_2, bio_features)
         
-        # Give higher weight to hard negatives: where seq says YES (>0.8) and Graph says NO (<0.5) but label is NO
+        # Give higher weight to hard negatives: where seq says YES (>0.8) and label is NO 
+        # and there's a significant gap (>0.2) with the Graph Model's prediction.
         weights = np.ones(len(labels))
-        hard_negatives = (base_preds_1 > 0.8) & (base_preds_2 < 0.5) & (labels == 0)
-        weights[hard_negatives] = 10.0  # Force XGBoost to care 10x more about these specific hard boundaries!
+        seq_graph_gap = base_preds_1 - base_preds_2
+        hard_negatives = (base_preds_1 > 0.8) & (labels == 0) & (seq_graph_gap > 0.2)
+        weights[hard_negatives] = 15.0  # Force XGBoost to care more about these specific traps!
         
-        print(f"Training XGBoost Meta-Learner with {X.shape[1]} features...")
+        print(f"Training XGBoost Meta-Learner with {X.shape[1]} features and {np.sum(weights > 1)} high-weight samples...")
         self.meta_model = xgb.XGBClassifier(
             n_estimators=100,
             max_depth=4,

@@ -68,7 +68,8 @@ def analyze_case(p1, p2):
             
     # Ensemble
     ens = PPIEnsemble(str(MODELS_DIR / "ensemble_model.pkl"))
-    bio_score = 1.0 if loc1 == loc2 and loc1 != "" else 0.0
+    bio_comp = bio_mgr.check_biological_compatibility(p1, p2)
+    bio_score = bio_comp.get("score", 0.5)
     
     # 2. SHAP Explanation
     explainer = PPIExplainer(str(MODELS_DIR / "ensemble_model.pkl"))

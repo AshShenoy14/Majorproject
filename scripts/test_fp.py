@@ -15,7 +15,7 @@ from src.data.feature_extraction import ESMFeatureExtractor
 from src.utils.bio_encoder import BioFeatureEncoder
 
 def main():
-    p1 = "ENSP00000265350"
+    p1 = "ENSP00000226574"
     p2 = "ENSP00000326767"
     device = "cuda:0" if torch.cuda.is_available() else "cpu"
     print(f"Device: {device}")
