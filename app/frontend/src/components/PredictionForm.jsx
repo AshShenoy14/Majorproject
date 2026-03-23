@@ -31,6 +31,7 @@ import {
 import InteractionVisualizer from './InteractionVisualizer';
 import ProteinViewer from './ProteinViewer';
 import MutationScanner from './MutationScanner';
+import ResidueInteractionGraph from './ResidueInteractionGraph';
 import html2pdf from 'html2pdf.js';
 
 const inputBoxStyles = (isDark) => ({
@@ -157,14 +158,27 @@ const PredictionForm = () => {
     const element = document.getElementById('prediction-report');
     if (!element) return;
 
+    // Use specific options for professional PDF output
     const opt = {
-      margin: 0.5,
-      filename: `PPI_Report_${id1}_${id2}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, backgroundColor: isDark ? '#0a192f' : '#f4f6f8' },
-      jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+      margin: [0.5, 0.5],
+      filename: `TransGraph_PPI_Report_${id1 || 'Analysis'}.pdf`,
+      image: { type: 'jpeg', quality: 1.0 },
+      html2canvas: { 
+        scale: 2, 
+        useCORS: true, 
+        backgroundColor: '#ffffff', // Force white for professional PDF
+        logging: false,
+        letterRendering: true
+      },
+      jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
     };
-    html2pdf().set(opt).from(element).save();
+
+    // Temporarily add a "Printing" class to handle special alignment if needed
+    element.classList.add('is-printing');
+    
+    html2pdf().set(opt).from(element).save().then(() => {
+      element.classList.remove('is-printing');
+    });
   };
 
   const handleSubmit = async (e) => {
@@ -235,9 +249,9 @@ const PredictionForm = () => {
         boxShadow: isDark ? '0 24px 48px rgba(0,0,0,0.25)' : '0 24px 48px rgba(0,0,0,0.06)',
       }}
     >
-      <Grid container spacing={4}>
+      <Stack spacing={4}>
         {/* Input Section */}
-        <Grid item xs={12} md={6}>
+        <Box>
           <Typography variant="h4" gutterBottom sx={{
             fontWeight: 800,
             background: isDark
@@ -421,10 +435,12 @@ const PredictionForm = () => {
               <Alert severity="error" variant="filled" sx={{ mt: 3 }}>{error}</Alert>
             </Fade>
           )}
-        </Grid>
+        </Box>
+
+        <Divider sx={{ opacity: 0.1 }} />
 
         {/* Results Section */}
-        <Grid item xs={12} md={6} sx={{ borderLeft: { md: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}` }, pl: { md: 5 } }}>
+        <Box>
           <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             <AnimatePresence mode="wait">
               {!result && !loading && (
@@ -471,21 +487,61 @@ const PredictionForm = () => {
                   component={motion.div}
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
-                  sx={{ p: 2, bgcolor: isDark ? 'rgba(0,0,0,0.2)' : '#fff', borderRadius: 2 }}
+                  sx={{ 
+                    p: 4, 
+                    bgcolor: isDark ? 'rgba(0,0,0,0.3)' : '#fff', 
+                    borderRadius: 3,
+                    position: 'relative',
+                    // Print-specific styles
+                    '@media print': {
+                      bgcolor: '#fff !important',
+                      color: '#000 !important',
+                      p: '2cm !important',
+                      boxShadow: 'none !important',
+                      border: 'none !important'
+                    }
+                  }}
                 >
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: -2, '@media print': { display: 'none' } }}>
+                    <Button
+                      variant="outlined"
+                      color="secondary"
+                      size="small"
+                      startIcon={<InfoIcon />}
+                      onClick={handleExportPDF}
+                      sx={{ 
+                        borderRadius: '20px',
+                        fontSize: '0.7rem',
+                        px: 2,
+                        textTransform: 'none',
+                        borderWidth: '1px !important'
+                      }}
+                    >
+                      Export PDF
+                    </Button>
+                  </Box>
+
+                  {/* PDF Only Header */}
+                  <Box className="pdf-header" sx={{ 
+                    display: 'none', 
+                    flexDirection: 'column', 
+                    alignItems: 'center', 
+                    mb: 4,
+                    borderBottom: '2px solid #00e5ff',
+                    pb: 2,
+                    '.is-printing &': { display: 'flex' }
+                  }}>
+                    <Typography variant="h4" sx={{ color: '#00695c', fontWeight: 800 }}>TransGraph-PPI</Typography>
+                    <Typography variant="subtitle2" color="text.secondary">Protein-Protein Interaction Analysis Report</Typography>
+                    <Typography variant="caption" sx={{ mt: 1 }}>Generated on: {new Date().toLocaleDateString()}</Typography>
+                  </Box>
+
                   {batchResults.length > 1 && (
                     <Alert severity="success" sx={{ mb: 2 }}>
-                      Batch processed successfully! Showing first pair. Check history or implement a viewer to see the other {batchResults.length - 1} results.
+                      Batch processed successfully! Check history or implement a viewer to see the other {batchResults.length - 1} results.
                     </Alert>
                   )}
-                  <Button
-                    variant="contained"
-                    color="secondary"
-                    onClick={handleExportPDF}
-                    sx={{ mt: 2 }}
-                  >
-                    Export as PDF
-                  </Button>
+                  
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <Box>
                       <Typography variant="h6">Probability</Typography>
@@ -582,6 +638,27 @@ const PredictionForm = () => {
                     </Grid>
                   </Box>
                   
+                  {/* Residue Interaction Graphs for Topology Visualization */}
+                  <Box>
+                    <Typography variant="subtitle2" color="text.secondary" gutterBottom>Sequence Topology Networks</Typography>
+                    <Grid container spacing={2}>
+                      <Grid item xs={12} md={6}>
+                        <ResidueInteractionGraph 
+                          proteinId={id1 || "Protein A"} 
+                          sequence={seq1 || result.protein1_seq} 
+                          isDark={isDark} 
+                        />
+                      </Grid>
+                      <Grid item xs={12} md={6}>
+                        <ResidueInteractionGraph 
+                          proteinId={id2 || "Protein B"} 
+                          sequence={seq2 || result.protein2_seq} 
+                          isDark={isDark} 
+                        />
+                      </Grid>
+                    </Grid>
+                  </Box>
+                  
                   {/* Novelty 1: Localization Feasibility */}
                   {feasibility && (
                     <Alert 
@@ -628,8 +705,8 @@ const PredictionForm = () => {
               )}
             </AnimatePresence>
           </Box>
-        </Grid>
-      </Grid>
+        </Box>
+      </Stack>
     </Paper>
   );
 };

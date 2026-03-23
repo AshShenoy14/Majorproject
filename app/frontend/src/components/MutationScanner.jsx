@@ -12,14 +12,13 @@ import {
   Stack,
   Alert,
   IconButton,
-  Tooltip,
-  Divider
+  CircularProgress,
+  Paper
 } from '@mui/material';
 import {
   Science as ScienceIcon,
   Add as AddIcon,
   Delete as DeleteIcon,
-  InfoOutlined as InfoIcon,
   KeyboardDoubleArrowUp as EnhancingIcon,
   KeyboardDoubleArrowDown as DisruptingIcon,
   Minimize as NeutralIcon
@@ -34,6 +33,8 @@ const MutationScanner = ({ protein1, protein2, isDark }) => {
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [vulnerability, setVulnerability] = useState(null);
+  const [designing, setDesigning] = useState(false);
 
   const addMutation = () => {
     setMutations([...mutations, { protein: 1, pos: '', orig: '', mut: '' }]);
@@ -49,6 +50,33 @@ const MutationScanner = ({ protein1, protein2, isDark }) => {
     setMutations(mutations.filter((_, i) => i !== index));
   };
 
+  const handleOptimize = async (mode = 'disrupt') => {
+    if (!protein1.seq || !protein2.seq) {
+      setError("Sequence data is required for optimization.");
+      return;
+    }
+    setDesigning(true);
+    setError(null);
+    try {
+      const resp = await axios.post('http://localhost:8000/analysis/optimize', {
+        protein1_id: protein1.id,
+        protein1_seq: protein1.seq,
+        protein2_id: protein2.id,
+        protein2_seq: protein2.seq
+      }, { params: { mode } });
+      
+      const suggestions = resp.data.suggestions;
+      setMutations(suggestions.map(s => ({
+        protein: 1, pos: s.pos, orig: s.orig, mut: s.mut
+      })));
+      setResults(null); 
+    } catch (err) {
+      setError("AI Optimizer unavailable.");
+    } finally {
+      setDesigning(false);
+    }
+  };
+
   const handleScan = async () => {
     if (!protein1.seq || !protein2.seq) {
       setError("Sequence data is required for mutation scanning.");
@@ -57,6 +85,7 @@ const MutationScanner = ({ protein1, protein2, isDark }) => {
 
     setLoading(true);
     setError(null);
+    setVulnerability(null);
     try {
       const payload = {
         protein1_id: protein1.id,
@@ -72,6 +101,15 @@ const MutationScanner = ({ protein1, protein2, isDark }) => {
 
       const resp = await axios.post('http://localhost:8000/analysis/mutate', payload);
       setResults(resp.data.mutation_results);
+
+      // Check Pathway Vulnerability for the most disruptive mutation
+      const maxDisrupt = resp.data.mutation_results.sort((a, b) => a.impact_delta - b.impact_delta)[0];
+      if (maxDisrupt && maxDisrupt.impact_delta < -0.1) {
+          const vResp = await axios.get('http://localhost:8000/analysis/vulnerability', {
+              params: { p1: protein1.id, p2: protein2.id, delta: maxDisrupt.impact_delta }
+          });
+          setVulnerability(vResp.data);
+      }
     } catch (err) {
       setError(err.response?.data?.detail || "Failed to scan mutations.");
     } finally {
@@ -80,9 +118,9 @@ const MutationScanner = ({ protein1, protein2, isDark }) => {
   };
 
   const getImpactColor = (delta) => {
-    if (delta < -0.05) return '#f44336'; // Disruptive
-    if (delta > 0.05) return '#4caf50';  // Enhancing
-    return '#757575'; // Neutral
+    if (delta < -0.05) return '#f44336';
+    if (delta > 0.05) return '#4caf50';
+    return '#757575';
   };
 
   const getImpactIcon = (delta) => {
@@ -163,20 +201,47 @@ const MutationScanner = ({ protein1, protein2, isDark }) => {
             ))}
             
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
-              <Button size="small" startIcon={<AddIcon />} onClick={addMutation}>Add Mutation</Button>
+              <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                <Button 
+                   size="small" 
+                   startIcon={<ScienceIcon />} 
+                   onClick={() => handleOptimize('disrupt')}
+                   disabled={designing}
+                   color="secondary"
+                >
+                  {designing ? <CircularProgress size={16} /> : 'AI Suggest Inhibition'}
+                </Button>
+                <Button size="small" startIcon={<AddIcon />} onClick={addMutation}>Add Row</Button>
+              </Box>
               <Button 
                 variant="contained" 
                 size="medium" 
                 onClick={handleScan}
                 disabled={loading}
-                sx={{ borderRadius: '20px', px: 4 }}
+                sx={{ borderRadius: '20px', px: 4, fontWeight: 'bold' }}
               >
-                {loading ? <CircularProgress size={20} /> : 'Scan Impact'}
+                {loading ? <CircularProgress size={20} /> : 'Biological Scan'}
               </Button>
             </Box>
           </Stack>
         </CardContent>
       </Card>
+
+      {vulnerability && (
+          <Alert 
+            severity={vulnerability.risk_level === 'High' ? 'error' : 'warning'} 
+            sx={{ mt: 2, borderRadius: 2 }}
+            variant="filled"
+          >
+            <Typography variant="subtitle2" fontWeight="bold">Pathway Vulnerability Alert: {vulnerability.risk_level} Risk</Typography>
+            <Typography variant="body2">{vulnerability.description}</Typography>
+            {vulnerability.affected_pathways.length > 0 && (
+                <Box sx={{ mt: 1 }}>
+                    <Typography variant="caption" sx={{ opacity: 0.9 }}>Potentially affected: {vulnerability.affected_pathways.slice(0, 3).join(", ")}...</Typography>
+                </Box>
+            )}
+          </Alert>
+      )}
 
       {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
 

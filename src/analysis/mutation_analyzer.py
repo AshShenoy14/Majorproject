@@ -71,3 +71,62 @@ class MutationAnalyzer:
             "protein2": p2_id,
             "mutation_results": results
         }
+    def suggest_optimal_mutations(self, 
+                                 p1_id: str, p1_seq: str, 
+                                 p2_id: str, p2_seq: str, 
+                                 mode: str = 'disrupt', # 'disrupt' or 'stabilize'
+                                 top_n: int = 5) -> Dict[str, Any]:
+        """
+        Suggests mutations that most strongly disrupt or stabilize the interaction.
+        Uses a heuristic search around predicted hotspots.
+        """
+        # 1. First, find hotspots to narrow search space
+        from src.analysis.hotspot_analyzer import HotspotAnalyzer
+        ha = HotspotAnalyzer(self.seq_model, self.esm_extractor)
+        hotspots = ha.identify_hotspots(p1_id, p1_seq, p2_id, p2_seq)
+        
+        # 2. Pick top positions based on impact
+        impacts = hotspots['protein1']['residue_impact']
+        # Get indices of top 3 impact positions
+        top_positions = np.argsort(impacts)[-3:][::-1]
+        
+        candidates = []
+        amino_acids = "ACDEFGHIKLMNPQRSTVWY"
+        
+        # 3. Test substitutions at these positions
+        with torch.no_grad():
+            base_embs = self.esm_extractor.get_embeddings({p1_id: p1_seq, p2_id: p2_seq}, batch_size=2)
+            e1_base = base_embs[p1_id].unsqueeze(0).to(self.device).float()
+            e2_base = base_embs[p2_id].unsqueeze(0).to(self.device).float()
+            base_score = torch.sigmoid(self.seq_model(e1_base, e2_base)).item()
+
+            for pos in top_positions:
+                orig_aa = p1_seq[pos]
+                for mut_aa in amino_acids:
+                    if mut_aa == orig_aa: continue
+                    
+                    # Create mutated sequence
+                    mut_seq = p1_seq[:pos] + mut_aa + p1_seq[pos+1:]
+                    mut_embs = self.esm_extractor.get_embeddings({p1_id: mut_seq}, batch_size=1)
+                    e1_mut = mut_embs[p1_id].unsqueeze(0).to(self.device).float()
+                    mut_score = torch.sigmoid(self.seq_model(e1_mut, e2_base)).item()
+                    
+                    candidates.append({
+                        "pos": int(pos + 1),
+                        "orig": orig_aa,
+                        "mut": mut_aa,
+                        "score": mut_score,
+                        "delta": mut_score - base_score
+                    })
+        
+        # 4. Sort and return
+        if mode == 'disrupt':
+            candidates.sort(key=lambda x: x['delta'])
+        else:
+            candidates.sort(key=lambda x: x['delta'], reverse=True)
+            
+        return {
+            "mode": mode,
+            "base_score": base_score,
+            "suggestions": candidates[:top_n]
+        }
