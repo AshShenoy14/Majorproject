@@ -64,9 +64,11 @@ async def load_system():
     # Feature Extractor
     models["esm"] = ESMFeatureExtractor(device=device)
     
-    # Sequence Model
+    # Sequence Model — auto-detect input_dim from ESM model
     seq_path = PROJECT_ROOT / "models" / "sequence_model_best.pth"
-    models["seq_model"] = SequencePPIModel(input_dim=320).to(device)
+    input_dim = models["esm"].model.config.hidden_size
+    print(f"Detected ESM embedding dimension: {input_dim}")
+    models["seq_model"] = SequencePPIModel(input_dim=input_dim).to(device)
     if seq_path.exists():
         models["seq_model"].load_state_dict(torch.load(seq_path, map_location=device))
         models["seq_model"].eval()
@@ -168,23 +170,25 @@ async def predict_interaction(pair: ProteinPair):
             idx1 = data_cache["mapping"].get(p1, None) if "mapping" in data_cache else None
             idx2 = data_cache["mapping"].get(p2, None) if "mapping" in data_cache else None
             
-            append_nodes = []
-            if idx1 is None:
-                idx1 = x_graph.shape[0]
-                append_nodes.append(e1.view(1, -1))
-            if idx2 is None:
-                idx2 = x_graph.shape[0] + len(append_nodes)
-                append_nodes.append(e2.view(1, -1))
-                
-            if append_nodes:
-                # Inductive step: dynamically inject new unseen node embeddings to the graph 
-                # (isolated nodes that will self-loop in GAT)
-                x_graph = torch.cat([x_graph] + append_nodes, dim=0)
-                
-            edge_label_index = torch.tensor([[idx1], [idx2]], dtype=torch.long).to(models["esm"].device)
-            
             with torch.no_grad():
-                g_out = models["graph_model"](x_graph, edge_index, edge_label_index)
+                # Pre-compute GAT node embeddings for efficiency
+                if "gat_embeddings" not in data_cache:
+                    data_cache["gat_embeddings"] = models["graph_model"].encode(x_graph, edge_index)
+                
+                # Get z1
+                if idx1 is not None:
+                    z1 = data_cache["gat_embeddings"][idx1].unsqueeze(0)
+                else:
+                    z1 = models["graph_model"].encode_sequences(e1)
+                    
+                # Get z2
+                if idx2 is not None:
+                    z2 = data_cache["gat_embeddings"][idx2].unsqueeze(0)
+                else:
+                    z2 = models["graph_model"].encode_sequences(e2)
+                    
+                # Decode
+                g_out = models["graph_model"].decode_from_embeddings(z1, z2)
                 graph_prob = torch.sigmoid(g_out).item()
         
         # 5. Ensemble Prediction

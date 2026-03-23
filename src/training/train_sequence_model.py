@@ -3,7 +3,11 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 import argparse
+import numpy as np
 from tqdm import tqdm
+from sklearn.metrics import (
+    average_precision_score, f1_score, precision_score, recall_score
+)
 import os
 import sys
 
@@ -54,14 +58,30 @@ def train(epochs: int = 30, batch_size: int = 64, lr: float = 1e-3, embedding_pa
     print(f"Dataset: {len(train_dataset)} train / {len(val_dataset)} val samples")
     print(f"Batch size: {batch_size} | Total train batches/epoch: {len(train_loader)}")
 
+    # ── Compute class weights for imbalanced data ────────────────────────
+    train_labels_all = train_dataset.df['label'].values
+    n_pos = (train_labels_all == 1).sum()
+    n_neg = (train_labels_all == 0).sum()
+    if n_pos > 0 and n_neg > 0:
+        pos_weight = torch.tensor([n_neg / n_pos], dtype=torch.float32).to(device)
+        print(f"Class balance: {n_pos} pos / {n_neg} neg → pos_weight={pos_weight.item():.3f}")
+    else:
+        pos_weight = torch.tensor([1.0], dtype=torch.float32).to(device)
+        print(f"⚠ Single-class data detected — pos_weight=1.0")
+
     # ── Model, Optimizer, Loss ───────────────────────────────────────────
-    # Use hardcoded input_dim=320 for esm2_t6_8M_UR50D embeddings (after mean-pooling)
-    input_dim = 320
+    # Auto-detect embedding dimension from loaded embeddings
+    sample_emb = next(iter(embeddings.values()))
+    if sample_emb.dim() > 1:
+        input_dim = sample_emb.shape[-1]  # per-residue embeddings
+    else:
+        input_dim = sample_emb.shape[0]   # already mean-pooled
+    print(f"Detected embedding dimension: {input_dim}")
 
     model     = SequencePPIModel(input_dim=input_dim).to(device)
     optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=1e-4)
-    # BCEWithLogitsLoss combines sigmoid + BCE for numerical stability
-    criterion = nn.BCEWithLogitsLoss()
+    # BCEWithLogitsLoss with pos_weight to handle class imbalance
+    criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
     # Cosine annealing scheduler for smooth LR decay
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-5)
 
@@ -123,6 +143,8 @@ def train(epochs: int = 30, batch_size: int = 64, lr: float = 1e-3, embedding_pa
         val_loss    = 0.0
         val_correct = 0
         val_total   = 0
+        all_val_labels = []
+        all_val_probs  = []
 
         with torch.no_grad():
             for emb1, emb2, labels in val_loader:
@@ -132,12 +154,26 @@ def train(epochs: int = 30, batch_size: int = 64, lr: float = 1e-3, embedding_pa
                 val_loss += loss.item()
 
                 # Apply sigmoid for accuracy calculation (model outputs raw logits)
-                predicted = (torch.sigmoid(outputs) > 0.5).float()
+                probs = torch.sigmoid(outputs)
+                predicted = (probs > 0.5).float()
                 val_total   += labels.size(0)
                 val_correct += (predicted == labels).sum().item()
 
+                all_val_labels.extend(labels.cpu().numpy().flatten())
+                all_val_probs.extend(probs.cpu().numpy().flatten())
+
         avg_val_loss = val_loss / len(val_loader) if len(val_loader) > 0 else 0.0
         val_acc      = val_correct / val_total if val_total > 0 else 0.0
+
+        # Compute advanced metrics (AUPRC, F1, Precision, Recall)
+        val_labels_np = np.array(all_val_labels)
+        val_probs_np  = np.array(all_val_probs)
+        val_preds_np  = (val_probs_np > 0.5).astype(float)
+
+        val_auprc     = average_precision_score(val_labels_np, val_probs_np) if len(np.unique(val_labels_np)) > 1 else 0.0
+        val_f1        = f1_score(val_labels_np, val_preds_np, zero_division=0)
+        val_precision = precision_score(val_labels_np, val_preds_np, zero_division=0)
+        val_recall    = recall_score(val_labels_np, val_preds_np, zero_division=0)
 
         # Step LR scheduler
         scheduler.step()
@@ -148,9 +184,11 @@ def train(epochs: int = 30, batch_size: int = 64, lr: float = 1e-3, embedding_pa
             f"Epoch [{epoch+1}/{epochs}] | "
             f"Train Loss: {avg_train_loss:.4f} | "
             f"Val Loss: {avg_val_loss:.4f} | "
-            f"Val Acc: {val_acc:.4f} | "
-            f"LR: {current_lr:.6f} | "
-            f"Best Val Loss: {best_val_loss:.4f}"
+            f"Acc: {val_acc:.4f} | "
+            f"AUPRC: {val_auprc:.4f} | "
+            f"F1: {val_f1:.4f} | "
+            f"P: {val_precision:.4f} R: {val_recall:.4f} | "
+            f"LR: {current_lr:.6f}"
         )
         print(f"  Progress: {epoch+1}/{epochs} epochs done "
               f"({(epoch+1)/epochs*100:.0f}%) — {epochs - epoch - 1} remaining")

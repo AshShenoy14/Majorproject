@@ -89,7 +89,10 @@ def run_cv(data_path, embedding_path, k_folds=5, epochs=5, batch_size=32):
         "pr_auc": []
     }
 
-    input_dim = 320
+    # Auto-detect embedding dimension from loaded embeddings
+    sample_emb = next(iter(embeddings.values()))
+    input_dim = sample_emb.shape[-1] if sample_emb.dim() > 1 else sample_emb.shape[0]
+    print(f"Detected embedding dimension: {input_dim}")
 
     for fold, (train_ids, val_ids) in enumerate(kfold.split(full_dataset)):
         print(f"\nFold {fold+1}/{k_folds}")

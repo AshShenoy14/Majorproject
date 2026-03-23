@@ -53,6 +53,13 @@ class PPIEnsemble:
                 print(f"    → Ensemble will rely heavily on the other model.")
 
         print(f"Training XGBoost Meta-Learner with {X.shape[1]} features...")
+
+        # Compute scale_pos_weight for class imbalance
+        n_pos = (labels == 1).sum()
+        n_neg = (labels == 0).sum()
+        spw = n_neg / n_pos if n_pos > 0 else 1.0
+        print(f"  Class balance: {n_pos} pos / {n_neg} neg → scale_pos_weight={spw:.3f}")
+
         self.meta_model = xgb.XGBClassifier(
             n_estimators=200,
             max_depth=4,
@@ -61,6 +68,7 @@ class PPIEnsemble:
             colsample_bytree=0.8,
             reg_alpha=0.1,
             reg_lambda=1.0,
+            scale_pos_weight=spw,
             objective='binary:logistic',
             eval_metric='logloss',
             use_label_encoder=False,

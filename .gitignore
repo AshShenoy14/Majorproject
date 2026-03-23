@@ -35,3 +35,4 @@ checkpoints/
 TRAINING_COMPARISON_ANALYSIS.md
 GAT_TRAINING_ANALYSIS_REPORT.md
 master_training_log.txt
+*.png

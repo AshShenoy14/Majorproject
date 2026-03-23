@@ -1,247 +1,321 @@
-import torch
+"""
+Compare models with leakage detection and honest metrics.
+"""
+
 import pandas as pd
 import numpy as np
-import joblib
+import torch
 import os
 import sys
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, average_precision_score
+from tqdm import tqdm
 from tabulate import tabulate
+from sklearn.metrics import (
+    accuracy_score, precision_score, recall_score,
+    f1_score, roc_auc_score, average_precision_score,
+    roc_curve
+)
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
 from src.models.sequence_model import SequencePPIModel
 from src.models.graph_model import GATLinkPredictor
-from src.analysis.explainability import PPIExplainer
 from src.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT
-
-EVAL_LABEL = "P Test"
-
-def find_optimal_threshold(y_true, y_prob, method="f1"):
-    best_thresh = 0.5
-    best_score = -1
-
-    for thresh in np.arange(0.1, 0.91, 0.01):
-        y_pred = (y_prob > thresh).astype(int)
-        if method == "f1":
-            score = f1_score(y_true, y_pred, zero_division=0)
-        elif method == "youden":
-            tp = np.sum((y_pred == 1) & (y_true == 1))
-            tn = np.sum((y_pred == 0) & (y_true == 0))
-            fp = np.sum((y_pred == 1) & (y_true == 0))
-            fn = np.sum((y_pred == 0) & (y_true == 1))
-            tpr = tp / (tp + fn) if (tp + fn) > 0 else 0
-            fpr = fp / (fp + tn) if (fp + tn) > 0 else 0
-            score = tpr - fpr
-
-        if score > best_score:
-            best_score = score
-            best_thresh = thresh
-
-    return best_thresh, best_score
+from src.analysis.explainability import PPIExplainer
 
 
-def evaluate_models():
+def check_leakage():
+    """Verify no protein leakage between train and test."""
+    train_df = pd.read_csv(PROCESSED_DATA_DIR / "train.csv")
+    test_df = pd.read_csv(PROCESSED_DATA_DIR / "test.csv")
+
+    train_proteins = (set(train_df['protein1']) |
+                      set(train_df['protein2']))
+    test_proteins = (set(test_df['protein1']) |
+                     set(test_df['protein2']))
+
+    overlap = train_proteins & test_proteins
+    overlap_ratio = len(overlap) / len(test_proteins) if test_proteins else 0
+
+    print(f"\n=== Leakage Check ===")
+    print(f"Train proteins: {len(train_proteins)}")
+    print(f"Test proteins:  {len(test_proteins)}")
+    print(f"Overlap:        {len(overlap)} ({overlap_ratio:.1%})")
+
+    if overlap_ratio > 0.5:
+        print("⚠️  HIGH OVERLAP — metrics are INFLATED!")
+        print("   Run: python src/data/split_dataset.py")
+        print("   Then retrain both models.\n")
+        return False
+    elif overlap_ratio > 0:
+        print(f"⚠️  Some overlap exists ({len(overlap)} proteins)")
+        return True
+    else:
+        print("✓  CLEAN — no protein leakage")
+        return True
+
+
+def check_graph_leakage():
+    """Verify test edges are NOT in the message-passing graph."""
+    graph_path = PROCESSED_DATA_DIR / "ppi_graph.pt"
+    map_path = PROCESSED_DATA_DIR / "ppi_graph_mapping.pt"
+    test_path = PROCESSED_DATA_DIR / "test.csv"
+
+    if not all(p.exists() for p in [graph_path, map_path, test_path]):
+        print("Cannot check graph leakage — files missing")
+        return
+
+    graph_data = torch.load(graph_path, weights_only=False)
+    node_mapping = torch.load(map_path, weights_only=False)
+    test_df = pd.read_csv(test_path)
+
+    # Get graph edges as set of pairs
+    ei = graph_data.edge_index.numpy()
+    graph_edges = set()
+    for i in range(ei.shape[1]):
+        pair = (min(ei[0, i], ei[1, i]), max(ei[0, i], ei[1, i]))
+        graph_edges.add(pair)
+
+    # Check how many test positive edges are in graph
+    leaked = 0
+    total_test_pos = 0
+
+    for _, row in test_df[test_df['label'] == 1].iterrows():
+        p1, p2 = row['protein1'], row['protein2']
+        if p1 in node_mapping and p2 in node_mapping:
+            u, v = node_mapping[p1], node_mapping[p2]
+            pair = (min(u, v), max(u, v))
+            total_test_pos += 1
+            if pair in graph_edges:
+                leaked += 1
+
+    print(f"\n=== Graph Edge Leakage ===")
+    print(f"Test positive edges: {total_test_pos}")
+    print(f"Found in graph:      {leaked}")
+
+    if leaked > 0:
+        print(f"⚠️  {leaked} test edges LEAKED into graph!")
+        print("   Retrain with: python src/training/train_graph.py")
+    else:
+        print("✓  CLEAN — no test edges in graph")
+
+
+def evaluate():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"[{EVAL_LABEL}] Evaluating models on {device}...")
+    print(f"Evaluating on {device}...\n")
+
+    # Check for leakage FIRST
+    is_clean = check_leakage()
+    check_graph_leakage()
+
+    if not is_clean:
+        print("\n" + "=" * 60)
+        print("FIX LEAKAGE BEFORE TRUSTING THESE METRICS")
+        print("=" * 60 + "\n")
 
     # Load test data
-    test_path = PROCESSED_DATA_DIR / "test.csv"
-    if not test_path.exists():
-        print(f"[{EVAL_LABEL}] Test data not found at {test_path}")
-        return
+    test_df = pd.read_csv(PROCESSED_DATA_DIR / "test.csv")
+    embeddings = torch.load(PROCESSED_DATA_DIR / "embeddings.pt",
+                            weights_only=False)
+    embeddings = {k: v.float() if v.dtype == torch.float16 else v
+                  for k, v in embeddings.items()}
+    node_mapping = torch.load(PROCESSED_DATA_DIR / "ppi_graph_mapping.pt",
+                              weights_only=False)
 
-    test_df = pd.read_csv(test_path)
-    print(f"[{EVAL_LABEL}] Loaded {len(test_df)} test samples.")
+    # Auto-detect embedding dimension from loaded embeddings
+    sample_emb = next(iter(embeddings.values()))
+    input_dim = sample_emb.shape[-1] if sample_emb.dim() > 1 else sample_emb.shape[0]
+    print(f"Detected embedding dimension: {input_dim}")
 
-    # Load embeddings and mapping
-    emb_path = PROCESSED_DATA_DIR / "embeddings.pt"
-    map_path = PROCESSED_DATA_DIR / "ppi_graph_mapping.pt"
-    graph_data_path = PROCESSED_DATA_DIR / "ppi_graph.pt"
-
-    if not emb_path.exists() or not map_path.exists() or not graph_data_path.exists():
-        print(f"[{EVAL_LABEL}] Required processed data (embeddings, mapping, graph) missing.")
-        return
-
-    embeddings = torch.load(emb_path, map_location="cpu", weights_only=False)
-    embeddings = {k: v.float() if v.dtype == torch.float16 else v for k, v in embeddings.items()}
-    node_mapping = torch.load(map_path, map_location="cpu", weights_only=False)
-    graph_data = torch.load(graph_data_path, map_location="cpu", weights_only=False)
-
-    filtered_df = test_df[
-        test_df["protein1"].isin(embeddings) &
-        test_df["protein2"].isin(embeddings) &
-        test_df["protein1"].isin(node_mapping) &
-        test_df["protein2"].isin(node_mapping)
-    ].copy()
-
-    print(f"[{EVAL_LABEL}] {len(filtered_df)} valid samples after filtering.")
-
-    # Load Models
-    seq_path = PROJECT_ROOT / "models" / "sequence_model_best.pth"
-    graph_model_path = PROJECT_ROOT / "models" / "graph_model_best.pth"
-    ensemble_path = PROJECT_ROOT / "models" / "ensemble_model.pkl"
-
-    input_dim = 320
+    # Load sequence model
     seq_model = SequencePPIModel(input_dim=input_dim).to(device)
-    if seq_path.exists():
-        seq_model.load_state_dict(torch.load(seq_path, map_location=device))
+    seq_model.load_state_dict(torch.load(
+        PROJECT_ROOT / "models" / "sequence_model_best.pth",
+        map_location=device
+    ))
     seq_model.eval()
 
-        # Load GAT config (auto-saved during training)
-    gat_config_path = PROJECT_ROOT / "models" / "graph_model_config.pt"
-    if gat_config_path.exists():
-        gat_config = torch.load(gat_config_path, map_location="cpu", weights_only=False)
-        gat_hidden = gat_config["hidden_channels"]
-        gat_heads = gat_config.get("heads", 4)
-        print(f"GAT config loaded: hidden={gat_hidden}, heads={gat_heads}")
-    else:
-        gat_hidden = 64
-        gat_heads = 4
-        print("GAT config not found — using defaults: hidden=64, heads=4")
-
-    graph_model = GATLinkPredictor(
-        in_channels=graph_data.x.shape[1],
-        hidden_channels=gat_hidden,
-        heads=gat_heads,
+    graph_data = torch.load(
+        PROCESSED_DATA_DIR / "ppi_graph.pt", weights_only=False
     ).to(device)
-    if graph_model_path.exists():
-        graph_model.load_state_dict(torch.load(graph_model_path, map_location=device))
+
+    # Load graph model
+    config = torch.load(
+        PROJECT_ROOT / "models" / "graph_model_config.pt",
+        map_location="cpu", weights_only=False
+    )
+    graph_model = GATLinkPredictor(
+        in_channels=config["in_channels"],
+        hidden_channels=config["hidden_channels"],
+        heads=config.get("heads", 4),
+    ).to(device)
+    graph_model.load_state_dict(torch.load(
+        PROJECT_ROOT / "models" / "graph_model_best.pth",
+        map_location=device
+    ))
     graph_model.eval()
 
+    # Load ensemble
+    ensemble_path = PROJECT_ROOT / "models" / "ensemble_model.pkl"
     ensemble_model = None
     if ensemble_path.exists():
+        import joblib
         ensemble_model = joblib.load(ensemble_path)
 
-    # Prepare batch data
-    batch_emb1 = []
-    batch_emb2 = []
-    g_src = []
-    g_dst = []
-    labels = []
+    # Separate: proteins IN graph vs NOT in graph
+    known_rows = []
+    novel_rows = []
 
-    for _, row in filtered_df.iterrows():
-        p1, p2, label = row["protein1"], row["protein2"], row["label"]
-        e1 = embeddings[p1]
-        e2 = embeddings[p2]
-        batch_emb1.append(e1.mean(dim=0) if e1.dim() > 1 else e1)
-        batch_emb2.append(e2.mean(dim=0) if e2.dim() > 1 else e2)
-        g_src.append(node_mapping[p1])
-        g_dst.append(node_mapping[p2])
-        labels.append(label)
+    for _, row in test_df.iterrows():
+        p1, p2 = row['protein1'], row['protein2']
+        if p1 not in embeddings or p2 not in embeddings:
+            continue
 
-    labels = np.array(labels)
-    batch_emb1 = torch.stack(batch_emb1)
-    batch_emb2 = torch.stack(batch_emb2)
+        in_graph = (p1 in node_mapping and p2 in node_mapping)
+        if in_graph:
+            known_rows.append(row)
+        else:
+            novel_rows.append(row)
 
-    # Predict Sequence
-    seq_preds = []
+    print(f"\nTest split: {len(known_rows)} known-protein pairs, "
+          f"{len(novel_rows)} novel-protein pairs")
+
+    # Pre-compute GAT node embeddings
     with torch.no_grad():
-        batch_size = 64
-        for i in range(0, len(batch_emb1), batch_size):
-            e1 = batch_emb1[i:i+batch_size].to(device)
-            e2 = batch_emb2[i:i+batch_size].to(device)
-            out = seq_model(e1, e2)
-            probs = torch.sigmoid(out)
-            seq_preds.extend(probs.cpu().numpy().flatten())
-    seq_preds = np.array(seq_preds)
+        z_gat = graph_model.encode(
+            graph_data.x, graph_data.edge_index
+        )
+        # Using batch size for sequence embeddings mapped to gat space
+        all_prots = list(embeddings.keys())
+        prot_to_idx = {p: i for i, p in enumerate(all_prots)}
+        emb_matrix = []
+        for p in all_prots:
+            e = embeddings[p]
+            emb_matrix.append(e.mean(0) if e.dim() > 1 else e)
+        emb_matrix = torch.stack(emb_matrix)
 
-    # Predict Graph
-    g_edge_label_index = torch.tensor([g_src, g_dst], dtype=torch.long)
-    graph_x = graph_data.x.to(device)
-    graph_edge_index = graph_data.edge_index.to(device)
-    graph_preds = []
-    with torch.no_grad():
-        batch_size = 10000
-        for i in range(0, g_edge_label_index.size(1), batch_size):
-            chunk = g_edge_label_index[:, i:i+batch_size].to(device)
-            out = graph_model(graph_x, graph_edge_index, chunk)
-            probs = torch.sigmoid(out)
-            graph_preds.extend(probs.cpu().numpy().flatten())
-    graph_preds = np.array(graph_preds)
+        fallback_embs_list = []
+        bs = 1000
+        for i in range(0, len(emb_matrix), bs):
+            fblk = graph_model.encode_sequences(emb_matrix[i:i+bs].to(device))
+            fallback_embs_list.append(fblk)
+        fallback_embs = torch.cat(fallback_embs_list, dim=0)
 
-    # Predict Ensemble
-    ens_preds = None
-    if ensemble_model:
-        conf_seq = np.abs(seq_preds - 0.5)
-        conf_gat = np.abs(graph_preds - 0.5)
-        disagreement = np.abs(seq_preds - graph_preds)
-        X = np.column_stack((seq_preds, graph_preds, conf_seq, conf_gat, disagreement))
-        ens_preds = ensemble_model.predict_proba(X)[:, 1]
+    # Evaluate on BOTH subsets
+    for subset_name, rows in [("Known Proteins", known_rows),
+                              ("Novel Proteins", novel_rows),
+                              ("All Test", known_rows + novel_rows)]:
+        if not rows:
+            print(f"\n{subset_name}: No samples")
+            continue
 
-    # Metrics helper
-    def calc_metrics(y_true, y_prob, threshold=0.5):
-        y_pred = (y_prob > threshold).astype(int)
-        return [
-            accuracy_score(y_true, y_pred),
-            precision_score(y_true, y_pred, zero_division=0),
-            recall_score(y_true, y_pred, zero_division=0),
-            f1_score(y_true, y_pred, zero_division=0),
-            roc_auc_score(y_true, y_prob),
-            average_precision_score(y_true, y_prob)
-        ]
+        df_subset = pd.DataFrame(rows)
+        labels = df_subset['label'].values
 
-    # === P Test Results (threshold=0.5) ===
-    results = []
-    results.append(["ESM-MLP"] + calc_metrics(labels, seq_preds))
-    results.append(["GAT"] + calc_metrics(labels, graph_preds))
-    if ens_preds is not None:
-        results.append(["Ensemble"] + calc_metrics(labels, ens_preds))
+        # Sequence predictions
+        seq_preds = []
+        graph_preds = []
 
-    headers = ["Model", "Accuracy", "Precision", "Recall", "F1", "ROC-AUC", "PR-AUC"]
-    print(f"\n=== {EVAL_LABEL} Results (threshold=0.5) ===")
-    print(tabulate(results, headers=headers, floatfmt=".4f", tablefmt="grid"))
+        with torch.no_grad():
+            bs = 128
+            for i in tqdm(range(0, len(df_subset), bs), desc=f"Predicting {subset_name}"):
+                batch_rows = df_subset.iloc[i:i+bs]
+                
+                # Fetch Esm embeddings
+                e1_batch = []
+                e2_batch = []
+                b1_idx = []
+                b2_idx = []
+                b1_known = []
+                b2_known = []
+                
+                for _, row in batch_rows.iterrows():
+                    p1, p2 = row['protein1'], row['protein2']
+                    e1 = embeddings[p1]
+                    e2 = embeddings[p2]
+                    e1_batch.append(e1.mean(0) if e1.dim() > 1 else e1)
+                    e2_batch.append(e2.mean(0) if e2.dim() > 1 else e2)
+                    
+                    if p1 in node_mapping:
+                        b1_known.append(True)
+                        b1_idx.append(node_mapping[p1])
+                    else:
+                        b1_known.append(False)
+                        b1_idx.append(prot_to_idx[p1])
+                        
+                    if p2 in node_mapping:
+                        b2_known.append(True)
+                        b2_idx.append(node_mapping[p2])
+                    else:
+                        b2_known.append(False)
+                        b2_idx.append(prot_to_idx[p2])
 
-    # === P Test Optimal Threshold Tuning (F1) ===
-    print(f"\n=== {EVAL_LABEL} Optimal Threshold Tuning (F1-maximizing) ===")
-    tuning_results = []
+                e1_tens = torch.stack(e1_batch).to(device)
+                e2_tens = torch.stack(e2_batch).to(device)
+                
+                # Seq Pred
+                out = seq_model(e1_tens, e2_tens)
+                seq_preds.extend(torch.sigmoid(out).cpu().numpy().flatten())
+                
+                # Graph Pred
+                z1_batch = []
+                z2_batch = []
+                for j in range(len(b1_idx)):
+                    if b1_known[j]:
+                        z1_batch.append(z_gat[b1_idx[j]])
+                    else:
+                        z1_batch.append(fallback_embs[b1_idx[j]])
+                        
+                    if b2_known[j]:
+                        z2_batch.append(z_gat[b2_idx[j]])
+                    else:
+                        z2_batch.append(fallback_embs[b2_idx[j]])
+                
+                z1_tens = torch.stack(z1_batch).to(device)
+                z2_tens = torch.stack(z2_batch).to(device)
+                
+                g_out = graph_model.decode_from_embeddings(z1_tens, z2_tens)
+                graph_preds.extend(torch.sigmoid(g_out).cpu().numpy().flatten())
 
-    for name, preds in [("ESM-MLP", seq_preds), ("GAT", graph_preds)]:
-        best_t, best_f1 = find_optimal_threshold(labels, preds, method="f1")
-        tuned_metrics = calc_metrics(labels, preds, threshold=best_t)
-        tuning_results.append([name, best_t] + tuned_metrics)
-
-    if ens_preds is not None:
-        best_t, best_f1 = find_optimal_threshold(labels, ens_preds, method="f1")
-        tuned_metrics = calc_metrics(labels, ens_preds, threshold=best_t)
-        tuning_results.append(["Ensemble", best_t] + tuned_metrics)
-
-    tuning_headers = ["Model", "Best Thresh", "Accuracy", "Precision", "Recall", "F1", "ROC-AUC", "PR-AUC"]
-    print(tabulate(tuning_results, headers=tuning_headers, floatfmt=".4f", tablefmt="grid"))
-
-    # === P Test Youden's Index ===
-    print(f"\n=== {EVAL_LABEL} Optimal Threshold (Youden's J) ===")
-    youden_results = []
-    for name, preds in [("ESM-MLP", seq_preds), ("GAT", graph_preds)]:
-        best_t, best_j = find_optimal_threshold(labels, preds, method="youden")
-        tuned_metrics = calc_metrics(labels, preds, threshold=best_t)
-        youden_results.append([name, best_t, best_j] + tuned_metrics)
-
-    if ens_preds is not None:
-        best_t, best_j = find_optimal_threshold(labels, ens_preds, method="youden")
-        tuned_metrics = calc_metrics(labels, ens_preds, threshold=best_t)
-        youden_results.append(["Ensemble", best_t, best_j] + tuned_metrics)
-
-    youden_headers = ["Model", "Best Thresh", "Youden J", "Accuracy", "Precision", "Recall", "F1", "ROC-AUC", "PR-AUC"]
-    print(tabulate(youden_results, headers=youden_headers, floatfmt=".4f", tablefmt="grid"))
-
-    # SHAP
-    if ensemble_model:
-        print(f"\n[{EVAL_LABEL}] Generating SHAP Summary Plot...")
-        try:
-            explainer = PPIExplainer(str(ensemble_path))
+        seq_preds = np.array(seq_preds)
+        graph_preds = np.array(graph_preds)
+        
+        # Predict Ensemble (With 5 features including disagreement)
+        ens_preds = None
+        if ensemble_model:
             conf_seq = np.abs(seq_preds - 0.5)
             conf_gat = np.abs(graph_preds - 0.5)
             disagreement = np.abs(seq_preds - graph_preds)
-            X_shap = np.column_stack((seq_preds, graph_preds, conf_seq, conf_gat, disagreement))
-            explainer.save_summary_plot(
-                X_shap,
-                title=f"SHAP Summary Plot ({EVAL_LABEL})",
-                output_path=str(PROJECT_ROOT / "data" / "processed" / "plots" / "shap_summary.png")
-            )
-        except Exception as e:
-            print(f"SHAP generation failed: {e}")
-            print("Skipping SHAP plot. Metrics above are still valid.")
+            X = np.column_stack((seq_preds, graph_preds, conf_seq, conf_gat, disagreement))
+            try:
+                ens_preds = ensemble_model.predict_proba(X)[:, 1]
+            except Exception:
+                # Fallback to 4 features just in case
+                X_fallback = np.column_stack((seq_preds, graph_preds, conf_seq, conf_gat))
+                ens_preds = ensemble_model.predict_proba(X_fallback)[:, 1]
+
+        # Metrics
+        print(f"\n=== {subset_name} (n={len(labels)}) ===")
+        results = []
+        
+        def calc_met(ypreds):
+            binary = (ypreds > 0.5).astype(int)
+            return [
+                accuracy_score(labels, binary),
+                precision_score(labels, binary, zero_division=0),
+                recall_score(labels, binary, zero_division=0),
+                f1_score(labels, binary, zero_division=0),
+                roc_auc_score(labels, ypreds),
+                average_precision_score(labels, ypreds)
+            ]
+            
+        results.append(["Sequence"] + calc_met(seq_preds))
+        results.append(["GAT"] + calc_met(graph_preds))
+        if ens_preds is not None:
+            results.append(["Ensemble"] + calc_met(ens_preds))
+
+        headers = ["Model", "Accuracy", "Precision", "Recall", "F1", "ROC-AUC", "PR-AUC"]
+        print(tabulate(results, headers=headers, floatfmt=".4f", tablefmt="grid"))
 
 
 if __name__ == "__main__":
-    evaluate_models()
+    evaluate()

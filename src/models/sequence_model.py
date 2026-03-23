@@ -14,33 +14,33 @@ class SequencePPIModel(nn.Module):
     apply torch.sigmoid() only at inference.
     """
 
-    def __init__(self, input_dim: int = 320, hidden_dim: int = 256, dropout: float = 0.3):
+    def __init__(self, input_dim: int = 320, hidden_dim: int = 256, dropout: float = 0.4):
         super().__init__()
 
         # Shared encoder — weight-tied across both proteins
         # Projects raw ESM embeddings into discriminative space
         self.protein_encoder = nn.Sequential(
             nn.Linear(input_dim, hidden_dim),
-            nn.BatchNorm1d(hidden_dim),
-            nn.GELU(),
+            nn.LayerNorm(hidden_dim),
+            nn.ReLU(),
             nn.Dropout(dropout),
-            nn.Linear(hidden_dim, hidden_dim),
-            nn.BatchNorm1d(hidden_dim),
-            nn.GELU(),
+            nn.Linear(hidden_dim, hidden_dim // 2),
+            nn.LayerNorm(hidden_dim // 2),
+            nn.ReLU(),
             nn.Dropout(dropout),
         )
 
         # Interaction classifier
-        # Input: [h1 || h2 || h1*h2 || |h1-h2|] = hidden_dim * 4
+        # Input: [h1 || h2 || h1*h2 || |h1-h2|] = (hidden_dim // 2) * 4 = hidden_dim * 2
         self.classifier = nn.Sequential(
-            nn.Linear(hidden_dim * 4, hidden_dim),
-            nn.BatchNorm1d(hidden_dim),
-            nn.GELU(),
+            nn.Linear(hidden_dim * 2, hidden_dim),
+            nn.LayerNorm(hidden_dim),
+            nn.ReLU(),
             nn.Dropout(dropout),
             nn.Linear(hidden_dim, hidden_dim // 2),
-            nn.BatchNorm1d(hidden_dim // 2),
-            nn.GELU(),
-            nn.Dropout(dropout * 0.5),
+            nn.LayerNorm(hidden_dim // 2),
+            nn.ReLU(),
+            nn.Dropout(dropout),
             nn.Linear(hidden_dim // 2, 1),
         )
 

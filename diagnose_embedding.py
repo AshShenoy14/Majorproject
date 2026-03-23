@@ -7,8 +7,14 @@ from src.utils.paths import PROJECT_ROOT, PROCESSED_DATA_DIR
 
 device = "cpu"
 
-# 1. Load model
-model = SequencePPIModel(input_dim=320).to(device)
+# Auto-detect embedding dimension from embeddings
+embs_peek = torch.load(PROCESSED_DATA_DIR / "embeddings.pt", weights_only=False)
+sample_emb = next(iter(embs_peek.values()))
+input_dim = sample_emb.shape[-1] if sample_emb.dim() > 1 else sample_emb.shape[0]
+del embs_peek
+print(f"Detected embedding dimension: {input_dim}")
+
+model = SequencePPIModel(input_dim=input_dim).to(device)
 seq_path = PROJECT_ROOT / "models" / "sequence_model_best.pth"
 model.load_state_dict(torch.load(seq_path, map_location=device, weights_only=True))
 model.eval()

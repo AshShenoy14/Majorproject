@@ -27,7 +27,14 @@ def train_ensemble(seq_model_path, graph_model_path, graph_data_path):
     # 1. Load Base Models
     print("Loading base models...")
 
-    input_dim = 320
+    # Auto-detect embedding dimension from loaded embeddings
+    emb_path = PROCESSED_DATA_DIR / "embeddings.pt"
+    embeddings_peek = torch.load(emb_path, weights_only=False)
+    sample_emb = next(iter(embeddings_peek.values()))
+    input_dim = sample_emb.shape[-1] if sample_emb.dim() > 1 else sample_emb.shape[0]
+    del embeddings_peek  # free memory
+    print(f"Detected embedding dimension: {input_dim}")
+
     seq_model = SequencePPIModel(input_dim=input_dim).to(device)
     try:
         if os.path.exists(seq_model_path):
