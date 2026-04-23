@@ -89,27 +89,37 @@ const Predict = () => {
           <h2 className="text-2xl font-bold text-slate-800">New PPI Prediction</h2>
         </div>
 
-        <form onSubmit={handlePredict} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Protein A ID <TooltipIcon text="Ensembl Protein ID (e.g. ENSP...)" /></label>
-              <input
-                type="text"
-                value={protein1}
-                onChange={(e) => setProtein1(e.target.value)}
-                placeholder="Enter ENSP ID..."
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-scientific-primary outline-none transition-all"
-              />
+        <form onSubmit={handlePredict} className="space-y-10">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="space-y-3">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Protein Alpha <TooltipIcon text="Primary Ensembl Protein ID" /></label>
+              <div className="relative group">
+                <input
+                  type="text"
+                  value={protein1}
+                  onChange={(e) => setProtein1(e.target.value)}
+                  placeholder="ENSP..."
+                  className="w-full px-6 py-4 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:ring-4 focus:ring-scientific-primary/10 focus:border-scientific-primary outline-none transition-all font-bold text-slate-700 placeholder:text-slate-300"
+                />
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-scientific-primary transition-colors">
+                  <Activity size={18} />
+                </div>
+              </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Protein B ID <TooltipIcon text="The partner protein to test interaction against." /></label>
-              <input
-                type="text"
-                value={protein2}
-                onChange={(e) => setProtein2(e.target.value)}
-                placeholder="Enter ENSP ID..."
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-scientific-primary outline-none transition-all"
-              />
+            <div className="space-y-3">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Protein Beta <TooltipIcon text="Secondary Ensembl Protein ID" /></label>
+              <div className="relative group">
+                <input
+                  type="text"
+                  value={protein2}
+                  onChange={(e) => setProtein2(e.target.value)}
+                  placeholder="ENSP..."
+                  className="w-full px-6 py-4 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:ring-4 focus:ring-scientific-primary/10 focus:border-scientific-primary outline-none transition-all font-bold text-slate-700 placeholder:text-slate-300"
+                />
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-scientific-primary transition-colors">
+                  <Activity size={18} />
+                </div>
+              </div>
             </div>
           </div>
 
@@ -178,12 +188,12 @@ const Predict = () => {
             className="space-y-8 pb-12"
           >
             {/* Summary Result Card */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-1 glass-card p-8 flex flex-col items-center text-center justify-center relative overflow-hidden">
-                <div className="absolute top-0 left-0 w-full h-1 bg-scientific-gradient" />
-                <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-6">Interaction Result</h3>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+              <div className="lg:col-span-1 glass-card p-10 flex flex-col items-center text-center justify-center relative overflow-hidden group">
+                <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-teal-400 via-teal-500 to-violet-500" />
+                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-10">Analysis Consensus</h3>
 
-                <div className="relative w-48 h-48 mb-6">
+                <div className="relative w-56 h-56 mb-8 group-hover:scale-105 transition-transform duration-700">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
                       <Pie
@@ -191,63 +201,63 @@ const Predict = () => {
                           { value: result.interaction_probability * 100 },
                           { value: 100 - (result.interaction_probability * 100) }
                         ]}
-                        innerRadius={60}
-                        outerRadius={80}
+                        innerRadius={70}
+                        outerRadius={90}
                         startAngle={180}
                         endAngle={-180}
                         paddingAngle={5}
                         dataKey="value"
                       >
-                        <Cell fill={result.interaction_probability > 0.5 ? "#22C55E" : "#F59E0B"} />
+                        <Cell fill={result.interaction_probability > 0.5 ? "#14B8A6" : "#F59E0B"} className="drop-shadow-lg" />
                         <Cell fill="#F1F5F9" />
                       </Pie>
                     </PieChart>
                   </ResponsiveContainer>
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-4xl font-extrabold text-slate-800">{(Number(result.interaction_probability || 0) * 100).toFixed(1)}%</span>
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Probability</span>
+                    <span className="text-5xl font-black text-slate-800 tracking-tighter">{(Number(result.interaction_probability || 0) * 100).toFixed(1)}%</span>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Probability</span>
                   </div>
                 </div>
 
-                <div className={`flex items-center gap-2 px-6 py-2 rounded-full mb-4 ${
-                  result.interaction_probability > 0.5 
-                    ? (Number(result.confidence_score) > 0.3 ? 'bg-green-50 text-green-600 border border-green-100' : 'bg-amber-50 text-amber-600 border border-amber-100')
-                    : 'bg-orange-50 text-orange-600 border border-orange-100'
-                }`}>
-                  {result.interaction_probability > 0.5 
-                    ? (Number(result.confidence_score) > 0.3 ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />)
-                    : <XCircle size={18} />
-                  }
-                  <span className="font-bold uppercase tracking-wider">
+                <div className="space-y-3 w-full">
+                  <div className={`flex items-center justify-center gap-2 px-6 py-3 rounded-2xl ${
+                    result.interaction_probability > 0.5 
+                      ? (Number(result.confidence_score) > 0.3 ? 'bg-teal-50 text-teal-700 border border-teal-100' : 'bg-amber-50 text-amber-700 border border-amber-100')
+                      : 'bg-rose-50 text-rose-700 border border-rose-100'
+                  }`}>
                     {result.interaction_probability > 0.5 
-                      ? (Number(result.confidence_score) > 0.3 ? 'Strong Interaction' : 'Interaction (Unverified)')
-                      : 'No Interaction'
+                      ? (Number(result.confidence_score) > 0.3 ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />)
+                      : <XCircle size={20} />
                     }
-                  </span>
+                    <span className="font-black text-xs uppercase tracking-widest">
+                      {result.interaction_probability > 0.5 
+                        ? (Number(result.confidence_score) > 0.3 ? 'Strong Binding' : 'Weak Consensus')
+                        : 'No Interaction'
+                      }
+                    </span>
+                  </div>
+
+                  <div className={`flex items-center justify-center gap-2 px-6 py-3 rounded-2xl ${result.explanation?.Biological_Match ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-slate-100 text-slate-400 border border-slate-200'}`}>
+                    <ShieldCheck size={18} />
+                    <span className="font-black text-[10px] uppercase tracking-widest">
+                      {result.explanation?.Biological_Match ? 'Bio-Alignment Verified' : 'No Bio-Alignment'}
+                    </span>
+                  </div>
                 </div>
 
-                <div className={`flex items-center gap-2 px-6 py-2 rounded-full mb-4 ${result.explanation?.Biological_Match ? 'bg-indigo-50 text-indigo-600 border border-indigo-100' : 'bg-slate-50 text-slate-400 border border-slate-100'}`}>
-                  <ShieldCheck size={18} />
-                  <span className="font-bold uppercase tracking-wider text-[10px]">
-                    {result.explanation?.Biological_Match ? 'Bio-Match: Compatible' : 'Bio-Match: Unverified'}
-                  </span>
-                </div>
-
-                <div className={`p-4 rounded-xl w-full mb-2 ${Number(result.confidence_score) > 0.6 ? 'bg-green-50/50' : Number(result.confidence_score) > 0.3 ? 'bg-amber-50/50' : 'bg-rose-50/50'}`}>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase">Confidence Score</span>
-                    <span className={`font-extrabold ${(Number(result.confidence_score || 0) * 100) > 60 ? 'text-green-600' : (Number(result.confidence_score || 0) * 100) > 30 ? 'text-amber-600' : 'text-rose-600'}`}>
+                <div className={`mt-8 p-5 rounded-[1.5rem] w-full ${Number(result.confidence_score) > 0.6 ? 'bg-teal-50/40' : Number(result.confidence_score) > 0.3 ? 'bg-amber-50/40' : 'bg-rose-50/40'}`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Confidence Index</span>
+                    <span className={`text-sm font-black ${(Number(result.confidence_score || 0) * 100) > 60 ? 'text-teal-600' : (Number(result.confidence_score || 0) * 100) > 30 ? 'text-amber-600' : 'text-rose-600'}`}>
                       {(Number(result.confidence_score || 0) * 100).toFixed(1)}%
                     </span>
                   </div>
-                  {Number(result.confidence_score) < 0.3 && (
-                    <p className="text-[10px] text-rose-500 font-medium mt-1 leading-tight">
-                      ⚠️ Caution: Low consensus between sequence and graph signals. High risk of false positive.
-                    </p>
-                  )}
-                </div>
-                <div className="text-[10px] text-slate-400 flex items-center justify-center gap-1">
-                  <Info size={10} /> Statistical reliability metric
+                  <div className="h-1 w-full bg-slate-200/50 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full transition-all duration-1000 ${Number(result.confidence_score) > 0.6 ? 'bg-teal-500' : Number(result.confidence_score) > 0.3 ? 'bg-amber-500' : 'bg-rose-500'}`}
+                      style={{ width: `${Number(result.confidence_score) * 100}%` }}
+                    />
+                  </div>
                 </div>
               </div>
 

@@ -21,70 +21,106 @@
     background-color: var(--color-scientific-background);
     color: #1e293b;
     @apply font-sans antialiased;
-    background-image: 
-      radial-gradient(at 0% 0%, rgba(13, 148, 136, 0.05) 0, transparent 50%), 
-      radial-gradient(at 50% 0%, rgba(124, 58, 237, 0.05) 0, transparent 50%), 
-      radial-gradient(at 100% 0%, rgba(8, 145, 178, 0.05) 0, transparent 50%);
+    position: relative;
     min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: url('/molecular_bg.png');
+    background-size: cover;
+    background-position: center;
+    opacity: 0.12; /* Slightly higher opacity for visibility but still low */
+    z-index: -1;
+    pointer-events: none;
+  }
+
+  body::after {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle at 50% 50%, transparent 0%, var(--color-scientific-background) 100%);
+    opacity: 0.6;
+    z-index: -1;
+    pointer-events: none;
   }
 }
 
 @layer components {
   /* Use standard CSS classes for components that need to be reused */
   .glass-card {
-    background-color: rgba(255, 255, 255, 0.7);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    box-shadow: var(--shadow-glass);
-    border-radius: 1rem;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    background-color: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(12px) saturate(180%);
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.05);
+    border-radius: 1.5rem;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .glass-card:hover {
     background-color: rgba(255, 255, 255, 0.8);
-    box-shadow: 0 10px 40px 0 rgba(31, 38, 135, 0.15);
-    transform: translateY(-2px);
+    box-shadow: 0 15px 45px 0 rgba(31, 38, 135, 0.08);
+    transform: translateY(-4px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
   }
 
   .btn-primary {
-    @apply px-4 py-2 bg-scientific-primary text-white rounded-xl font-medium transition-all duration-300 hover:bg-teal-700 hover:shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer;
+    @apply px-6 py-3 bg-scientific-primary text-white rounded-2xl font-bold transition-all duration-300 hover:shadow-xl hover:shadow-teal-500/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2;
   }
 
   .btn-secondary {
-    @apply px-4 py-2 bg-white/50 text-scientific-primary border border-scientific-primary/20 rounded-xl font-medium transition-all duration-300 hover:bg-scientific-primary/10 active:scale-95 cursor-pointer;
+    @apply px-6 py-3 bg-white/40 backdrop-blur-md text-scientific-primary border border-scientific-primary/10 rounded-2xl font-bold transition-all duration-300 hover:bg-white/60 active:scale-95 cursor-pointer flex items-center justify-center gap-2;
   }
 
   .scientific-sidebar {
     position: fixed;
-    left: 0;
-    top: 0;
+    left: 1.5rem;
+    top: 1.5rem;
+    bottom: 1.5rem;
     width: 16rem;
-    height: 100vh;
     z-index: 50;
-    border-radius: 0;
-    border-right: 1px solid rgba(255, 255, 255, 0.1);
-    background-color: rgba(255, 255, 255, 0.8);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    border-radius: 2rem;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    background-color: rgba(255, 255, 255, 0.6);
+    backdrop-filter: blur(24px) saturate(160%);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
     display: flex;
     flex-direction: column;
-    box-shadow: 4px 0 24px 0 rgba(0, 0, 0, 0.02);
+    box-shadow: 0 10px 40px 0 rgba(0, 0, 0, 0.03);
+    overflow: hidden;
   }
 
   .nav-item {
-    @apply flex items-center gap-3 px-4 py-3 mx-2 my-1 rounded-xl transition-all duration-200 text-slate-600 hover:bg-scientific-primary/10 hover:text-scientific-primary;
+    @apply flex items-center gap-3 px-4 py-3 mx-3 my-1 rounded-xl transition-all duration-300 text-slate-500 font-medium hover:bg-white/50 hover:text-scientific-primary;
   }
 
   .nav-item.active {
-    @apply bg-scientific-primary/20 text-scientific-primary font-semibold;
+    @apply bg-scientific-primary text-white font-bold shadow-lg shadow-teal-500/20;
+  }
+
+  .section-title {
+    @apply text-3xl font-black text-slate-800 tracking-tight mb-2;
+  }
+
+  .section-subtitle {
+    @apply text-slate-500 font-medium tracking-wide mb-8;
   }
 }
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
@@ -92,26 +128,30 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background-color: #e2e8f0;
+  background-color: rgba(13, 148, 136, 0.1);
   border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background-color: #cbd5e1;
+  background-color: rgba(13, 148, 136, 0.3);
 }
 
 /* Preloader Transitions */
 .content-fade-in {
-  animation: fadeIn 1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  animation: fadeIn 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
 }
 
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    filter: blur(10px);
+    transform: translateY(20px);
   }
   to {
     opacity: 1;
+    filter: blur(0);
     transform: translateY(0);
   }
 }

@@ -245,14 +245,46 @@ def evaluate_models():
     graph_preds = np.array(graph_preds)
 
 
-    # Predict Ensemble — with enhanced features
+    # Predict Ensemble — with enhanced 8-feature architecture
     ens_preds = None
     if ensemble_model:
-        # Enhanced features: [seq, gat, |seq-0.5|, |gat-0.5|]
+        # Enhanced features: [seq, gat, conf_seq, conf_gat, disagreement, max_conf, consensus, bio_score]
         conf_seq = np.abs(seq_preds - 0.5)
         conf_gat = np.abs(graph_preds - 0.5)
-        X = np.column_stack((seq_preds, graph_preds, conf_seq, conf_gat))
-        ens_preds = ensemble_model.predict_proba(X)[:, 1]
+        disagreement = np.abs(seq_preds - graph_preds)
+        max_conf = np.maximum(conf_seq, conf_gat)
+        consensus = seq_preds * graph_preds
+        
+        # Calculate biological compatibility scores for test set
+        from src.analysis.biological_managers import BiologicalManager
+        bio_manager = BiologicalManager()
+        bio_scores = []
+        for _, row in tqdm(filtered_df.iterrows(), total=len(filtered_df), desc="Test Bio Analysis"):
+            p1, p2 = row["protein1"], row["protein2"]
+            comp = bio_manager.check_localization_compatibility(p1, p2, fetch_missing=False)
+            bio_scores.append(comp.get("score", 0.5))
+        
+        bio_scores_np = np.array(bio_scores)
+        
+        # Construct the 8-feature matrix
+        X = np.column_stack((
+            seq_preds, 
+            graph_preds, 
+            conf_seq, 
+            conf_gat, 
+            disagreement, 
+            max_conf, 
+            consensus,
+            bio_scores_np
+        ))
+        
+        # Predict using the updated XGBoost model
+        try:
+            ens_preds = ensemble_model.predict_proba(X)[:, 1]
+        except Exception as e:
+            print(f"  [!] Ensemble prediction failed: {e}. Falling back to 4-feature slice...")
+            # Fallback for older model compatibility if needed
+            ens_preds = ensemble_model.predict_proba(X[:, :4])[:, 1]
 
     # Calculate Metrics (default threshold 0.5)
     def calc_metrics(y_true, y_prob, threshold=0.5):

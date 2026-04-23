@@ -21,17 +21,21 @@ const Layout = ({ children }) => {
   return (
     <div className="flex min-h-screen">
       <Sidebar />
-      <main className="flex-1 ml-64 p-8 transition-all duration-300">
-        <header className="mb-8 flex justify-between items-center">
+      <main className="flex-1 ml-[19rem] mr-6 my-6 p-8 transition-all duration-300">
+        <header className="mb-10 flex justify-between items-center">
           <div>
-            <h2 className="text-sm font-bold text-scientific-primary uppercase tracking-[0.2em]">
+            <h2 className="text-xs font-black text-scientific-primary uppercase tracking-[0.3em] mb-1">
               {meta.title}
             </h2>
             {meta.subtitle && (
-              <p className="text-xs text-gray-400 mt-0.5 tracking-wide">{meta.subtitle}</p>
+              <p className="text-sm text-slate-500 font-medium tracking-tight">{meta.subtitle}</p>
             )}
           </div>
           <div className="flex items-center gap-4">
+            <div className="glass-card px-4 py-2 flex items-center gap-2 text-xs font-bold text-slate-600">
+              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+              SYSTEM ONLINE
+            </div>
           </div>
         </header>
 

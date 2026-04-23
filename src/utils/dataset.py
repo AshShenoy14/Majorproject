@@ -7,12 +7,13 @@ from typing import Dict, Union
 from src.utils.bio_encoder import BioFeatureEncoder
 
 class PPIDataset(Dataset):
-    def __init__(self, data: Union[str, pd.DataFrame], embeddings: Dict[str, torch.Tensor], bio_mapping: Dict[str, torch.Tensor] = None):
+    def __init__(self, data: Union[str, pd.DataFrame], embeddings: Dict[str, torch.Tensor], bio_mapping: Dict[str, torch.Tensor] = None, augment: bool = False):
         """
         Args:
             data: Path to the csv file OR a pandas DataFrame (protein1, protein2, label).
             embeddings: Dictionary mapping ProteinID -> Embedding.
             bio_mapping: Dictionary mapping ProteinID -> Biological Feature Vector.
+            augment: If True, enables symmetric flipping and Gaussian noise.
         """
         if isinstance(data, pd.DataFrame):
             self.df = data
@@ -21,6 +22,7 @@ class PPIDataset(Dataset):
             
         self.embeddings = embeddings
         self.bio_mapping = bio_mapping or {}
+        self.augment = augment
         self.bio_dim = 0
         if self.bio_mapping:
             first_val = next(iter(self.bio_mapping.values()))
@@ -45,6 +47,10 @@ class PPIDataset(Dataset):
         p2 = row["protein2"]
         label = row["label"]
         
+        # Symmetric flipping (Augmentation)
+        if self.augment and torch.rand(1) > 0.5:
+            p1, p2 = p2, p1
+            
         # Convert to float32 on-the-fly
         emb1 = self.embeddings[p1].float()
         emb2 = self.embeddings[p2].float()
@@ -55,6 +61,11 @@ class PPIDataset(Dataset):
         if emb2.dim() > 1:
             emb2 = emb2.mean(dim=0)
             
+        # Inject Gaussian Noise (Augmentation)
+        if self.augment:
+            emb1 = emb1 + torch.randn_like(emb1) * 0.01
+            emb2 = emb2 + torch.randn_like(emb2) * 0.01
+
         # Append Bio-Features if available
         if self.bio_mapping:
             bio1 = self.bio_mapping.get(p1, torch.zeros(self.bio_dim))

@@ -53,13 +53,29 @@ def main():
     seq_model.load_state_dict(torch.load(MODELS_DIR / "sequence_model_best.pth", map_location=device))
     seq_model.eval()
 
-    from torch_geometric.utils import degree
-    deg = degree(graph_data.edge_index[0], graph_data.x.shape[0]).view(-1, 1)
-    deg_norm = (deg - deg.mean()) / (deg.std() + 1e-6)
-    graph_data.x = torch.cat([graph_data.x, deg_norm], dim=-1)
+    # No extra features added here to maintain compatibility with trained models
 
-    graph_model = GATLinkPredictor(in_channels=graph_data.x.shape[1], hidden_channels=128).to(device)
-    graph_model.load_state_dict(torch.load(MODELS_DIR / "graph_model_best.pth", map_location=device))
+    # Graph Model — updated to support auto-detection (GAT/GIN)
+    from src.models.graph_model import GATLinkPredictor, GINLinkPredictor
+    in_channels = graph_data.x.shape[1]
+    
+    graph_model_path = MODELS_DIR / "graph_model_best.pth"
+    if graph_model_path.exists():
+        state_dict = torch.load(graph_model_path, map_location=device)
+        is_gin = any("convs" in k for k in state_dict.keys())
+        
+        if is_gin:
+            print("Detected GIN architecture for Graph Model.")
+            graph_model = GINLinkPredictor(in_channels=in_channels, hidden_channels=128).to(device)
+        else:
+            print("Detected GAT architecture for Graph Model.")
+            graph_model = GATLinkPredictor(in_channels=in_channels, hidden_channels=128, heads=4).to(device)
+            
+        graph_model.load_state_dict(state_dict)
+    else:
+        print(f"Graph model not found at {graph_model_path}. Defaulting to GAT.")
+        graph_model = GATLinkPredictor(in_channels=in_channels, hidden_channels=128, heads=4).to(device)
+    
     graph_model.eval()
 
     ensemble = PPIEnsemble(str(MODELS_DIR / "ensemble_model.pkl"))
@@ -73,10 +89,21 @@ def main():
     for _, row in filtered_df.iterrows():
         p1, p2 = row["protein1"], row["protein2"]
         e1, e2 = embeddings[p1], embeddings[p2]
-        batch_emb1.append(e1.mean(dim=0) if e1.dim() > 1 else e1)
-        batch_emb2.append(e2.mean(dim=0) if e2.dim() > 1 else e2)
+        e1_v = e1.mean(dim=0) if e1.dim() > 1 else e1
+        e2_v = e2.mean(dim=0) if e2.dim() > 1 else e2
+        
+        # Append Bio-Features (Matches train_ensemble.py logic)
+        b1 = bio_mapping.get(p1, torch.zeros(bio_dim))
+        b2 = bio_mapping.get(p2, torch.zeros(bio_dim))
+        
+        batch_emb1.append(torch.cat([e1_v, b1]))
+        batch_emb2.append(torch.cat([e2_v, b2]))
+        
+        # Restore Graph components
         g_src.append(node_mapping[p1])
         g_dst.append(node_mapping[p2])
+        
+        # Binary compatibility score for ensemble meta-learner
         loc1, loc2 = bio_df.get(p1, "unk1"), bio_df.get(p2, "unk2")
         bio_features.append([1.0 if loc1 == loc2 and loc1 != "unk1" else 0.0])
 

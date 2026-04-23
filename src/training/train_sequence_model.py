@@ -81,8 +81,8 @@ def train(
     print(f"Loaded biological features for {len(bio_mapping)} proteins.")
 
     # ── Datasets & DataLoaders ───────────────────────────────────────────
-    train_dataset = PPIDataset(PROCESSED_DATA_DIR / "train.csv", embeddings, bio_mapping=bio_mapping)
-    val_dataset   = PPIDataset(PROCESSED_DATA_DIR / "val.csv", embeddings, bio_mapping=bio_mapping)
+    train_dataset = PPIDataset(PROCESSED_DATA_DIR / "train.csv", embeddings, bio_mapping=bio_mapping, augment=True)
+    val_dataset   = PPIDataset(PROCESSED_DATA_DIR / "val.csv", embeddings, bio_mapping=bio_mapping, augment=False)
 
     train_loader = DataLoader(
         train_dataset,
@@ -205,7 +205,7 @@ def train(
             best_val_loss = avg_val_loss
             epochs_no_improve = 0
             torch.save(model.state_dict(), best_model_path)
-            print(f"  ✓ New best model saved → {best_model_path}")
+            print(f"  [OK] New best model saved -> {best_model_path}")
         else:
             epochs_no_improve += 1
             print(f"  No improvement for {epochs_no_improve}/{patience} epochs.")
@@ -219,11 +219,11 @@ def train(
             "best_val_loss": best_val_loss,
             "epochs_no_improve": epochs_no_improve,
         }, checkpoint_path)
-        print(f"  ✓ Checkpoint saved → {checkpoint_path}")
+        print(f"  [OK] Checkpoint saved -> {checkpoint_path}")
 
         # --- Early stopping ---
         if epochs_no_improve >= patience:
-            print(f"\n  ✗ Early stopping triggered after {patience} epochs without improvement.")
+            print(f"\n  [STOP] Early stopping triggered after {patience} epochs without improvement.")
             break
 
         cooldown_if_needed(cooldown_seconds)

@@ -140,15 +140,18 @@ def train(
     
     optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     
-    # Custom weighted BCE for Structural Penalty
-    def structural_bce_loss(input, target, weights):
-        # target=1: Positive, target=0: Negative
-        # we want to penalize negatives more if they are 'hard'
-        loss = F.binary_cross_entropy_with_logits(input, target, reduction='none')
-        # weights: 1.0 for hard negative, 0.5 for easy negative/positive
-        # Apply structural_penalty multiplier specifically to negatives with weight=1.0
-        weighted_loss = loss * weights * structural_penalty
-        return weighted_loss.mean()
+    # Focal Loss for handling hard negatives and boosting accuracy to 95%
+    def focal_loss(inputs, targets, alpha=0.25, gamma=2.0):
+        # inputs are logits
+        p = torch.sigmoid(inputs)
+        ce_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction="none")
+        p_t = p * targets + (1 - p) * (1 - targets)
+        loss = ce_loss * ((1 - p_t) ** gamma)
+        
+        if alpha >= 0:
+            alpha_t = alpha * targets + (1 - alpha) * (1 - targets)
+            loss = alpha_t * loss
+        return loss.mean()
 
     # Using CosineAnnealingLR for better convergence on CPU
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-6)
@@ -206,8 +209,10 @@ def train(
             
             # Predict for chunk using z_detached
             out_c = model.decode(z_detached, s_c, d_c)
-            w_c = train_weights[i:i+chunk_size]
-            loss_c = structural_bce_loss(out_c.squeeze(), lbl_c, w_c)
+            lbl_c = train_labels[i:i+chunk_size]
+            
+            # Use Focal Loss to drive accuracy higher
+            loss_c = focal_loss(out_c.squeeze(), lbl_c)
             
             # Scale loss by chunk size relative to total edges
             scaled_loss = loss_c * (len(s_c) / num_train_edges)

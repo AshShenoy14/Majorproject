@@ -75,48 +75,62 @@ const ProteinPreloader = ({ progress, onComplete }) => {
         <motion.div
           initial={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.8, ease: "easeInOut" }}
-          className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-slate-950 overflow-hidden"
+          transition={{ duration: 1.2, ease: [0.4, 0, 0.2, 1] }}
+          className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[#020617] overflow-hidden"
         >
+          {/* Ambient Background Gradient */}
+          <div className="absolute inset-0 z-0 opacity-30">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-teal-500/10 blur-[120px] rounded-full" />
+            <div className="absolute top-1/4 left-1/4 w-[400px] h-[400px] bg-violet-500/5 blur-[100px] rounded-full" />
+          </div>
+
           <div className="relative z-10 w-full flex-1 min-h-0">
             <Canvas dpr={[1, 2]}>
-              <PerspectiveCamera makeDefault position={[0, 0, 14]} />
-              <ambientLight intensity={0.5} />
-              <pointLight position={[10, 10, 10]} intensity={1} />
-              <spotLight position={[-10, 10, 10]} angle={0.15} penumbra={1} intensity={1} />
+              <PerspectiveCamera makeDefault position={[0, 0, 12]} />
+              <ambientLight intensity={0.6} />
+              <pointLight position={[10, 10, 10]} intensity={1.5} />
+              <spotLight position={[-10, 10, 10]} angle={0.15} penumbra={1} intensity={1.5} />
               <Helix />
-              <OrbitControls enableZoom={false} enablePan={false} autoRotate autoRotateSpeed={0.5} />
+              <OrbitControls enableZoom={false} enablePan={false} autoRotate autoRotateSpeed={1} />
             </Canvas>
           </div>
 
-          <div className="relative z-10 flex flex-col items-center gap-4 flex-shrink-0 pb-10">
-            <motion.h1
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.2 }}
-              className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-teal-400 to-purple-400 tracking-tight"
-            >
-              TransGraph-PPI
-            </motion.h1>
-
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 0.6 }}
-              className="text-slate-400 text-sm font-medium uppercase tracking-[0.2em]"
-            >
-              Initializing Neural Interactome
-            </motion.p>
-
-            <div className="mt-4 w-64 h-1.5 bg-slate-800 rounded-full overflow-hidden">
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: `${progress}%` }}
-                className="h-full bg-gradient-to-r from-teal-500 to-purple-500 shadow-[0_0_10px_rgba(20,184,166,0.5)]"
-              />
+          <div className="relative z-10 flex flex-col items-center gap-6 flex-shrink-0 pb-20">
+            <div className="text-center">
+              <motion.h1
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.2 }}
+                className="text-5xl font-black text-white tracking-tighter mb-2"
+              >
+                Trans<span className="text-teal-400">Graph</span>
+              </motion.h1>
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 0.5 }}
+                className="text-teal-100 text-[10px] font-black uppercase tracking-[0.4em]"
+              >
+                Neural Interactome Intelligence
+              </motion.p>
             </div>
 
-            <div className="text-slate-500 font-mono text-xs tabular-nums mt-1">
-              {Math.round(progress)}%
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-80 h-1 bg-white/5 rounded-full overflow-hidden border border-white/5">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${progress}%` }}
+                  className="h-full bg-gradient-to-r from-teal-400 via-teal-500 to-violet-500 shadow-[0_0_15px_rgba(45,212,191,0.4)]"
+                />
+              </div>
+
+              <div className="flex items-center gap-4 w-full justify-between">
+                <div className="text-[10px] text-teal-500/50 font-bold uppercase tracking-widest">
+                  {progress < 40 ? 'Synthesizing...' : progress < 80 ? 'Optimizing GNN...' : 'Finalizing...'}
+                </div>
+                <div className="text-white font-black text-xs tabular-nums tracking-wider">
+                  {Math.round(progress)}%
+                </div>
+              </div>
             </div>
           </div>
         </motion.div>

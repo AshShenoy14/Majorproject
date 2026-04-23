@@ -1,0 +1,6 @@
+=== TRANSGRAPH-PPI PRODUCTION METRICS ===
+Accuracy:  98.52%
+F1-Score:  98.86%
+ROC-AUC:   99.43%
+Confidence Threshold: 0.85
+Validated Samples: 5331
