@@ -3,10 +3,10 @@ import { NavLink } from 'react-router-dom';
 import { 
   Home, Search, Dna, Box, Share2, 
   ShieldAlert, Info, Database, Activity, 
-  Bot, Globe, Settings, Cpu
+  Bot, Globe, Settings, Cpu, X
 } from 'lucide-react';
 
-const Sidebar = () => {
+const Sidebar = ({ onClose }) => {
   const menuItems = [
     { name: 'Home', icon: <Home size={16} />, path: '/' },
     { name: 'PPI Predictor', icon: <Search size={16} />, path: '/predict' },
@@ -19,8 +19,16 @@ const Sidebar = () => {
   ];
 
   return (
-    <div className="scientific-sidebar bg-white/90 border-r border-slate-100 shadow-2xl flex flex-col h-full overflow-hidden">
+    <div className="scientific-sidebar bg-white/95 backdrop-blur-xl border-r border-slate-200 shadow-2xl flex flex-col h-full overflow-hidden relative">
       
+      {/* Close Button (only visible on mobile or when triggered) */}
+      <button 
+        onClick={onClose}
+        className="absolute top-6 right-6 p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
+      >
+        <X size={18} />
+      </button>
+
       {/* Brand Section */}
       <div className="p-10 flex flex-col gap-1 items-center">
         <div className="p-3 bg-emerald-500/10 rounded-2xl text-emerald-600 mb-2">
