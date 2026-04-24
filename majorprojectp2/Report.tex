@@ -243,7 +243,7 @@ We dedicate this page to acknowledge and thank those responsible for the shaping
 \noindent The framework integrates ESM-2 protein language model embeddings with a Graph Neural Network (GNN) – specifically a Graph Attention Network (GAT) or Graph Isomorphism Network (GIN) – through a deep stacking-based ensemble strategy using XGBoost as the meta-learner. To address dataset imbalance and enhance robustness, we implemented Focal Loss and symmetric data augmentation.
 \par
 \vspace{0.15in}
-\noindent The TransGraph-PPI framework achieves state-of-the-art performance with an accuracy of \textbf{98.52\%}, F1-score of \textbf{98.86\%}, and an ROC-AUC of \textbf{99.43\%}. Explainability is incorporated through SHAP analysis, allowing for the identification of conserved functional domains contributing to interactions. Furthermore, the predicted interaction network is analyzed using centrality measures to prioritize potential drug targets cross-referenced with ChEMBL.
+\noindent The TransGraph-PPI framework achieves state-of-the-art performance with an accuracy of \textbf{88.46\%}, F1-score of \textbf{88.48\%}, and an ROC-AUC of \textbf{95.23\%}. Explainability is incorporated through SHAP analysis, allowing for the identification of conserved functional domains contributing to interactions. Furthermore, the predicted interaction network is analyzed using centrality measures to prioritize potential drug targets cross-referenced with ChEMBL.
 \par
 \vspace{0.15in}
 \noindent The results demonstrate that TransGraph-PPI significantly outperforms traditional baselines and existing single-modality methods, providing a reliable, interpretable, and high-performance computational tool for proteomics and structural biology.
@@ -356,15 +356,14 @@ Table 2.1 presents a consolidated comparison of all ten reviewed papers, highlig
 \hline
 \textbf{Paper / Title} & \textbf{Method} & \textbf{Dataset} & \textbf{Algorithm} & \textbf{Key Results} & \textbf{Limitations} \\ \hline
 Charih et al. (2025) & Survey ML \& DL for PPI & BioGRID, STRING, IntAct, MINT & SVM, RF, CNN, RNN, Transformer PLMs & PLM embeddings improved accuracy & Dataset imbalance; cross-species generalisation limited \\ \hline
-Alkhateeb \& Awad (2023) & Review DL architectures & STRING, DIP, HPRD, HIPPIE & DNN, CNN, RNN, GCN, Ensemble & >90\% accuracy; GCNs capture topology & High cost; poor interpretability \\ \hline
-Hu \& Ohue (2024) SpatialPPIv2 & PLM + GNN structure-aware & PINDER (>1M pairs), Negatome 2.0 & ProtBERT/ProtT5/ ESM-2 + GAT & Acc. $\approx$0.91, AUROC=0.972 & Structural dependency \\ \hline
-Soleymani et al. (2023) ProtInteract & Seq.-based ConvTCN AE & STRING, Negatome 2.0 & ConvTCN-AE + CNN & 2 hrs vs. 72 hrs (LSTM) & Quality sensitive; no interpretability \\ \hline
-\c{C}elebi et al. (2023) xCAPT5 & PLM + Siamese CNN + XGBoost & Benchmark PPI datasets & T5-XL + Siamese CNN + XGBoost & Strong MCC; multi-kernel CNN gains & High GPU cost \\ \hline
-Yu et al. (2024) DeepGNHV & HV-PPI PLM + GNN + structure & BioGRID, IntAct (>30K pairs) & ProtT5 + AlphaFold2 + GAT & Strong AUROC; unseen virus generalisation & Needs AlphaFold2 static structures \\ \hline
-Alsamkary et al. (2025) & PLM arch. multi-chain affinity & PPB-Affinity (8,207) & HP + PAD with ESM/ProtT5 & HP top 7/10; 12\% Spearman gain & No structural modeling \\ \hline
-Zhang et al. (2024) ESM-GNN & PPI sites ESM-2 + GGNN & Dset186, Dset72, PPI-Pred & ESM-2 + Gated GNN + MLP & AUC=0.892, F1=0.847 & Site-level only \\ \hline
-Gao et al. (2025) PFMBench & Benchmark protein foundation models & 38 tasks, 8 categories & ESM-2, ProtT5, ESM3, ProTrek & Multimodal > seq-only; ProTrek 75\% & High compute \\ \hline
-Liu \& Zhang (2025) GLTPPI & ESM-2 + GAT + global-local topology & SHS27k, SHS148k, Yeast & ESM-2 + GAT + RW + VGAE & 0.8979/0.9355; beats baselines & Relies on network quality \\ \hline
+Mewara \& Lalwani (2022) & Survey DL approaches & Human, H. pylori, SHS & CNN, LSTM, Attention & Strong performance with attention & Ignores topological context \\ \hline
+Reim et al. (2025) & Unbiased benchmark study & Homology-reduced sets & ESM-based DL models & Performance plateaus at 0.65 accuracy & Homology data leakage in priors \\ \hline
+Cui et al. (2025) & Architecture review & 100+ studies surveyed & MLP, CNN, RNN, PLM, GNN & PLMs consistently top-perform & Hybrid seq-graph methods scarce \\ \hline
+Albu et al. (2023) MM-StackEns & Multimodal Stacking & Benchmark PPI datasets & RF, SVM, DNN Stacking & Stacking beats individual models & Lacks learned PLM/graph features \\ \hline
+Maurya \& Chatterjee (2025) & Decoder-only Transformer & Human PPI datasets & GPT-style Decoder Transformer & Competitive with encoder models & Small fine-tuning dataset \\ \hline
+Lin et al. (2023) ESM-2 & Protein Foundation Model & 250M sequences (UniRef) & Transformer (MLM) & SOTA sequence representations & High compute for large variants \\ \hline
+Veli\v{c}kovi\'{c} et al. (2018) GAT & Graph Attention Network & Node classification sets & Multi-head Attention GNN & Learns importance of neighbors & Relies on graph completeness \\ \hline
+\textbf{TransGraph-PPI (Proposed)} & \textbf{Hybrid Stacking Ensemble} & \textbf{STRING, BioGRID (Human)} & \textbf{ESM-2 + GATv2 + XGBoost} & \textbf{88.46\% Acc, 0.9523 AUC} & \textbf{Graph cold-start for new nodes} \\ \hline
 \end{tabular}
 \label{tab:comparison}
 \end{sidewaystable}
@@ -381,7 +380,7 @@ The proposed project distinguishes itself through a novel hybrid architecture th
 
 \noindent
 \textbf{\textcolor{red}{How it Would Advance the State-of-the-Art:}} \\
-TransGraph-PPI advances the state-of-the-art by pioneering a multimodal ensemble framework that overcomes the performance ceiling of current sequence-only or graph-only models. By leveraging evolutionary-scale protein language models alongside network-level attention mechanisms and Focal Loss optimization, it achieves a production-grade accuracy of \textbf{98.52\%} and ROC-AUC of \textbf{99.43\%}. The project's emphasis on global-local topology learning and deep stacking provides a robust solution for handling sparse biological data, setting a new benchmark for assistive computational tools in proteomics. \\
+TransGraph-PPI advances the state-of-the-art by pioneering a multimodal ensemble framework that overcomes the performance ceiling of current sequence-only or graph-only models. By leveraging evolutionary-scale protein language models alongside network-level attention mechanisms and Focal Loss optimization, it achieves a production-grade accuracy of \textbf{88.46\%} and ROC-AUC of \textbf{95.23\%}. The project's emphasis on global-local topology learning and deep stacking provides a robust solution for handling sparse biological data, setting a new benchmark for assistive computational tools in proteomics. \\
 
 \noindent
 \textbf{\textcolor{red}{How it Differs from Existing Works:}} \\
@@ -609,7 +608,7 @@ TransGraph-PPI achieved an exceptional production-grade accuracy of \textbf{98.5
     bar width=15pt,
 ]
 \addplot coordinates {(Accuracy,71.2) (F1-Score,71.2) (AUROC,74.5)};
-\addplot coordinates {(Accuracy,98.52) (F1-Score,98.86) (AUROC,99.43)};
+\addplot coordinates {(Accuracy,88.46) (F1-Score,88.48) (AUROC,95.23)};
 \legend{Logistic Baseline, TransGraph-PPI}
 \end{axis}
 \end{tikzpicture}
@@ -622,7 +621,7 @@ SHAP analysis revealed that the model correctly prioritizes conserved functional
 
 \chapter{Conclusion and Future Work}
 \section{Conclusion}
-This project successfully developed and validated \textbf{TransGraph-PPI}, a high-performance hybrid ensemble framework for sequence-based Protein–Protein Interaction prediction. By integrating the complementary strengths of ESM-2 protein language model embeddings and Graph Neural Networks (GNNs) – specifically Graph Attention and Graph Isomorphism Networks – we bridged the gap between sequence semantics and network topology. The implementation of Focal Loss, symmetric data augmentation, and a deep stacking ensemble strategy allowed the model to achieve an exceptional production-grade accuracy of \textbf{98.52\%} and an ROC-AUC of \textbf{99.43\%}.
+This project successfully developed and validated \textbf{TransGraph-PPI}, a high-performance hybrid ensemble framework for sequence-based Protein–Protein Interaction prediction. By integrating the complementary strengths of ESM-2 protein language model embeddings and Graph Neural Networks (GNNs) – specifically Graph Attention and Graph Isomorphism Networks – we bridged the gap between sequence semantics and network topology. The implementation of Focal Loss, symmetric data augmentation, and a deep stacking ensemble strategy allowed the model to achieve an exceptional production-grade accuracy of \textbf{88.46\%} and an ROC-AUC of \textbf{95.23\%}.
 
 The framework addresses critical limitations of existing methods by eliminating the need for handcrafted features, improving robustness to sparse network data, and providing biological interpretability through SHAP analysis. The project demonstrates that multimodal deep learning, when properly regularized and optimized, can reach the levels of precision required for high-confidence biological discovery and drug target prioritization.
 
@@ -645,31 +644,25 @@ Building on the success of TransGraph-PPI, the following directions are planned 
 F. Charih, J. R. Green, and K. K. Biggar, ``Sequence-Based Protein–Protein Interaction Prediction and Its Applications in Drug Discovery,'' \textit{Cells}, vol. 14, no. 18, p. 1449, 2025.
 
 \bibitem{ref2}
-N. Alkhateeb and M. Awad, ``Advances in Protein–Protein Interaction Prediction: A Deep Learning Perspective,'' \textit{Bioinformatics Journal Review}, 2023.
+B. Mewara and S. Lalwani, ``A Survey on Deep Networks Approaches in Prediction of Sequence-Based Protein-Protein Interactions,'' \textit{SN Computer Science}, vol. 3, no. 4, p. 298, 2022.
 
 \bibitem{ref3}
-W. Hu and M. Ohue, ``SpatialPPIv2: Enhancing Protein–Protein Interaction Prediction through Graph Neural Networks with Protein Language Models,'' \textit{Bioinformatics Advances}, 2024.
+J. Reim, J. Bernett, and M. List, ``Deep learning models for unbiased sequence-based PPI prediction plateau at an accuracy of 0.65,'' \textit{Bioinformatics}, vol. 41, no. S1, pp. i590--i598, 2025.
 
 \bibitem{ref4}
-F. Soleymani, E. Paquet, H. L. Viktor, W. Michalowski, and D. Spinello, ``ProtInteract: A Deep Learning Framework for Predicting Protein–Protein Interactions,'' \textit{Computational Biology and Medicine}, 2023.
+Y. Cui et al., ``Recent advances in deep learning for protein-protein interaction: a review,'' \textit{BioData Mining}, vol. 18, no. 1, p. 43, 2025.
 
 \bibitem{ref5}
-M. {\c{C}}elebi et al., ``xCAPT5: Protein–Protein Interaction Prediction Using Protein Language Model Embeddings and Deep Learning,'' \textit{Bioinformatics}, 2023.
+A.-I. Albu, M.-I. Bocicor, and G. Czibula, ``MM-StackEns: A new deep multimodal stacked generalization approach for protein-protein interaction prediction,'' \textit{Computers in Biology and Medicine}, vol. 153, p. 106526, 2023.
 
 \bibitem{ref6}
-Z. Yu et al., ``Graph Neural Network Integrated with Pretrained Protein Language Model for Predicting Human–Virus PPI (DeepGNHV),'' \textit{Bioinformatics}, 2024.
+M. Maurya and A. Chatterjee, ``Drug Discovery: Protein-Protein Interaction Prediction using Decoder-only Transformer Model,'' in \textit{Proc. RAIT 2025}, 2025.
 
 \bibitem{ref7}
-M. Alsamkary et al., ``Beyond Simple Concatenation: Fairly Assessing PLM Architectures for Multi-Chain PPI Prediction,'' \textit{Bioinformatics Advances}, 2025.
+Z. Lin et al., ``Evolutionary-scale prediction of atomic-level protein structure with a language model,'' \textit{Science}, vol. 379, no. 6637, pp. 1123--1130, 2023.
 
 \bibitem{ref8}
-J. Zhang et al., ``Predicting Human PPI Sites by Integrating ESM-2 Sequence Embeddings and a Gated GNN,'' \textit{Bioinformatics}, 2024.
-
-\bibitem{ref9}
-Z. Gao et al., ``PFMBench – Protein Foundation Model Benchmark,'' \textit{Nature Methods}, 2025.
-
-\bibitem{ref10}
-J. Liu and T. Zhang, ``ESM2-Driven PPI Prediction with Global-Local Graph Topology Learning (GLTPPI),'' \textit{Briefings in Bioinformatics}, 2025.
+P. Veli\v{c}kovi\'{c} et al., ``Graph Attention Networks,'' \textit{ICLR}, 2018.
 
 \end{thebibliography}
 

@@ -1,42 +1,39 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Inter:wght@400;700;900&family=JetBrains+Mono&display=swap');
 
 @theme {
-  --color-scientific-primary: #0D9488;
-  --color-scientific-secondary: #0891B2;
-  --color-scientific-accent: #7C3AED;
-  --color-scientific-background: #F8FAFC;
-  --color-scientific-success: #22C55E;
-  --color-scientific-warning: #F59E0B;
-  --color-scientific-danger: #EF4444;
-  --color-scientific-card: rgba(255, 255, 255, 0.7);
+  --color-scientific-primary: #059669; /* Rich Emerald */
+  --color-scientific-secondary: #4f46e5; /* Indigo */
+  --color-scientific-accent: #f59e0b; /* Amber */
+  --color-scientific-background: #f8fafc; /* Clean Slate 50 */
+  --color-scientific-card: rgba(255, 255, 255, 0.8);
+  --color-scientific-border: rgba(0, 0, 0, 0.05);
 
-  --background-image-glass-gradient: linear-gradient(135deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.1));
-  --background-image-scientific-gradient: linear-gradient(135deg, #0D9488 0%, #7C3AED 100%);
-
-  --shadow-glass: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
+  --font-cursive: 'Dancing Script', cursive;
+  --font-sans: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
 }
 
 @layer base {
   body {
     background-color: var(--color-scientific-background);
-    color: #1e293b;
+    color: #334155;
     @apply font-sans antialiased;
     position: relative;
     min-height: 100vh;
     overflow-x: hidden;
   }
 
+  /* Project-related Background Images (Low Opacity) */
   body::before {
     content: "";
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-image: url('/molecular_bg.png');
-    background-size: cover;
-    background-position: center;
-    opacity: 0.12; /* Slightly higher opacity for visibility but still low */
+    inset: 0;
+    background-image: url('/bio_soft_bg_1777002459029.png');
+    background-size: 80%;
+    background-repeat: no-repeat;
+    background-position: bottom right;
+    opacity: 0.05; /* Very low opacity as requested */
     z-index: -1;
     pointer-events: none;
   }
@@ -44,42 +41,36 @@
   body::after {
     content: "";
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: radial-gradient(circle at 50% 50%, transparent 0%, var(--color-scientific-background) 100%);
-    opacity: 0.6;
+    inset: 0;
+    background-image: url('/network_art_bg_1777002484316.png');
+    background-size: 50%;
+    background-repeat: no-repeat;
+    background-position: top left;
+    opacity: 0.03;
     z-index: -1;
     pointer-events: none;
   }
 }
 
 @layer components {
-  /* Use standard CSS classes for components that need to be reused */
   .glass-card {
-    background-color: rgba(255, 255, 255, 0.6);
-    backdrop-filter: blur(12px) saturate(180%);
-    -webkit-backdrop-filter: blur(12px) saturate(180%);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.05);
-    border-radius: 1.5rem;
+    background-color: var(--color-scientific-card);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--color-scientific-border);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.03);
+    border-radius: 2rem;
     transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .glass-card:hover {
-    background-color: rgba(255, 255, 255, 0.8);
-    box-shadow: 0 15px 45px 0 rgba(31, 38, 135, 0.08);
-    transform: translateY(-4px);
-    border: 1px solid rgba(255, 255, 255, 0.5);
+    background-color: #fff;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.06);
+    transform: translateY(-2px);
+    border-color: rgba(5, 150, 105, 0.2);
   }
 
   .btn-primary {
-    @apply px-6 py-3 bg-scientific-primary text-white rounded-2xl font-bold transition-all duration-300 hover:shadow-xl hover:shadow-teal-500/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2;
-  }
-
-  .btn-secondary {
-    @apply px-6 py-3 bg-white/40 backdrop-blur-md text-scientific-primary border border-scientific-primary/10 rounded-2xl font-bold transition-all duration-300 hover:bg-white/60 active:scale-95 cursor-pointer flex items-center justify-center gap-2;
+    @apply px-8 py-3 bg-scientific-primary text-white rounded-2xl font-bold transition-all duration-300 hover:shadow-xl hover:shadow-emerald-500/20 active:scale-95 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2;
   }
 
   .scientific-sidebar {
@@ -87,76 +78,40 @@
     left: 1.5rem;
     top: 1.5rem;
     bottom: 1.5rem;
-    width: 16rem;
+    width: 17rem;
     z-index: 50;
     border-radius: 2rem;
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    background-color: rgba(255, 255, 255, 0.6);
-    backdrop-filter: blur(24px) saturate(160%);
-    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    border: 1px solid var(--color-scientific-border);
+    background-color: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(16px);
     display: flex;
     flex-direction: column;
-    box-shadow: 0 10px 40px 0 rgba(0, 0, 0, 0.03);
-    overflow: hidden;
+    box-shadow: 10px 0 40px rgba(0, 0, 0, 0.02);
   }
 
   .nav-item {
-    @apply flex items-center gap-3 px-4 py-3 mx-3 my-1 rounded-xl transition-all duration-300 text-slate-500 font-medium hover:bg-white/50 hover:text-scientific-primary;
+    @apply flex items-center gap-4 px-6 py-4 mx-3 my-1 rounded-xl transition-all duration-300 text-slate-400 font-bold text-xs uppercase tracking-widest hover:bg-slate-50 hover:text-scientific-primary;
   }
 
   .nav-item.active {
-    @apply bg-scientific-primary text-white font-bold shadow-lg shadow-teal-500/20;
+    @apply bg-emerald-50 text-emerald-600 shadow-sm;
   }
 
-  .section-title {
-    @apply text-3xl font-black text-slate-800 tracking-tight mb-2;
-  }
-
-  .section-subtitle {
-    @apply text-slate-500 font-medium tracking-wide mb-8;
+  .logo-cursive {
+    font-family: var(--font-cursive);
+    @apply text-3xl text-slate-800;
   }
 }
 
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background-color: rgba(13, 148, 136, 0.1);
-  border-radius: 9999px;
-  border: 2px solid transparent;
-  background-clip: content-box;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(13, 148, 136, 0.3);
-}
-
-/* Preloader Transitions */
-.content-fade-in {
-  animation: fadeIn 1.2s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+.font-mono {
+  font-family: var(--font-mono);
 }
 
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-    filter: blur(10px);
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    filter: blur(0);
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-/* 3D Canvas Container */
-.preloader-canvas-container canvas {
-  touch-action: none;
+.animate-in {
+  animation: fadeIn 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
 }

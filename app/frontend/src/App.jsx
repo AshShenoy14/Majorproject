@@ -6,6 +6,7 @@ import Predict from './pages/Predict';
 import MutationAnalysis from './pages/MutationAnalysis';
 import StructureViewer from './pages/StructureViewer';
 import NetworkExplorer from './pages/NetworkExplorer';
+import NetworkExplorer3D from './pages/Network3D';
 import DrugInsights from './pages/DrugInsights';
 import Assistant from './pages/Assistant';
 import About from './pages/About';
@@ -55,6 +56,7 @@ function App() {
                                 <Route path="/mutation" element={<MutationAnalysis />} />
                                 <Route path="/structure" element={<StructureViewer />} />
                                 <Route path="/network" element={<NetworkExplorer />} />
+                                <Route path="/network-3d" element={<NetworkExplorer3D />} />
                                 <Route path="/drug-targets" element={<DrugInsights />} />
                                 <Route path="/assistant" element={<Assistant />} />
                                 <Route path="/about" element={<About />} />

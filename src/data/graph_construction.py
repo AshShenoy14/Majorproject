@@ -110,14 +110,37 @@ if __name__ == "__main__":
     # Undirected
     edge_index = torch.tensor([src + dst, dst + src], dtype=torch.long)
     
-    data = Data(x=x, edge_index=edge_index)
-    print(f"Graph constructed: {data.num_nodes} nodes, {data.num_edges} edges.")
+    # --- Advanced Structural Enrichment (90%+ Accuracy Strategy) ---
+    print("Calculating topological features for network enrichment...")
+    import networkx as nx
+    G = nx.Graph()
+    G.add_nodes_from(range(num_nodes))
+    edges = list(zip(src, dst))
+    G.add_edges_from(edges)
     
-    # Clean up embeddings to free memory
+    # Centrality metrics
+    degree_cent = nx.degree_centrality(G)
+    clustering = nx.clustering(G)
+    pagerank = nx.pagerank(G, alpha=0.85)
+    
+    # Convert to tensor (num_nodes, 3)
+    topo_features = torch.zeros((num_nodes, 3), dtype=torch.float32)
+    for i in range(num_nodes):
+        topo_features[i, 0] = degree_cent.get(i, 0)
+        topo_features[i, 1] = clustering.get(i, 0)
+        topo_features[i, 2] = pagerank.get(i, 0)
+    
+    # Concatenate ESM embeddings with topological features
+    x_enriched = torch.cat([x, topo_features], dim=-1)
+    
+    data = Data(x=x_enriched, edge_index=edge_index)
+    print(f"Enriched Graph: {data.num_nodes} nodes, {data.num_edges} edges, {data.num_node_features} features.")
+    
+    # Clean up
     del embeddings
     gc.collect()
     
     # 6. Save Graph and Mapping
     torch.save(data, PROCESSED_DATA_DIR / "ppi_graph.pt")
     torch.save(node_mapping, PROCESSED_DATA_DIR / "ppi_graph_mapping.pt")
-    print("Graph and mapping saved.")
+    print("Graph and mapping saved with structural enrichment.")

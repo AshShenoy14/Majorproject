@@ -16,7 +16,7 @@ from tqdm import tqdm
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
 from src.models.sequence_model import SequencePPIModel
-from src.models.graph_model import GATLinkPredictor
+from src.models.graph_model import GATLinkPredictor, GINLinkPredictor
 from src.analysis.explainability import PPIExplainer
 from src.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT
 
@@ -163,14 +163,28 @@ def evaluate_models():
     # Graph Model: Dynamic Input detection (494 or 491 dims)
     in_channels = graph_data.x.shape[1]
     print(f"  Detected Graph Input Channels: {in_channels}")
-    graph_model = GATLinkPredictor(in_channels=in_channels, hidden_channels=128, heads=4).to(device)
     if graph_model_path.exists():
-         print(f"  Loading GATv2 Model (heads=4, hidden=128)...")
+         print(f"  Loading Graph Model (in_channels={in_channels}, hidden=128)...")
+         state_dict = torch.load(graph_model_path, map_location=device, weights_only=False)
+         
+         # Auto-detect architecture by inspecting state_dict keys
+         is_gin = any("convs" in k for k in state_dict.keys())
+         
+         if is_gin:
+             from src.models.graph_model import GINLinkPredictor
+             graph_model = GINLinkPredictor(in_channels=in_channels, hidden_channels=128).to(device)
+             print("  [OK] Initializing GIN architecture (Dynamic Detection).")
+         else:
+             from src.models.graph_model import GATLinkPredictor
+             graph_model = GATLinkPredictor(in_channels=in_channels, hidden_channels=128, heads=4).to(device)
+             print("  [OK] Initializing GAT architecture (Dynamic Detection).")
+             
          try:
-             graph_model.load_state_dict(torch.load(graph_model_path, map_location=device))
+             graph_model.load_state_dict(state_dict)
+             print("  [SUCCESS] Graph Model state_dict loaded.")
          except Exception as e:
-             print(f"  [!] GAT load failed: {e}. Ensure checkpoint matches hidden_channels=128.")
-             # Fallback retry if needed, but 128 is the new standard
+             print(f"  [CRITICAL] Graph load failed: {e}")
+             return
     graph_model.eval()
 
     ensemble_model = None

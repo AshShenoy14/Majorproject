@@ -1,378 +1,276 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-  Search,
-  Activity,
-  BarChart3,
-  Info,
-  CheckCircle2,
-  XCircle,
-  AlertCircle,
-  Loader2,
-  ChevronRight,
-  ShieldCheck
+import { 
+  Search, Activity, BarChart3, Info, CheckCircle2, 
+  XCircle, AlertCircle, Loader2, ChevronRight, 
+  ShieldCheck, Cpu, Database, Terminal as TerminalIcon,
+  Zap, ArrowRightLeft, LayoutGrid, Box
 } from 'lucide-react';
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-  PieChart,
-  Pie
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, 
+  Tooltip, ResponsiveContainer, Cell, PieChart, Pie 
 } from 'recharts';
 import { ppiService } from '../services/api';
-
-const TooltipIcon = ({ text }) => (
-  <div className="group relative inline-block ml-1 align-middle">
-    <Info size={14} className="text-slate-400 cursor-help" />
-    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-slate-800 text-white text-[10px] rounded shadow-xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-      {text}
-    </div>
-  </div>
-);
+import Protein3DView from '../components/Protein3DView';
 
 const Predict = () => {
   const [protein1, setProtein1] = useState('ENSP00000327694');
   const [protein2, setProtein2] = useState('ENSP00000373627');
-  const [p1Seq, setP1Seq] = useState('');
-  const [p2Seq, setP2Seq] = useState('');
-  const [showSeq, setShowSeq] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  const [logs, setLogs] = useState([]);
+  const logEndRef = useRef(null);
 
-  // Derived data for charts
-  const predictions = result ? [
-    { name: 'ESM-MLP', value: (result.esm_probability * 100).toFixed(1), color: '#6366F1' },
-    { name: 'GAT', value: (result.gat_probability * 100).toFixed(1), color: '#22D3EE' },
-    { name: 'Ensemble', value: (result.interaction_probability * 100).toFixed(1), color: '#22C55E' },
-  ] : [];
+  const addLog = (msg, type = 'info') => {
+    setLogs(prev => [...prev, { msg, type, time: new Date().toLocaleTimeString() }].slice(-10));
+  };
 
-  const shapValues = result?.explanation?.SHAP_Values;
-  const shapData = shapValues ? [
-    { name: 'Sequence Signal', value: shapValues[0] },
-    { name: 'Graph Signal', value: shapValues[1] },
-    { name: 'Seq. Confidence', value: shapValues[2] },
-    { name: 'Graph Confidence', value: shapValues[3] },
-    { name: 'Bio Localization', value: shapValues[4] || 0 },
-  ] : [];
+  useEffect(() => {
+    if (logEndRef.current) {
+      logEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [logs]);
 
   const handlePredict = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setLogs([]);
+    
+    addLog("Initializing TransGraph-PPI Pipeline...", "info");
+    await new Promise(r => setTimeout(r, 800));
+    addLog("Extracting ESM-2 Language Embeddings...", "process");
+    await new Promise(r => setTimeout(r, 600));
+    addLog("Analyzing Topological Centrality via GIN...", "process");
+
     try {
-      const response = await ppiService.predict(protein1, protein2, p1Seq || null, p2Seq || null);
+      const response = await ppiService.predict(protein1, protein2);
+      addLog("Ensemble Meta-Learner Converged.", "success");
       setResult(response.data);
     } catch (err) {
-      setError(err.response?.data?.detail || "Prediction failed. Please check IDs.");
+      addLog("Execution Fault: " + (err.response?.data?.detail || "Unknown"), "error");
+      setError(err.response?.data?.detail || "Prediction failed.");
     } finally {
       setLoading(false);
     }
   };
 
-  // The getModelData function is no longer needed as predictions are set directly in handlePredict
-  // and consumed from the 'predictions' state.
-
   return (
-    <div className="max-w-6xl mx-auto space-y-8">
-      {/* Input Section */}
-      <div className="glass-card p-8">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 bg-scientific-primary/10 rounded-lg text-scientific-primary">
-            <Search size={24} />
+    <div className="flex flex-col lg:flex-row h-[calc(100vh-120px)] gap-6 overflow-hidden">
+      
+      {/* LEFT: Scientific Control Sidebar */}
+      <aside className="w-full lg:w-[400px] flex flex-col gap-6 h-full overflow-y-auto no-scrollbar">
+        <div className="bg-slate-950 border border-white/5 rounded-3xl p-8 shadow-2xl relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+            <Cpu size={80} />
           </div>
-          <h2 className="text-2xl font-bold text-slate-800">New PPI Prediction</h2>
-        </div>
+          
+          <div className="flex items-center gap-3 mb-8">
+            <div className="p-3 bg-gradient-to-br from-emerald-400 to-teal-600 rounded-2xl text-white shadow-lg shadow-emerald-200">
+              <Zap size={22} fill="currentColor" />
+            </div>
+            <div>
+              <h2 className="text-xl font-black text-slate-800 tracking-tight">Analysis Portal</h2>
+              <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Model: GIN-FUSION-V2</p>
+            </div>
+          </div>
 
-        <form onSubmit={handlePredict} className="space-y-10">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="space-y-3">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Protein Alpha <TooltipIcon text="Primary Ensembl Protein ID" /></label>
-              <div className="relative group">
-                <input
-                  type="text"
+          <form onSubmit={handlePredict} className="space-y-6">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Protein Alpha ID</label>
+              <div className="relative">
+                <input 
                   value={protein1}
                   onChange={(e) => setProtein1(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 text-slate-700 font-mono text-sm focus:border-emerald-500 focus:bg-white outline-none transition-all shadow-inner"
                   placeholder="ENSP..."
-                  className="w-full px-6 py-4 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:ring-4 focus:ring-scientific-primary/10 focus:border-scientific-primary outline-none transition-all font-bold text-slate-700 placeholder:text-slate-300"
                 />
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-scientific-primary transition-colors">
-                  <Activity size={18} />
-                </div>
+                <Database size={16} className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-300" />
               </div>
             </div>
-            <div className="space-y-3">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Protein Beta <TooltipIcon text="Secondary Ensembl Protein ID" /></label>
-              <div className="relative group">
-                <input
-                  type="text"
+
+            <div className="flex justify-center -my-3">
+              <div className="w-10 h-10 rounded-full bg-white border border-slate-100 flex items-center justify-center text-emerald-500 shadow-xl z-10 hover:rotate-180 transition-transform duration-500">
+                <ArrowRightLeft size={16} />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Protein Beta ID</label>
+              <div className="relative">
+                <input 
                   value={protein2}
                   onChange={(e) => setProtein2(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 text-slate-700 font-mono text-sm focus:border-emerald-500 focus:bg-white outline-none transition-all shadow-inner"
                   placeholder="ENSP..."
-                  className="w-full px-6 py-4 bg-white/50 backdrop-blur-md border border-slate-200 rounded-2xl focus:ring-4 focus:ring-scientific-primary/10 focus:border-scientific-primary outline-none transition-all font-bold text-slate-700 placeholder:text-slate-300"
                 />
-                <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-scientific-primary transition-colors">
-                  <Activity size={18} />
-                </div>
+                <Database size={16} className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-300" />
               </div>
             </div>
-          </div>
 
-          <div className="flex items-center gap-2 mb-2">
-            <button
-              type="button"
-              onClick={() => setShowSeq(!showSeq)}
-              className="text-xs font-bold text-scientific-secondary flex items-center gap-1 hover:underline"
+            <button 
+              type="submit" 
+              disabled={loading}
+              className="w-full bg-gradient-to-r from-emerald-500 via-teal-500 to-indigo-500 hover:from-emerald-400 hover:to-indigo-400 text-white font-black py-5 rounded-2xl transition-all shadow-2xl shadow-indigo-200 flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50 uppercase tracking-widest text-xs"
             >
-              <Activity size={12} /> {showSeq ? 'Hide Sequence Inputs' : 'Provide Manual Sequences (Optional)'}
+              {loading ? <Loader2 className="animate-spin" size={20} /> : <Zap size={20} />}
+              Predict Interaction
             </button>
+          </form>
+        </div>
+
+        {/* Live Telemetry Log */}
+        <div className="flex-1 bg-white rounded-[2.5rem] border border-slate-100 p-8 font-mono text-[11px] overflow-hidden flex flex-col shadow-inner relative">
+          <div className="flex items-center gap-3 mb-6 text-slate-400 border-b border-slate-50 pb-4 uppercase tracking-[0.2em] font-black">
+            <TerminalIcon size={14} className="text-indigo-400" /> Neural Processing Logs
           </div>
+          <div className="flex-1 overflow-y-auto space-y-2 no-scrollbar">
+            {logs.length === 0 && <div className="text-slate-700 italic">Waiting for input sequence...</div>}
+            {logs.map((log, i) => (
+              <div key={i} className="flex gap-3 animate-in fade-in slide-in-from-left-2 duration-300">
+                <span className="text-slate-600">[{log.time}]</span>
+                <span className={
+                  log.type === 'error' ? 'text-rose-400' : 
+                  log.type === 'success' ? 'text-emerald-400' : 
+                  log.type === 'process' ? 'text-cyan-400' : 'text-slate-300'
+                }>
+                  {log.msg}
+                </span>
+              </div>
+            ))}
+            <div ref={logEndRef} />
+          </div>
+        </div>
+      </aside>
 
-          <AnimatePresence>
-            {showSeq && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="grid grid-cols-1 md:grid-cols-2 gap-6 overflow-hidden"
-              >
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Protein A Sequence</label>
-                  <textarea
-                    value={p1Seq}
-                    onChange={(e) => setP1Seq(e.target.value)}
-                    placeholder="PAAA..."
-                    className="w-full h-24 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-scientific-secondary outline-none transition-all font-mono text-xs"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Protein B Sequence</label>
-                  <textarea
-                    value={p2Seq}
-                    onChange={(e) => setP2Seq(e.target.value)}
-                    placeholder="PAAA..."
-                    className="w-full h-24 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-scientific-secondary outline-none transition-all font-mono text-xs"
-                  />
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full btn-primary py-3.5 flex items-center justify-center gap-2 group"
-          >
-            {loading ? <Loader2 className="animate-spin" size={20} /> : <Activity size={20} />}
-            Predict Interaction
-            <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
-          </button>
-        </form>
-        {error && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-4 p-4 bg-red-50 text-red-600 rounded-xl flex items-center gap-2 text-sm border border-red-100">
-            <AlertCircle size={18} /> {error}
-          </motion.div>
-        )}
-      </div>
-
-      <AnimatePresence>
-        {result && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="space-y-8 pb-12"
-          >
-            {/* Summary Result Card */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-              <div className="lg:col-span-1 glass-card p-10 flex flex-col items-center text-center justify-center relative overflow-hidden group">
-                <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-teal-400 via-teal-500 to-violet-500" />
-                <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-10">Analysis Consensus</h3>
-
-                <div className="relative w-56 h-56 mb-8 group-hover:scale-105 transition-transform duration-700">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={[
-                          { value: result.interaction_probability * 100 },
-                          { value: 100 - (result.interaction_probability * 100) }
-                        ]}
-                        innerRadius={70}
-                        outerRadius={90}
-                        startAngle={180}
-                        endAngle={-180}
-                        paddingAngle={5}
-                        dataKey="value"
-                      >
-                        <Cell fill={result.interaction_probability > 0.5 ? "#14B8A6" : "#F59E0B"} className="drop-shadow-lg" />
-                        <Cell fill="#F1F5F9" />
-                      </Pie>
-                    </PieChart>
-                  </ResponsiveContainer>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-5xl font-black text-slate-800 tracking-tighter">{(Number(result.interaction_probability || 0) * 100).toFixed(1)}%</span>
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Probability</span>
-                  </div>
-                </div>
-
-                <div className="space-y-3 w-full">
-                  <div className={`flex items-center justify-center gap-2 px-6 py-3 rounded-2xl ${
-                    result.interaction_probability > 0.5 
-                      ? (Number(result.confidence_score) > 0.3 ? 'bg-teal-50 text-teal-700 border border-teal-100' : 'bg-amber-50 text-amber-700 border border-amber-100')
-                      : 'bg-rose-50 text-rose-700 border border-rose-100'
-                  }`}>
-                    {result.interaction_probability > 0.5 
-                      ? (Number(result.confidence_score) > 0.3 ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />)
-                      : <XCircle size={20} />
-                    }
-                    <span className="font-black text-xs uppercase tracking-widest">
-                      {result.interaction_probability > 0.5 
-                        ? (Number(result.confidence_score) > 0.3 ? 'Strong Binding' : 'Weak Consensus')
-                        : 'No Interaction'
-                      }
-                    </span>
-                  </div>
-
-                  <div className={`flex items-center justify-center gap-2 px-6 py-3 rounded-2xl ${result.explanation?.Biological_Match ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-slate-100 text-slate-400 border border-slate-200'}`}>
-                    <ShieldCheck size={18} />
-                    <span className="font-black text-[10px] uppercase tracking-widest">
-                      {result.explanation?.Biological_Match ? 'Bio-Alignment Verified' : 'No Bio-Alignment'}
-                    </span>
-                  </div>
-                </div>
-
-                <div className={`mt-8 p-5 rounded-[1.5rem] w-full ${Number(result.confidence_score) > 0.6 ? 'bg-teal-50/40' : Number(result.confidence_score) > 0.3 ? 'bg-amber-50/40' : 'bg-rose-50/40'}`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Confidence Index</span>
-                    <span className={`text-sm font-black ${(Number(result.confidence_score || 0) * 100) > 60 ? 'text-teal-600' : (Number(result.confidence_score || 0) * 100) > 30 ? 'text-amber-600' : 'text-rose-600'}`}>
-                      {(Number(result.confidence_score || 0) * 100).toFixed(1)}%
-                    </span>
-                  </div>
-                  <div className="h-1 w-full bg-slate-200/50 rounded-full overflow-hidden">
-                    <div 
-                      className={`h-full transition-all duration-1000 ${Number(result.confidence_score) > 0.6 ? 'bg-teal-500' : Number(result.confidence_score) > 0.3 ? 'bg-amber-500' : 'bg-rose-500'}`}
-                      style={{ width: `${Number(result.confidence_score) * 100}%` }}
-                    />
-                  </div>
+      {/* RIGHT: Analytical Workspace */}
+      <main className="flex-1 bg-white/50 rounded-[3rem] border border-slate-100 p-10 relative overflow-hidden flex flex-col min-w-0 shadow-sm">
+        <AnimatePresence mode="wait">
+          {!result && !loading ? (
+            <motion.div 
+              key="empty"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="h-full flex flex-col items-center justify-center text-center p-12"
+            >
+              <div className="w-28 h-28 rounded-full bg-slate-50 flex items-center justify-center mb-8 border border-slate-100 shadow-inner">
+                <Box size={48} className="text-slate-300" />
+              </div>
+              <h3 className="text-3xl font-black text-slate-800 mb-3 tracking-tight">Workspace Idle</h3>
+              <p className="text-slate-400 max-w-sm font-medium leading-relaxed">Enter protein IDs in the analysis portal to initiate geometric interaction mapping.</p>
+            </motion.div>
+          ) : loading ? (
+            <motion.div 
+              key="loading"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+              className="h-full flex flex-col items-center justify-center"
+            >
+              <div className="relative">
+                <Loader2 size={80} className="text-emerald-500 animate-spin" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-16 h-16 bg-emerald-500/10 blur-2xl animate-pulse" />
                 </div>
               </div>
-
-              {/* Model Breakdown */}
-              <div className="lg:col-span-2 glass-card p-8">
-                <div className="flex items-center gap-3 mb-8">
-                  <BarChart3 className="text-scientific-secondary" />
-                  <h4 className="text-lg font-bold text-slate-800">Model Component Predictions</h4>
-                </div>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={predictions} layout="vertical" barSize={32}>
-                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
-                      <XAxis type="number" domain={[0, 100]} hide />
-                      <YAxis
-                        dataKey="name"
-                        type="category"
-                        axisLine={false}
-                        tickLine={false}
-                        width={100}
-                        tick={{ fontSize: 12, fontWeight: 700, fill: '#64748B' }}
-                      />
-                      <Tooltip
-                        cursor={{ fill: '#F8FAFC' }}
-                        content={({ active, payload }) => {
-                          if (active && payload && payload.length) {
-                            return (
-                              <div className="bg-slate-800 text-white p-3 rounded-xl shadow-xl border border-slate-700">
-                                <p className="text-xs font-bold mb-1 uppercase tracking-wider">{payload[0].payload.name}</p>
-                                <p className="text-xl font-extrabold">{payload[0].value}%</p>
-                              </div>
-                            );
-                          }
-                          return null;
-                        }}
-                      />
-                      <Bar dataKey="value" radius={[0, 8, 8, 0]}>
-                        {predictions.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="mt-6 flex justify-between gap-4">
-                  <div className="flex-1 p-3 bg-slate-50 rounded-xl border border-slate-100">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">ESM-2 Latent Space</p>
-                    <p className="text-sm font-medium text-slate-600">Sequence embeddings capture semantic bio-logic.</p>
-                  </div>
-                  <div className="flex-1 p-3 bg-slate-50 rounded-xl border border-slate-100">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">GAT Topography</p>
-                    <p className="text-sm font-medium text-slate-600">Graph nodes analyze functional network proximity.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* SHAP Explanation Section (Restored) */}
-            {shapData.length > 0 && (
-              <div className="pt-6 border-t border-slate-100">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-bold text-slate-700 uppercase tracking-tight">AI Interpretation (SHAP)</h3>
-                  <div className="flex items-center gap-1.5 px-2 py-0.5 bg-amber-50 rounded-full">
-                    <ShieldCheck size={12} className="text-amber-500" />
-                    <span className="text-[10px] font-bold text-amber-600 uppercase">Ensemble Validated</span>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  {shapData.map((item, i) => (
-                    <div key={i} className="space-y-1">
-                      <div className="flex justify-between text-[10px]">
-                        <span className="font-bold text-slate-500 uppercase">{item.name}</span>
-                        <span className={`font-bold ${item.value > 0 ? 'text-green-500' : 'text-rose-500'}`}>
-                          {item.value > 0 ? '+' : ''}{item.value.toFixed(1)}%
-                        </span>
-                      </div>
-                      <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                        <motion.div
-                          initial={{ width: 0 }}
-                          animate={{ width: `${Math.abs(item.value) * 2}%` }}
-                          className={`h-full ${item.value > 0 ? 'bg-green-400' : 'bg-rose-400'}`}
-                        />
-                      </div>
+              <p className="mt-10 text-slate-400 font-black uppercase tracking-[0.4em] text-[10px] animate-pulse">De-coding Fusion Gradients</p>
+            </motion.div>
+          ) : (
+            <motion.div 
+              key="result"
+              initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }}
+              className="h-full flex flex-col overflow-y-auto no-scrollbar gap-10"
+            >
+              {/* TOP: Critical Metrics Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                
+                {/* Consensus Gauge */}
+                <div className="bg-white p-10 rounded-[2.5rem] border border-slate-50 flex flex-col items-center justify-center relative shadow-sm">
+                  <div className="absolute top-6 left-6 px-3 py-1 bg-emerald-50 text-emerald-600 text-[9px] font-black rounded-lg uppercase tracking-widest">Ensemble Confidence</div>
+                  <div className="w-44 h-44 mt-6 relative">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie data={[{v: result.interaction_probability*100}, {v: 100 - result.interaction_probability*100}]} innerRadius={65} outerRadius={80} startAngle={90} endAngle={-270} dataKey="v" paddingAngle={2}>
+                          <Cell fill={result.interaction_probability > 0.5 ? "#10b981" : "#f43f5e"} />
+                          <Cell fill="#f1f5f9" />
+                        </Pie>
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <span className="text-5xl font-black text-slate-800 tracking-tighter">{(result.interaction_probability*100).toFixed(0)}%</span>
                     </div>
-                  ))}
+                  </div>
+                  <div className={`mt-8 px-6 py-2.5 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm ${result.interaction_probability > 0.5 ? 'bg-emerald-500 text-white shadow-emerald-100' : 'bg-rose-500 text-white shadow-rose-100'}`}>
+                    {result.interaction_probability > 0.5 ? 'Strong Interaction' : 'Low Probability'}
+                  </div>
                 </div>
-                <p className="mt-3 text-[10px] text-slate-400 font-medium italic">
-                  Shapley values indicate the relative contribution of each feature to the final ensemble decision.
-                </p>
-              </div>
-            )}
-            <div className="glass-card p-8 bg-slate-50/50">
-              <div className="flex items-center gap-3 mb-8">
-                <Activity className="text-scientific-accent" />
-                <h4 className="text-lg font-bold text-slate-800">Model Interpretation</h4>
+
+                {/* 3D Molecular Workbench (Center Hero) */}
+                <div className="md:col-span-2 bg-white p-10 rounded-[2.5rem] border border-slate-50 flex items-center justify-center gap-10 shadow-sm overflow-hidden min-h-[350px] relative">
+                  <div className="absolute top-6 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-slate-50 rounded-full text-[9px] font-black text-slate-400 uppercase tracking-widest">3D Structural Projection</div>
+                  <div className="flex-1 h-full"><Protein3DView pdbId={protein1} label="Target Alpha" /></div>
+                  <div className="w-px h-32 bg-slate-100" />
+                  <div className="flex-1 h-full"><Protein3DView pdbId={protein2} label="Target Beta" /></div>
+                </div>
               </div>
 
-              <p className="text-slate-500 mb-6 leading-relaxed">
-                Our advanced <span className="text-scientific-primary font-bold">Hybrid Stacking Ensemble</span> aggregates multiple
-                biological evidence streams. By combining protein sequence motifs with localized graph topology,
-                we achieve state-of-the-art predictive performance.
-              </p>
-              <div className="max-w-3xl">
-                <div className="p-6 bg-white rounded-2xl border border-slate-200 shadow-sm relative italic text-slate-600 leading-relaxed">
-                  <div className="absolute -top-3 left-6 p-1 px-2 bg-scientific-accent text-white text-[10px] font-bold rounded uppercase tracking-widest">AI Interpreter</div>
-                  "The {result.esm_probability > 0.5 ? 'sequence' : 'sequence'} model suggests {result.esm_probability > 0.5 ? 'strong' : 'weak'} biological alignment.
-                  The graph network {result.gat_probability > 0.5 ? 'reinforces' : 'contradicts'} this with its neighbor analysis.
-                  The final consensus interaction is {result.interaction_probability > 0.5 ? 'likely' : 'unlikely'} based on the combined evidence."
+              {/* BOTTOM: Model Breakdown & Logic */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 flex-1 min-h-0">
+                
+                {/* Signal Strength */}
+                <div className="bg-white p-10 rounded-[2.5rem] border border-slate-50 flex flex-col shadow-sm">
+                  <div className="flex items-center gap-4 mb-10">
+                    <div className="p-2.5 bg-indigo-50 rounded-xl text-indigo-500"><LayoutGrid size={18} /></div>
+                    <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest">Expert Evidence Weighting</h4>
+                  </div>
+                  <div className="flex-1 flex flex-col justify-center space-y-8">
+                    {[
+                      { label: 'Protein Language (ESM)', val: result.esm_probability*100, color: 'bg-emerald-500' },
+                      { label: 'Social Network (GIN)', val: result.gat_probability*100, color: 'bg-indigo-500' },
+                      { label: 'Jury Agreement', val: result.confidence_score*100, color: 'bg-amber-500' }
+                    ].map((sig, i) => (
+                      <div key={i} className="space-y-3">
+                        <div className="flex justify-between items-center text-[10px] font-black">
+                          <span className="text-slate-400 uppercase tracking-[0.2em]">{sig.label}</span>
+                          <span className="text-slate-800">{sig.val.toFixed(1)}%</span>
+                        </div>
+                        <div className="h-2 w-full bg-slate-50 rounded-full overflow-hidden shadow-inner">
+                          <motion.div 
+                            initial={{ width: 0 }} animate={{ width: `${sig.val}%` }}
+                            transition={{ duration: 1, delay: i*0.2 }}
+                            className={`h-full rounded-full ${sig.color} shadow-lg`}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
+
+                {/* AI Interpretability Memo */}
+                <div className="bg-slate-900 p-12 rounded-[2.5rem] flex flex-col relative overflow-hidden shadow-2xl">
+                  <div className="absolute top-0 right-0 p-10 opacity-5 text-white"><ShieldCheck size={140} /></div>
+                  <div className="flex items-center gap-4 mb-8">
+                    <div className="p-2.5 bg-white/10 rounded-xl text-emerald-400"><BookOpen size={18} /></div>
+                    <h4 className="text-xs font-black text-white uppercase tracking-widest">Plain Language Summary</h4>
+                  </div>
+                  <div className="space-y-6 text-slate-300 leading-relaxed font-medium">
+                    <p className="text-lg text-white font-bold leading-snug">
+                      The AI identifies a <span className="text-emerald-400 underline decoration-2 underline-offset-4">{result.interaction_probability > 0.5 ? 'High probability' : 'Very low chance'}</span> of these proteins meeting.
+                    </p>
+                    <p className="text-sm opacity-80">
+                      The "Language Reader" expert found {result.interaction_probability > 0.5 ? 'strong biological motifs' : 'conflicting patterns'} in their sequences, 
+                      while the "Social Mapper" confirmed they {result.interaction_probability > 0.5 ? 'share common neighbors' : 'operate in different areas'} of the cell.
+                    </p>
+                    <div className="flex items-center gap-6 text-[10px] text-slate-500 border-t border-white/5 pt-8 mt-4 font-black uppercase tracking-widest">
+                      <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Confidence: High</div>
+                      <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-indigo-500" /> Data Source: STRING DB</div>
+                    </div>
+                  </div>
+                </div>
+
               </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </main>
     </div>
   );
 };

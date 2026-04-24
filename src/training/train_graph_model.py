@@ -199,29 +199,31 @@ def train(
         # Step 2: Link Prediction (Edge Chunking for Memory Stability)
         src, dst = train_edge_label_index
         num_train_edges = src.size(0)
-        chunk_size = 500 # Reduced from 2000 to 500 for extreme memory safety (~500MB per chunk)
+        # Increased chunk size for better CPU utilization and gradient stability
+        chunk_size = 10000 
         
         epoch_train_loss = 0
         for i in range(0, num_train_edges, chunk_size):
             s_c = src[i:i+chunk_size]
             d_c = dst[i:i+chunk_size]
             lbl_c = train_labels[i:i+chunk_size]
+            w_c = train_weights[i:i+chunk_size] # Use the pre-calculated weights
             
             # Predict for chunk using z_detached
             out_c = model.decode(z_detached, s_c, d_c)
-            lbl_c = train_labels[i:i+chunk_size]
             
-            # Use Focal Loss to drive accuracy higher
-            loss_c = focal_loss(out_c.squeeze(), lbl_c)
+            # Use Weighted Focal Loss to drive accuracy higher
+            # We multiply by w_c to focus on hard negatives/proximal interactions
+            loss_c = (focal_loss(out_c.squeeze(), lbl_c, alpha=0.3, gamma=2.5) * w_c).mean()
             
-            # Scale loss by chunk size relative to total edges
-            scaled_loss = loss_c * (len(s_c) / num_train_edges)
+            # Boost the gradient signal to prevent vanishing updates on CPU
+            # We use a fixed scaling factor instead of 1/total_edges
+            scaled_loss = loss_c * 10.0 
             
-            # Backprop only through decode (accumulates grads in decoder + z_detached)
+            # Backprop only through decode
             scaled_loss.backward()
             epoch_train_loss += loss_c.item() * (len(s_c) / num_train_edges)
             
-            # Clear intermediate chunk tensors
             del out_c, loss_c, scaled_loss
             
         # Step 3: Global Backprop through GNN

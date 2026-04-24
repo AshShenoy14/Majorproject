@@ -1,85 +1,87 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { 
-  Home, 
-  Search, 
-  Dna, 
-  Box, 
-  Share2, 
-  ShieldAlert, 
-  Info,
-  Database,
-  Activity,
-  Bot,
-  Globe
+  Home, Search, Dna, Box, Share2, 
+  ShieldAlert, Info, Database, Activity, 
+  Bot, Globe, Settings, Cpu
 } from 'lucide-react';
 
 const Sidebar = () => {
   const menuItems = [
-    { name: 'Dashboard', icon: <Home size={18} />, path: '/' },
-    { name: 'Interaction Predictor', icon: <Search size={18} />, path: '/predict' },
-    { name: 'Mutation Scanner', icon: <Dna size={18} />, path: '/mutation' },
-    { name: '3D Structure', icon: <Box size={18} />, path: '/structure' },
-    { name: 'Interactome Graph', icon: <Share2 size={18} />, path: '/network' },
-    { name: 'Drug Insights', icon: <ShieldAlert size={18} />, path: '/drug-targets' },
-    { name: 'Bio-AI Assistant', icon: <Bot size={18} />, path: '/assistant' },
-    { name: 'Zero-Shot Eval', icon: <Globe size={18} />, path: '/zero-shot' },
-    { name: 'System Info', icon: <Info size={18} />, path: '/about' },
+    { name: 'Terminal', icon: <Home size={16} />, path: '/' },
+    { name: 'PPI Predictor', icon: <Search size={16} />, path: '/predict' },
+    { name: 'Mutation Analysis', icon: <Dna size={16} />, path: '/mutation' },
+    { name: 'Structure View', icon: <Box size={16} />, path: '/structure' },
+    { name: 'Interactome 3D', icon: <Share2 size={16} />, path: '/network-3d' },
+    { name: 'Drug Insights', icon: <ShieldAlert size={16} />, path: '/drug-targets' },
+    { name: 'Bio-Assistant', icon: <Bot size={16} />, path: '/assistant' },
+    { name: 'Zero-Shot Eval', icon: <Globe size={16} />, path: '/zero-shot' },
   ];
 
   return (
-    <div className="scientific-sidebar">
-      <div className="p-8 flex items-center gap-3">
-        <div className="w-12 h-12 bg-gradient-to-br from-teal-400 to-teal-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-teal-500/30">
-          <Activity size={28} />
+    <div className="scientific-sidebar bg-white/90 border-r border-slate-100 shadow-2xl flex flex-col h-full overflow-hidden">
+      
+      {/* Brand Section */}
+      <div className="p-10 flex flex-col gap-1 items-center">
+        <div className="p-3 bg-emerald-500/10 rounded-2xl text-emerald-600 mb-2">
+          <Activity size={32} />
         </div>
-        <div>
-          <h1 className="text-2xl font-black tracking-tighter text-slate-800 leading-none">
-            Trans<span className="text-scientific-primary">Graph</span>
-          </h1>
-          <p className="text-[10px] text-slate-400 font-bold tracking-[0.2em] uppercase mt-1">
-            PPI FRAMEWORK
-          </p>
-        </div>
+        <h1 className="logo-cursive tracking-tight">
+          Trans<span className="text-emerald-500">Graph</span>
+        </h1>
+        <p className="text-[9px] text-slate-400 font-black tracking-[0.4em] uppercase">
+          PPI FRAMEWORK
+        </p>
       </div>
 
-      <nav className="flex-1 px-2 space-y-1">
+      {/* Navigation */}
+      <nav className="flex-1 px-4 space-y-1">
+        <div className="px-6 mb-4">
+          <p className="text-[9px] font-black text-slate-600 uppercase tracking-widest">Main Modules</p>
+        </div>
         {menuItems.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}
             className={({ isActive }) => 
-              `nav-item ${isActive ? 'active' : ''}`
+              `nav-item ${isActive ? 'active' : 'opacity-60 hover:opacity-100'}`
             }
           >
-            <div className="w-8 h-8 flex items-center justify-center rounded-lg">
+            <div className="w-5 h-5 flex items-center justify-center">
               {item.icon}
             </div>
-            <span className="text-sm font-bold tracking-tight">{item.name}</span>
+            <span className="text-[11px] font-black uppercase tracking-widest">{item.name}</span>
           </NavLink>
         ))}
       </nav>
 
+      {/* Hardware Status Panel */}
       <div className="p-6">
-        <div className="p-5 glass-card bg-white/40 border-none shadow-none">
-          <div className="flex items-center gap-2 text-scientific-primary mb-3">
-            <Database size={16} />
-            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Live Data</span>
+        <div className="p-6 bg-black/40 rounded-[2rem] border border-white/5">
+          <div className="flex items-center gap-2 text-emerald-500 mb-4">
+            <Activity size={14} />
+            <span className="text-[9px] font-black uppercase tracking-[0.2em]">Real-time Status</span>
           </div>
-          <div className="space-y-3">
+          <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] text-slate-500 font-bold uppercase">Backend</span>
-              <div className="flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-                <span className="text-[10px] text-slate-700 font-bold uppercase">Ready</span>
+              <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Engine Status</span>
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                <span className="text-[9px] text-emerald-400 font-black uppercase">Online</span>
               </div>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-[10px] text-slate-500 font-bold uppercase">GPU Sync</span>
-              <div className="flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-                <span className="text-[10px] text-slate-700 font-bold uppercase">Active</span>
+              <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">GNN Core</span>
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                <span className="text-[9px] text-emerald-400 font-black uppercase">Synced</span>
               </div>
+            </div>
+            <div className="mt-4 pt-4 border-t border-white/5">
+               <div className="flex justify-between items-center opacity-50">
+                  <span className="text-[9px] text-slate-500 font-bold uppercase">Uptime</span>
+                  <span className="text-[9px] text-slate-300 font-mono">14:22:04</span>
+               </div>
             </div>
           </div>
         </div>

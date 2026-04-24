@@ -19,22 +19,22 @@ const Layout = ({ children }) => {
   const meta = PAGE_META[location.pathname] ?? { title: 'Bioinformatics Analysis', subtitle: '' };
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen bg-slate-50">
       <Sidebar />
-      <main className="flex-1 ml-[19rem] mr-6 my-6 p-8 transition-all duration-300">
-        <header className="mb-10 flex justify-between items-center">
+      <main className="flex-1 ml-[19rem] mr-8 my-8 transition-all duration-300">
+        <header className="mb-12 flex justify-between items-center">
           <div>
-            <h2 className="text-xs font-black text-scientific-primary uppercase tracking-[0.3em] mb-1">
+            <h2 className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.4em] mb-1">
               {meta.title}
             </h2>
             {meta.subtitle && (
-              <p className="text-sm text-slate-500 font-medium tracking-tight">{meta.subtitle}</p>
+              <p className="text-xl text-slate-800 font-black tracking-tight">{meta.subtitle}</p>
             )}
           </div>
           <div className="flex items-center gap-4">
-            <div className="glass-card px-4 py-2 flex items-center gap-2 text-xs font-bold text-slate-600">
-              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-              SYSTEM ONLINE
+            <div className="glass-card bg-white px-6 py-3 flex items-center gap-3 text-[10px] font-black text-slate-400 tracking-widest border-none">
+              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)] animate-pulse"></div>
+              SYSTEM ACTIVE
             </div>
           </div>
         </header>
