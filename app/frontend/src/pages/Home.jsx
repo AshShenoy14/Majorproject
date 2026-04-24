@@ -60,8 +60,8 @@ const Home = () => {
       <div className="relative overflow-hidden rounded-[3rem] bg-white min-h-[450px] flex items-center shadow-xl border border-slate-100">
         {/* Background Image with Overlay */}
         <div 
-          className="absolute inset-0 z-0 bg-cover bg-center opacity-[0.04]"
-          style={{ backgroundImage: "url('/network_art_bg_1777002484316.png')" }}
+          className="absolute inset-0 z-0 bg-cover bg-center opacity-[0.06]"
+          style={{ backgroundImage: "url('/ppi_hero_bg_1777021983794.png')" }}
         />
         <div className="absolute inset-0 z-0 bg-gradient-to-r from-white via-white/40 to-transparent" />
         
