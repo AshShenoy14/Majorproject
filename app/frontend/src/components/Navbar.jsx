@@ -46,16 +46,16 @@ const Navbar = () => {
                 <Toolbar disableGutters>
                     {/* Logo / Title */}
                     <Typography
-                        variant="h5"
+                        variant="h4"
                         noWrap
                         component={Link}
                         to="/"
                         sx={{
                             mr: 2,
                             display: { xs: 'none', md: 'flex' },
-                            fontFamily: '"Outfit", sans-serif',
-                            fontWeight: 800,
-                            letterSpacing: '.1rem',
+                            fontFamily: "'Dancing Script', cursive",
+                            fontWeight: 700,
+                            letterSpacing: '.05rem',
                             background: `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
                             WebkitBackgroundClip: 'text',
                             WebkitTextFillColor: 'transparent',
@@ -69,7 +69,7 @@ const Navbar = () => {
                             },
                         }}
                     >
-                        TransGraph-PPI
+                        TransGraph PPI
                     </Typography>
 
                     {/* Mobile Title */}

@@ -26,7 +26,7 @@ const About = () => {
         </motion.div>
         
         <h1 className="text-5xl font-black text-slate-800 tracking-tight leading-tight">
-           Understanding the <span className="logo-cursive text-emerald-500">Magic</span> behind TransGraph
+           Understanding the Magic behind <span className="logo-cursive text-emerald-500">TransGraph PPI</span>
         </h1>
         
         <p className="text-xl text-slate-500 max-w-3xl mx-auto leading-relaxed">

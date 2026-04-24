@@ -57,37 +57,37 @@ const Home = () => {
   return (
     <div className="space-y-12">
       {/* Hero Section */}
-      <div className="relative overflow-hidden rounded-[2.5rem] bg-slate-900 min-h-[450px] flex items-center shadow-2xl">
+      <div className="relative overflow-hidden rounded-[3rem] bg-white min-h-[450px] flex items-center shadow-xl border border-slate-100">
         {/* Background Image with Overlay */}
         <div 
-          className="absolute inset-0 z-0 bg-cover bg-center opacity-40 mix-blend-overlay"
-          style={{ backgroundImage: "url('/network_bg.png')" }}
+          className="absolute inset-0 z-0 bg-cover bg-center opacity-[0.04]"
+          style={{ backgroundImage: "url('/network_art_bg_1777002484316.png')" }}
         />
-        <div className="absolute inset-0 z-0 bg-gradient-to-r from-slate-900 via-slate-900/80 to-transparent" />
+        <div className="absolute inset-0 z-0 bg-gradient-to-r from-white via-white/40 to-transparent" />
         
-        <div className="relative z-10 p-12 max-w-3xl">
+        <div className="relative z-10 p-16 max-w-3xl">
           <motion.div 
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-teal-500/10 border border-teal-500/20 backdrop-blur-xl text-teal-400 text-[10px] font-black uppercase tracking-[0.2em] mb-8"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase tracking-[0.2em] mb-8"
           >
-            <Zap size={14} /> AI-Powered Biological Discovery System
+            <Zap size={14} className="text-emerald-500" /> AI-Powered Biological Discovery System
           </motion.div>
           <motion.h1 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="text-6xl font-black mb-6 leading-[1.1] text-white tracking-tight"
+            className="text-6xl font-black mb-6 leading-[1.1] text-slate-800 tracking-tight"
           >
-            Decoding the Language of <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-violet-400">Proteins</span>
+            Decoding the Language of <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-teal-400">Proteins</span>
           </motion.h1>
           <motion.p 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="text-xl text-slate-300 mb-10 leading-relaxed font-medium"
+            className="text-xl text-slate-500 mb-10 leading-relaxed font-medium"
           >
-            TransGraph-PPI is a state-of-the-art hybrid AI framework combining protein language models (ESM-2) 
+            <span className="font-cursive text-emerald-600 text-2xl">TransGraph PPI</span> is a state-of-the-art hybrid AI framework combining protein language models (ESM-2) 
             and graph neural networks (GAT) to analyze complex biological interactomes.
           </motion.p>
           <motion.div 
@@ -96,18 +96,18 @@ const Home = () => {
             transition={{ delay: 0.3 }}
             className="flex gap-5"
           >
-            <Link to="/predict" className="btn-primary">
+            <Link to="/predict" className="btn-primary shadow-2xl shadow-emerald-200">
               Start Analysis <ArrowRight size={20} />
             </Link>
-            <Link to="/about" className="btn-secondary text-white border-white/10 hover:text-teal-400">
+            <Link to="/about" className="px-8 py-3 bg-slate-50 text-slate-600 rounded-2xl font-bold transition-all duration-300 border border-slate-100 hover:bg-slate-100 hover:text-slate-800 flex items-center justify-center gap-2">
               Technical Specs
             </Link>
           </motion.div>
         </div>
         
         {/* Floating elements for visual interest */}
-        <div className="absolute top-1/4 right-20 w-32 h-32 bg-teal-500/20 blur-[80px] rounded-full animate-pulse" />
-        <div className="absolute bottom-1/4 right-40 w-48 h-48 bg-violet-500/10 blur-[100px] rounded-full animate-pulse delay-700" />
+        <div className="absolute top-1/4 right-20 w-48 h-48 bg-emerald-100/30 blur-[80px] rounded-full animate-pulse" />
+        <div className="absolute bottom-1/4 right-40 w-64 h-64 bg-teal-100/20 blur-[100px] rounded-full animate-pulse delay-700" />
       </div>
 
       {/* Stats Grid */}
@@ -181,13 +181,13 @@ const Home = () => {
         {/* Action Cards */}
         <div className="space-y-6">
           <Link to="/predict" className="block outline-none group">
-            <div className="glass-card p-8 bg-scientific-primary text-white border-none relative overflow-hidden h-[240px] flex flex-col justify-end">
-              <div className="absolute top-0 right-0 p-8 opacity-20 group-hover:scale-110 group-hover:opacity-30 transition-all duration-500">
+            <div className="glass-card p-8 bg-white hover:bg-emerald-50/50 transition-all border-slate-100 relative overflow-hidden h-[240px] flex flex-col justify-end group">
+              <div className="absolute top-0 right-0 p-8 text-emerald-500/5 group-hover:text-emerald-500/10 group-hover:scale-110 transition-all duration-500">
                 <Search size={120} />
               </div>
-              <h4 className="text-2xl font-black mb-2 relative z-10">Predict Interaction</h4>
-              <p className="text-teal-50/70 text-sm font-medium mb-6 relative z-10">Run hybrid ESM+GAT model to predict binding probability.</p>
-              <div className="flex items-center text-xs font-black uppercase tracking-widest gap-2 relative z-10">
+              <h4 className="text-2xl font-black mb-2 text-slate-800 relative z-10">Predict Interaction</h4>
+              <p className="text-slate-500 text-sm font-medium mb-6 relative z-10">Run hybrid ESM+GAT model to predict binding probability.</p>
+              <div className="flex items-center text-xs font-black uppercase tracking-widest text-emerald-600 gap-2 relative z-10 group-hover:gap-4 transition-all">
                 Launch System <ArrowRight size={16} />
               </div>
             </div>

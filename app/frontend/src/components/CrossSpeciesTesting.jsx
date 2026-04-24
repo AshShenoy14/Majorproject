@@ -98,16 +98,15 @@ const CrossSpeciesTesting = () => {
             animate={{ opacity: 1, scale: 1 }}
             sx={{ maxWidth: 1200, margin: '0 auto', p: 3 }}
         >
-            <Box sx={{ textAlign: 'center', mb: 6 }}>
+            <Box sx={{ textAlign: 'center', mb: 8 }}>
                 <Typography variant="h3" fontWeight="900" gutterBottom sx={{ 
-                    background: isDark ? 'linear-gradient(45deg, #00e5ff, #b388ff)' : 'linear-gradient(45deg, #00695c, #6200ea)',
-                    WebkitBackgroundClip: 'text',
-                    WebkitTextFillColor: 'transparent'
+                    color: '#1e293b',
+                    letterSpacing: '-0.02em'
                 }}>
-                    Cross-Species Zero-Shot Generalization
+                    Cross-Species <span className="font-cursive text-emerald-500">Zero-Shot</span> Generalization
                 </Typography>
-                <Typography variant="h6" color="text.secondary" sx={{ maxWidth: 800, margin: '0 auto' }}>
-                    Evaluator Showcase: Prove that the TransGraph-PPI architecture learned fundamental <strong>biological physics</strong> instead of simply memorizing human datasets. Run live inference on unobserved evolutionary kingdoms.
+                <Typography variant="body1" sx={{ color: '#64748b', maxWidth: 800, margin: '0 auto', fontWeight: 500, lineHeight: 1.8 }}>
+                    Evaluator Showcase: Prove that the TransGraph-PPI architecture learned fundamental <strong className="text-slate-800">biological physics</strong> instead of simply memorizing human datasets. Run live inference on unobserved evolutionary kingdoms.
                 </Typography>
             </Box>
 
@@ -115,49 +114,70 @@ const CrossSpeciesTesting = () => {
                 {SPECIES_TESTS.map((testCase, idx) => (
                     <Grid item xs={12} key={idx}>
                         <Card sx={{ 
-                            borderRadius: 4, 
-                            border: `1px solid ${isDark ? 'rgba(0, 229, 255, 0.2)' : 'rgba(0, 105, 92, 0.2)'}`,
-                            background: isDark ? 'rgba(10, 20, 40, 0.6)' : 'rgba(255, 255, 255, 0.8)',
-                            backdropFilter: 'blur(10px)',
-                            overflow: 'visible'
+                            borderRadius: '2.5rem', 
+                            border: '1px solid rgba(0,0,0,0.05)',
+                            background: '#ffffff',
+                            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.04)',
+                            overflow: 'visible',
+                            transition: 'all 0.3s ease'
                         }}>
-                            <CardContent sx={{ p: 4 }}>
+                            <CardContent sx={{ p: 6 }}>
                                 <Grid container spacing={4} alignItems="stretch">
                                     
                                     {/* Left Panel: Test Case Info */}
                                     <Grid item xs={12} md={4}>
-                                        <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', pr: { md: 3 }, borderRight: { md: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}` } }}>
+                                        <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', pr: { md: 4 }, borderRight: { md: '1px solid rgba(0,0,0,0.05)' } }}>
                                             <Typography variant="h2" sx={{ mb: 2 }}>{testCase.icon}</Typography>
-                                            <Typography variant="h5" fontWeight="bold" color="primary" gutterBottom>
+                                            <Typography variant="h5" fontWeight="900" sx={{ color: '#059669', mb: 0.5 }}>
                                                 {testCase.species}
                                             </Typography>
-                                            <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
+                                            <Typography variant="subtitle1" fontWeight="800" sx={{ color: '#334155', mb: 2 }}>
                                                 {testCase.title}
                                             </Typography>
-                                            <Typography variant="body2" color="text.secondary" paragraph>
+                                            <Typography variant="body2" sx={{ color: '#64748b', mb: 4, fontWeight: 500, lineHeight: 1.6 }}>
                                                 {testCase.description}
                                             </Typography>
                                             
-                                            <Stack direction="row" spacing={1} sx={{ mt: 'auto', mb: 3 }}>
-                                                <Chip label={testCase.p1} size="small" variant="outlined" color="secondary" />
-                                                <Chip label="↔" size="small" sx={{ border: 'none' }} />
-                                                <Chip label={testCase.p2} size="small" variant="outlined" color="secondary" />
+                                            <Stack direction="row" spacing={1.5} sx={{ mt: 'auto', mb: 4 }}>
+                                                <Chip 
+                                                    label={testCase.p1} 
+                                                    size="small" 
+                                                    sx={{ bgcolor: '#f1f5f9', color: '#475569', fontWeight: 900, borderRadius: '8px', border: 'none' }} 
+                                                />
+                                                <Typography sx={{ color: '#cbd5e1', fontWeight: 900 }}>→</Typography>
+                                                <Chip 
+                                                    label={testCase.p2} 
+                                                    size="small" 
+                                                    sx={{ bgcolor: '#f1f5f9', color: '#475569', fontWeight: 900, borderRadius: '8px', border: 'none' }} 
+                                                />
                                             </Stack>
 
                                             <Button 
                                                 variant="contained" 
-                                                color="primary" 
                                                 size="large"
                                                 onClick={() => handleRunZeroShot(idx, testCase)}
                                                 disabled={loadingMap[idx]}
-                                                startIcon={loadingMap[idx] ? <CircularProgress size={20} /> : <GraphIcon />}
-                                                sx={{ borderRadius: '30px', fontWeight: 'bold' }}
+                                                startIcon={loadingMap[idx] ? <CircularProgress size={16} color="inherit" /> : <GraphIcon />}
+                                                sx={{ 
+                                                    borderRadius: '1rem', 
+                                                    fontWeight: 900,
+                                                    textTransform: 'uppercase',
+                                                    letterSpacing: '0.1em',
+                                                    fontSize: '0.75rem',
+                                                    py: 1.5,
+                                                    background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+                                                    boxShadow: '0 10px 20px rgba(5, 150, 105, 0.2)',
+                                                    '&:hover': {
+                                                        background: 'linear-gradient(135deg, #047857 0%, #059669 100%)',
+                                                        boxShadow: '0 15px 25px rgba(5, 150, 105, 0.3)',
+                                                    }
+                                                }}
                                             >
                                                 {loadingMap[idx] ? "Computing Topology..." : "Run Zero-Shot Evaluator"}
                                             </Button>
 
                                             {errorMap[idx] && (
-                                                <Alert severity="error" sx={{ mt: 2 }}>{errorMap[idx]}</Alert>
+                                                <Alert severity="error" variant="outlined" sx={{ mt: 2, borderRadius: '1rem', border: '1px solid #fee2e2', color: '#b91c1c', bgcolor: '#fef2f2' }}>{errorMap[idx]}</Alert>
                                             )}
                                         </Box>
                                     </Grid>
@@ -172,10 +192,10 @@ const CrossSpeciesTesting = () => {
                                                     exit={{ opacity: 0 }}
                                                     style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                                 >
-                                                    <Box sx={{ textAlign: 'center', opacity: 0.4 }}>
-                                                        <BioIcon sx={{ fontSize: 60, mb: 2 }} />
-                                                        <Typography variant="h6">Awaiting Inference</Typography>
-                                                        <Typography variant="body2">Click run to fetch live UniProt FASTA sequences and compute interaction probability.</Typography>
+                                                    <Box sx={{ textAlign: 'center', p: 4, bgcolor: '#f8fafc', borderRadius: '2rem', width: '100%', border: '1px dashed #e2e8f0' }}>
+                                                        <BioIcon sx={{ fontSize: 40, mb: 2, color: '#94a3b8' }} />
+                                                        <Typography variant="h6" sx={{ color: '#64748b', fontWeight: 900, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.2em' }}>Awaiting Inference</Typography>
+                                                        <Typography variant="body2" sx={{ color: '#94a3b8', mt: 1, fontWeight: 500 }}>Click run to fetch live UniProt FASTA sequences and compute interaction probability.</Typography>
                                                     </Box>
                                                 </motion.div>
                                             ) : loadingMap[idx] ? (
@@ -185,10 +205,10 @@ const CrossSpeciesTesting = () => {
                                                     exit={{ opacity: 0 }}
                                                     style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                                                 >
-                                                    <Box sx={{ textAlign: 'center' }}>
-                                                        <CircularProgress size={60} thickness={2} sx={{ mb: 3, color: isDark ? '#00e5ff' : '#00695c' }} />
-                                                        <Typography variant="h6" color="primary">Processing Foreign Proteome...</Typography>
-                                                        <Typography variant="body2" color="text.secondary">Running ESM-2 embeddings and Graph Attention on purely non-human topologies.</Typography>
+                                                    <Box sx={{ textAlign: 'center', p: 4, bgcolor: '#f8fafc', borderRadius: '2rem', width: '100%' }}>
+                                                        <CircularProgress size={40} thickness={4} sx={{ mb: 3, color: '#059669' }} />
+                                                        <Typography variant="h6" sx={{ color: '#059669', fontWeight: 900, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.2em' }}>Processing Foreign Proteome...</Typography>
+                                                        <Typography variant="body2" sx={{ color: '#64748b', mt: 1, fontWeight: 500 }}>Running ESM-2 embeddings and Graph Attention on purely non-human topologies.</Typography>
                                                     </Box>
                                                 </motion.div>
                                             ) : (
@@ -196,12 +216,12 @@ const CrossSpeciesTesting = () => {
                                                     initial={{ opacity: 0, x: 20 }} 
                                                     animate={{ opacity: 1, x: 0 }} 
                                                 >
-                                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4, p: 3, bgcolor: '#f8fafc', borderRadius: '2rem' }}>
                                                         <Box>
-                                                            <Typography variant="h6" color="primary" fontWeight="bold">
+                                                            <Typography variant="h6" sx={{ color: '#059669', fontWeight: 900, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.1em', mb: 1 }}>
                                                                 Zero-Shot Interaction Probability
                                                             </Typography>
-                                                            <Typography variant="h3" fontWeight="900" sx={{ color: resultMap[idx].interaction_probability > 0.5 ? '#00e676' : '#ff3d00' }}>
+                                                            <Typography variant="h3" fontWeight="900" sx={{ color: resultMap[idx].interaction_probability > 0.5 ? '#10b981' : '#ef4444', letterSpacing: '-0.05em' }}>
                                                                 {(resultMap[idx].interaction_probability * 100).toFixed(1)}%
                                                             </Typography>
                                                         </Box>
@@ -209,11 +229,9 @@ const CrossSpeciesTesting = () => {
                                                             <Chip 
                                                                 icon={<CheckIcon />} 
                                                                 label={testCase.expected} 
-                                                                color="success" 
-                                                                variant="outlined" 
-                                                                sx={{ mb: 1 }}
+                                                                sx={{ mb: 1, bgcolor: '#ecfdf5', color: '#059669', fontWeight: 900, borderRadius: '8px', border: '1px solid #d1fae5' }} 
                                                             />
-                                                            <Typography variant="caption" display="block" color="text.secondary">
+                                                            <Typography variant="caption" display="block" sx={{ color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                                                                 ESM: {(resultMap[idx].esm_probability * 100).toFixed(1)}% | GAT: {(resultMap[idx].gat_probability * 100).toFixed(1)}%
                                                             </Typography>
                                                         </Box>

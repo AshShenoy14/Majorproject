@@ -8,7 +8,7 @@ import {
 
 const Sidebar = () => {
   const menuItems = [
-    { name: 'Terminal', icon: <Home size={16} />, path: '/' },
+    { name: 'Home', icon: <Home size={16} />, path: '/' },
     { name: 'PPI Predictor', icon: <Search size={16} />, path: '/predict' },
     { name: 'Mutation Analysis', icon: <Dna size={16} />, path: '/mutation' },
     { name: 'Structure View', icon: <Box size={16} />, path: '/structure' },
@@ -57,30 +57,30 @@ const Sidebar = () => {
 
       {/* Hardware Status Panel */}
       <div className="p-6">
-        <div className="p-6 bg-black/40 rounded-[2rem] border border-white/5">
-          <div className="flex items-center gap-2 text-emerald-500 mb-4">
+        <div className="p-6 bg-slate-50 rounded-[2rem] border border-slate-100 shadow-inner">
+          <div className="flex items-center gap-2 text-emerald-600 mb-4">
             <Activity size={14} />
             <span className="text-[9px] font-black uppercase tracking-[0.2em]">Real-time Status</span>
           </div>
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">Engine Status</span>
+              <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Engine Status</span>
               <div className="flex items-center gap-2">
                 <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-                <span className="text-[9px] text-emerald-400 font-black uppercase">Online</span>
+                <span className="text-[9px] text-emerald-600 font-black uppercase">Online</span>
               </div>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">GNN Core</span>
+              <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">GNN Core</span>
               <div className="flex items-center gap-2">
                 <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                <span className="text-[9px] text-emerald-400 font-black uppercase">Synced</span>
+                <span className="text-[9px] text-emerald-600 font-black uppercase">Synced</span>
               </div>
             </div>
-            <div className="mt-4 pt-4 border-t border-white/5">
-               <div className="flex justify-between items-center opacity-50">
-                  <span className="text-[9px] text-slate-500 font-bold uppercase">Uptime</span>
-                  <span className="text-[9px] text-slate-300 font-mono">14:22:04</span>
+            <div className="mt-4 pt-4 border-t border-slate-200">
+               <div className="flex justify-between items-center opacity-80">
+                  <span className="text-[9px] text-slate-400 font-bold uppercase">Uptime</span>
+                  <span className="text-[9px] text-slate-600 font-mono">14:22:04</span>
                </div>
             </div>
           </div>

@@ -101,9 +101,10 @@ const ProteinPreloader = ({ progress, onComplete }) => {
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.2 }}
-                className="text-5xl font-black text-white tracking-tighter mb-2"
+                className="text-5xl font-black text-white tracking-tight mb-2 font-cursive"
+                style={{ fontFamily: "'Dancing Script', cursive" }}
               >
-                Trans<span className="text-teal-400">Graph</span>
+                TransGraph <span className="text-teal-400">PPI</span>
               </motion.h1>
               <motion.p
                 initial={{ opacity: 0 }}

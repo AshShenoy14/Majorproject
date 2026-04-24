@@ -61,8 +61,8 @@ const Predict = () => {
       
       {/* LEFT: Scientific Control Sidebar */}
       <aside className="w-full lg:w-[400px] flex flex-col gap-6 h-full overflow-y-auto no-scrollbar">
-        <div className="bg-slate-950 border border-white/5 rounded-3xl p-8 shadow-2xl relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+        <div className="bg-white border border-slate-100 rounded-[2.5rem] p-8 shadow-xl relative overflow-hidden group">
+          <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:opacity-[0.06] transition-opacity text-slate-900">
             <Cpu size={80} />
           </div>
           

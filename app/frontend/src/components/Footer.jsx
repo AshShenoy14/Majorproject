@@ -33,7 +33,9 @@ const Footer = () => {
                 >
                     {'© '}
                     {new Date().getFullYear()}
-                    {' TransGraph-PPI Project. All rights reserved.'}
+                    {' '}
+                    <span style={{ fontFamily: "'Dancing Script', cursive", fontWeight: 700, fontSize: '1.1rem' }}>TransGraph PPI</span>
+                    {' Project. All rights reserved.'}
                 </Typography>
                 <Typography
                     variant="caption"

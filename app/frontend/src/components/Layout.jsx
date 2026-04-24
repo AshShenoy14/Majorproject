@@ -8,6 +8,7 @@ const PAGE_META = {
   '/mutation':    { title: 'Mutation Analysis',        subtitle: 'In-Silico Mutation Impact Scanner' },
   '/structure':   { title: 'Structure Viewer',         subtitle: '3D Protein Structure Visualization' },
   '/network':     { title: 'Network Explorer',         subtitle: 'Interactome Graph Analysis' },
+  '/network-3d':  { title: 'Interactome 3D',           subtitle: 'Global Interaction Topography' },
   '/drug-targets':{ title: 'Drug Insights',            subtitle: 'Drug Target Discovery & ChEMBL Data' },
   '/assistant':   { title: 'Protein Assistant',        subtitle: 'AI-Powered Biological Query Engine' },
   '/about':       { title: 'About',                    subtitle: 'Project Overview & Model Details' },

@@ -541,7 +541,7 @@ const PredictionForm = () => {
                     pb: 2,
                     '.is-printing &': { display: 'flex' }
                   }}>
-                    <Typography variant="h4" sx={{ color: '#00695c', fontWeight: 800 }}>TransGraph-PPI</Typography>
+                    <Typography variant="h4" sx={{ color: '#00695c', fontFamily: "'Dancing Script', cursive", fontWeight: 700 }}>TransGraph PPI</Typography>
                     <Typography variant="subtitle2" color="text.secondary">Protein-Protein Interaction Analysis Report</Typography>
                     <Typography variant="caption" sx={{ mt: 1 }}>Generated on: {new Date().toLocaleDateString()}</Typography>
                   </Box>

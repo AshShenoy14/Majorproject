@@ -101,6 +101,10 @@
     font-family: var(--font-cursive);
     @apply text-3xl text-slate-800;
   }
+
+  .bg-scientific-gradient {
+    background: linear-gradient(135deg, #059669 0%, #0d9488 100%);
+  }
 }
 
 .font-mono {

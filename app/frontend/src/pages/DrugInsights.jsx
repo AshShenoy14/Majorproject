@@ -115,31 +115,34 @@ const DrugInsights = () => {
     <div className="space-y-8 pb-12">
       {/* Header & Stats */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 glass-card p-8 bg-scientific-gradient text-white flex justify-between items-center relative overflow-hidden">
+        <div className="lg:col-span-2 glass-card p-10 bg-scientific-gradient text-white flex justify-between items-center relative overflow-hidden shadow-2xl shadow-emerald-200">
            <div className="relative z-10 space-y-4">
-              <div className="flex items-center gap-3">
-                 <div className="p-2 bg-white/20 rounded-lg">
-                    <ShieldAlert size={24} />
+              <div className="flex items-center gap-4">
+                 <div className="p-3 bg-white/20 backdrop-blur-md rounded-2xl">
+                    <ShieldAlert size={28} />
                  </div>
-                 <h2 className="text-3xl font-bold">Therapeutic Insights</h2>
+                 <div>
+                    <h2 className="text-3xl font-black tracking-tight leading-none">Therapeutic <span className="font-cursive text-emerald-100">Insights</span></h2>
+                    <p className="text-[10px] font-black uppercase tracking-[0.4em] text-emerald-200/60 mt-1">Druggability Landscape</p>
+                 </div>
               </div>
-              <p className="text-teal-50/80 max-w-md">
-                 Explore the druggability landscape of the PPI network. High centrality proteins often represent critical points of failure in pathological pathways.
+              <p className="text-emerald-50/90 max-w-sm text-sm font-medium leading-relaxed">
+                 Discover high-centrality proteins that represent critical nodes in pathological pathways, identifying them as prime candidates for therapeutic targeting.
               </p>
            </div>
            <div className="relative z-10 flex gap-4">
-              <div className="text-center p-4 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20">
-                 <p className="text-2xl font-bold">42</p>
-                 <p className="text-[10px] font-bold uppercase tracking-widest text-teal-100">Known Targets</p>
+              <div className="text-center p-5 bg-white/10 backdrop-blur-xl rounded-[2rem] border border-white/20 min-w-[110px] shadow-xl">
+                 <p className="text-3xl font-black">42</p>
+                 <p className="text-[9px] font-black uppercase tracking-widest text-emerald-200">Known Targets</p>
               </div>
-              <div className="text-center p-4 bg-teal-400/20 backdrop-blur-md rounded-2xl border border-white/20">
-                 <p className="text-2xl font-bold">18</p>
-                 <p className="text-[10px] font-bold uppercase tracking-widest text-teal-100">Novel Leads</p>
+              <div className="text-center p-5 bg-emerald-400/30 backdrop-blur-xl rounded-[2rem] border border-white/20 min-w-[110px] shadow-xl">
+                 <p className="text-3xl font-black">18</p>
+                 <p className="text-[9px] font-black uppercase tracking-widest text-emerald-200">Novel Leads</p>
               </div>
            </div>
-           {/* Decorative circles */}
-           <div className="absolute -right-16 -top-16 w-64 h-64 rounded-full bg-white/10" />
-           <div className="absolute -right-8 -bottom-8 w-32 h-32 rounded-full bg-white/5" />
+           {/* Decorative elements */}
+           <div className="absolute -right-16 -top-16 w-64 h-64 rounded-full bg-white/10 blur-3xl" />
+           <div className="absolute -right-8 -bottom-8 w-32 h-32 rounded-full bg-emerald-400/10 blur-2xl" />
         </div>
 
         <div className="glass-card p-6 flex flex-col justify-center">
@@ -199,13 +202,13 @@ const DrugInsights = () => {
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
-              <tr className="bg-slate-50/50 border-b border-slate-100">
-                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Protein ID</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Criticality</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pathway</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Target Status</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Compounds</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Action</th>
+              <tr className="bg-slate-50 border-b border-slate-100">
+                <th className="px-6 py-5 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Protein ID</th>
+                <th className="px-6 py-5 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Criticality</th>
+                <th className="px-6 py-5 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Pathway</th>
+                <th className="px-6 py-5 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Target Status</th>
+                <th className="px-6 py-5 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Compounds</th>
+                <th className="px-6 py-5 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
