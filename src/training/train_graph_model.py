@@ -141,7 +141,7 @@ def train(
     optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     
     # Focal Loss for handling hard negatives and boosting accuracy to 95%
-    def focal_loss(inputs, targets, alpha=0.25, gamma=2.0):
+    def focal_loss(inputs, targets, alpha=0.5, gamma=2.0):
         # inputs are logits
         p = torch.sigmoid(inputs)
         ce_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction="none")

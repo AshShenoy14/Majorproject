@@ -3,36 +3,31 @@ import torch.nn as nn
 
 
 class SequencePPIModel(nn.Module):
-    def __init__(self, input_dim: int = 480, bio_dim: int = 10, hidden_dim: int = 512, dropout: float = 0.3):
+    def __init__(self, input_dim: int = 480, hidden_dim: int = 768, dropout: float = 0.3):
         """
-        Enhanced MLP model with Biological Feature integration.
-        input_dim: ESM embedding dimension.
-        bio_dim: Biological feature dimension (e.g. localization).
+        Stable Symmetric MLP for PPI Prediction.
+        Focuses on ESM embeddings as biological features are currently sparse.
         """
         super().__init__()
-        # Total dimension per protein: ESM + Bio
-        total_prot_dim = input_dim + bio_dim
-        
-        # Input: [emb1, emb2, |emb1-emb2|, emb1*emb2] → total_prot_dim * 4
-        pair_dim = total_prot_dim * 4
+        # Symmetric Features: [A+B, A*B, |A-B|, max(A,B)]
+        # This covers almost all pairwise relationships
+        self.feature_dim = input_dim * 4
         
         self.input_proj = nn.Sequential(
-            nn.Linear(pair_dim, hidden_dim),
-            # Use LayerNorm for better stability when combining disparate features
+            nn.Linear(self.feature_dim, hidden_dim),
             nn.LayerNorm(hidden_dim),
             nn.GELU(),
             nn.Dropout(dropout),
         )
 
-        # Residual block 1
+        # Residual Blocks
         self.res1 = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim),
             nn.BatchNorm1d(hidden_dim),
             nn.GELU(),
             nn.Dropout(dropout),
         )
-
-        # Residual block 2 (Dimension Reduction)
+        
         self.res2 = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim // 2),
             nn.BatchNorm1d(hidden_dim // 2),
@@ -42,25 +37,29 @@ class SequencePPIModel(nn.Module):
 
         self.skip_proj = nn.Linear(hidden_dim, hidden_dim // 2)
 
-        # Output head
         self.head = nn.Sequential(
-            nn.Linear(hidden_dim // 2, hidden_dim // 4),
+            nn.Linear(hidden_dim // 2, 256),
             nn.GELU(),
             nn.Dropout(dropout / 2),
-            nn.Linear(hidden_dim // 4, 1),
+            nn.Linear(256, 1),
         )
 
     def forward(self, emb1, emb2):
-        # Rich pair features
-        concat = torch.cat([emb1, emb2], dim=1)
-        abs_diff = torch.abs(emb1 - emb2)
-        hadamard = emb1 * emb2
-        x = torch.cat([concat, abs_diff, hadamard], dim=1)
+        # Ensure we only use the ESM part if bio was appended
+        # ESM-2 8M is 480 dims
+        emb1 = emb1[:, :480]
+        emb2 = emb2[:, :480]
 
-        # Forward with residual connections
+        # Symmetric operators
+        f_sum = emb1 + emb2
+        f_prod = emb1 * emb2
+        f_diff = torch.abs(emb1 - emb2)
+        f_max = torch.max(emb1, emb2)
+        
+        x = torch.cat([f_sum, f_prod, f_diff, f_max], dim=1)
+        
         x = self.input_proj(x)
         x = x + self.res1(x)
         x = self.skip_proj(x) + self.res2(x)
-        x = self.head(x)
-
-        return x
+        
+        return self.head(x)

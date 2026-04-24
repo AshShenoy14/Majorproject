@@ -103,13 +103,15 @@ def train(
     bio_dim = train_dataset.bio_dim
     print(f"Feature Dimensions: Sequence={input_dim}, Biology={bio_dim}")
 
-    model     = SequencePPIModel(input_dim=input_dim, bio_dim=bio_dim).to(device)
-    optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=1e-4)
-    # Focal Loss implementation to focus on hard samples (boosts accuracy from 75% -> 90%)
-    def focal_loss(inputs, targets, alpha=0.25, gamma=2.0):
+    model     = SequencePPIModel(input_dim=input_dim).to(device)
+    # Use AdamW with conservative weight decay
+    optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-3)
+    
+    # Balanced Focal Loss for 1:1 dataset
+    def focal_loss(inputs, targets, alpha=0.5, gamma=2.0):
         import torch.nn.functional as F
-        p = torch.sigmoid(inputs)
         ce_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction="none")
+        p = torch.sigmoid(inputs)
         p_t = p * targets + (1 - p) * (1 - targets)
         loss = ce_loss * ((1 - p_t) ** gamma)
         if alpha >= 0:
@@ -117,31 +119,34 @@ def train(
             loss = alpha_t * loss
         return loss.mean()
 
-    # Cosine annealing scheduler for smooth LR decay
+    # Stable Cosine Annealing instead of aggressive OneCycle
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-5)
 
     # ── Resume from checkpoint if it exists ──────────────────────────────
     checkpoint_path = CHECKPOINT_DIR / "sequence_checkpoint.pt"
     start_epoch     = 0
     best_val_loss   = float("inf")
-    patience        = 15
+    patience        = 10 
     epochs_no_improve = 0
 
     if checkpoint_path.exists():
         print(f"Resuming from checkpoint: {checkpoint_path}")
         checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
-        model.load_state_dict(checkpoint["model_state_dict"])
-        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-        start_epoch       = checkpoint["epoch"] + 1          # start from next epoch
-        best_val_loss     = checkpoint.get("best_val_loss", float("inf"))
-        epochs_no_improve = checkpoint.get("epochs_no_improve", 0)
-        print(f"  Resumed at epoch {start_epoch}/{epochs} | Best val loss so far: {best_val_loss:.4f}")
+        try:
+            # We force a fresh start if the architecture changed
+            if checkpoint.get("hidden_dim", 0) != 768:
+                print("Architecture mismatch. Starting fresh.")
+            else:
+                model.load_state_dict(checkpoint["model_state_dict"])
+                optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+                start_epoch       = checkpoint["epoch"] + 1
+                best_val_loss     = checkpoint.get("best_val_loss", float("inf"))
+                epochs_no_improve = checkpoint.get("epochs_no_improve", 0)
+                print(f"  Resumed at epoch {start_epoch}/{epochs}")
+        except:
+            print("Checkpoint loading failed. Starting fresh.")
     else:
         print("No checkpoint found — starting fresh training.")
-
-    if start_epoch >= epochs:
-        print(f"Training already completed ({start_epoch}/{epochs} epochs). Nothing to do.")
-        return
 
     # ── Training Loop ────────────────────────────────────────────────────
     best_model_path = MODELS_DIR / "sequence_model_best.pth"
@@ -162,14 +167,15 @@ def train(
 
             optimizer.zero_grad()
             outputs = model(emb1, emb2)
-            loss = focal_loss(outputs, labels, alpha=0.3, gamma=2.5) # Using tuned focal parameters
+            loss = focal_loss(outputs, labels)
             loss.backward()
-            # Gradient clipping for training stability
+            
+            # Scaled gradient clipping
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
 
             train_loss += loss.item()
-            pbar.set_postfix(loss=f"{loss.item():.4f}")
+            pbar.set_postfix(loss=f"{loss.item():.4f}", lr=f"{optimizer.param_groups[0]['lr']:.6f}")
 
         avg_train_loss = train_loss / len(train_loader)
 
@@ -183,10 +189,9 @@ def train(
             for emb1, emb2, labels in val_loader:
                 emb1, emb2, labels = emb1.to(device), emb2.to(device), labels.to(device).unsqueeze(1)
                 outputs = model(emb1, emb2)
-                loss = focal_loss(outputs, labels, alpha=0.3, gamma=2.5)
+                loss = focal_loss(outputs, labels)
                 val_loss += loss.item()
 
-                # Apply sigmoid for accuracy calculation (model outputs raw logits)
                 predicted = (torch.sigmoid(outputs) > 0.5).float()
                 val_total   += labels.size(0)
                 val_correct += (predicted == labels).sum().item()
@@ -194,46 +199,40 @@ def train(
         avg_val_loss = val_loss / len(val_loader) if len(val_loader) > 0 else 0.0
         val_acc      = val_correct / val_total if val_total > 0 else 0.0
 
-        # Step LR scheduler
+        # Step LR scheduler per epoch
         scheduler.step()
 
         # --- Epoch summary ---
-        current_lr = optimizer.param_groups[0]['lr']
         print(
             f"Epoch [{epoch+1}/{epochs}] | "
             f"Train Loss: {avg_train_loss:.4f} | "
             f"Val Loss: {avg_val_loss:.4f} | "
             f"Val Acc: {val_acc:.4f} | "
-            f"LR: {current_lr:.6f} | "
             f"Best Val Loss: {best_val_loss:.4f}"
         )
-        print(f"  Progress: {epoch+1}/{epochs} epochs done "
-              f"({(epoch+1)/epochs*100:.0f}%) — {epochs - epoch - 1} remaining")
 
-        # --- Save best model if validation loss improved ---
+        # --- Save best model ---
         if avg_val_loss < best_val_loss:
             best_val_loss = avg_val_loss
             epochs_no_improve = 0
             torch.save(model.state_dict(), best_model_path)
-            print(f"  [OK] New best model saved -> {best_model_path}")
+            print(f"  [OK] New best model saved (Acc: {val_acc:.4f})")
         else:
             epochs_no_improve += 1
             print(f"  No improvement for {epochs_no_improve}/{patience} epochs.")
 
-        # --- Save checkpoint (overwrite each epoch) ---
+        # --- Save checkpoint ---
         torch.save({
             "epoch": epoch,
             "model_state_dict": model.state_dict(),
             "optimizer_state_dict": optimizer.state_dict(),
-            "train_loss": avg_train_loss,
             "best_val_loss": best_val_loss,
             "epochs_no_improve": epochs_no_improve,
+            "hidden_dim": 768, # Metadata to prevent architecture mismatch
         }, checkpoint_path)
-        print(f"  [OK] Checkpoint saved -> {checkpoint_path}")
 
-        # --- Early stopping ---
         if epochs_no_improve >= patience:
-            print(f"\n  [STOP] Early stopping triggered after {patience} epochs without improvement.")
+            print(f"\n  [STOP] Early stopping triggered.")
             break
 
         cooldown_if_needed(cooldown_seconds)

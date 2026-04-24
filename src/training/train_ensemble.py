@@ -41,7 +41,7 @@ def train_ensemble(seq_model_path, graph_model_path, graph_data_path):
     print(f"Detected input_dim={input_dim}")
 
     # Sequence Model
-    seq_model = SequencePPIModel(input_dim=input_dim, bio_dim=bio_dim).to(device)
+    seq_model = SequencePPIModel(input_dim=input_dim).to(device)
     try:
         if os.path.exists(seq_model_path):
             seq_model.load_state_dict(torch.load(seq_model_path, map_location=device))
