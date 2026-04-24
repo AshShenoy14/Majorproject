@@ -81,6 +81,8 @@ def train(
     print(f"Loaded biological features for {len(bio_mapping)} proteins.")
 
     # ── Datasets & DataLoaders ───────────────────────────────────────────
+    # --- Load Datasets ---
+    print("Loading datasets for Sequence PPI...")
     train_dataset = PPIDataset(PROCESSED_DATA_DIR / "train.csv", embeddings, bio_mapping=bio_mapping, augment=True)
     val_dataset   = PPIDataset(PROCESSED_DATA_DIR / "val.csv", embeddings, bio_mapping=bio_mapping, augment=False)
 
@@ -134,8 +136,8 @@ def train(
         checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
         try:
             # We force a fresh start if the architecture changed
-            if checkpoint.get("hidden_dim", 0) != 768:
-                print("Architecture mismatch. Starting fresh.")
+            if checkpoint.get("hidden_dim", 0) != 1024:
+                print("Architecture mismatch (expected 1024). Starting fresh.")
             else:
                 model.load_state_dict(checkpoint["model_state_dict"])
                 optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
@@ -228,7 +230,7 @@ def train(
             "optimizer_state_dict": optimizer.state_dict(),
             "best_val_loss": best_val_loss,
             "epochs_no_improve": epochs_no_improve,
-            "hidden_dim": 768, # Metadata to prevent architecture mismatch
+            "hidden_dim": 1024, # Metadata to prevent architecture mismatch
         }, checkpoint_path)
 
         if epochs_no_improve >= patience:

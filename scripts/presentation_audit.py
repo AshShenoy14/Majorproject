@@ -51,7 +51,7 @@ def main():
     input_dim = next(iter(embeddings.values())).shape[-1]
 
     # Models
-    seq_model = SequencePPIModel(input_dim=input_dim, bio_dim=bio_dim).to(device)
+    seq_model = SequencePPIModel(input_dim=input_dim, hidden_dim=1024).to(device)
     if (MODELS_DIR / "sequence_model_best.pth").exists():
         seq_model.load_state_dict(torch.load(MODELS_DIR / "sequence_model_best.pth", map_location=device))
     seq_model.eval()
@@ -61,7 +61,7 @@ def main():
     if graph_model_path.exists():
         state_dict = torch.load(graph_model_path, map_location=device)
         is_gin = any("convs" in k for k in state_dict.keys())
-        graph_model = (GINLinkPredictor if is_gin else GATLinkPredictor)(in_channels=in_channels, hidden_channels=128).to(device)
+        graph_model = (GINLinkPredictor if is_gin else GATLinkPredictor)(in_channels=in_channels, hidden_channels=256).to(device)
         graph_model.load_state_dict(state_dict)
     else:
         graph_model = GATLinkPredictor(in_channels=in_channels, hidden_channels=128).to(device)
@@ -71,17 +71,21 @@ def main():
 
     # Inference
     batch_emb1, batch_emb2, g_src, g_dst, bio_features = [], [], [], [], []
+    from src.analysis.biological_managers import BiologicalManager
+    bio_manager = BiologicalManager()
+    
     for _, row in filtered_df.iterrows():
         p1, p2 = row["protein1"], row["protein2"]
         e1_v = embeddings[p1].mean(dim=0) if embeddings[p1].dim() > 1 else embeddings[p1]
         e2_v = embeddings[p2].mean(dim=0) if embeddings[p2].dim() > 1 else embeddings[p2]
-        b1 = bio_mapping.get(p1, torch.zeros(bio_dim))
-        b2 = bio_mapping.get(p2, torch.zeros(bio_dim))
-        batch_emb1.append(torch.cat([e1_v, b1]))
-        batch_emb2.append(torch.cat([e2_v, b2]))
+        batch_emb1.append(e1_v)
+        batch_emb2.append(e2_v)
         g_src.append(node_mapping[p1])
         g_dst.append(node_mapping[p2])
-        bio_features.append([1.0 if b1.sum() == b2.sum() else 0.0]) # Simplified compatibility
+        
+        # Compatibility score for ensemble
+        comp = bio_manager.check_localization_compatibility(p1, p2, fetch_missing=False)
+        bio_features.append([comp.get("score", 0.5)])
 
     batch_emb1, batch_emb2 = torch.stack(batch_emb1), torch.stack(batch_emb2)
     seq_probs = torch.sigmoid(seq_model(batch_emb1, batch_emb2)).detach().numpy().flatten()

@@ -134,9 +134,9 @@ def train(
     # ── Model, Optimizer, Loss ───────────────────────────────────────────
     if model_type == "GIN":
         from src.models.graph_model import GINLinkPredictor
-        model = GINLinkPredictor(in_channels=data.x.shape[1], hidden_channels=128).to(device)
+        model = GINLinkPredictor(in_channels=data.x.shape[1], hidden_channels=256).to(device)
     else:
-        model = GATLinkPredictor(in_channels=data.x.shape[1], hidden_channels=128, heads=4).to(device)
+        model = GATLinkPredictor(in_channels=data.x.shape[1], hidden_channels=256).to(device)
     
     optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     

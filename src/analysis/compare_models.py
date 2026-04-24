@@ -149,55 +149,31 @@ def evaluate_models():
     graph_model_path = PROJECT_ROOT / "models" / "graph_model_best.pth"
     ensemble_path = PROJECT_ROOT / "models" / "ensemble_model.pkl"
 
-    # Sequence model: ESM + Bio
-    seq_model = SequencePPIModel(input_dim=esm_dim, bio_dim=bio_dim).to(device)
+    # Sequence model: Symmetric ESM-MLP (High Capacity)
+    seq_model = SequencePPIModel(input_dim=esm_dim, hidden_dim=1024).to(device)
     if seq_path.exists():
-         print(f"  Loading Sequence Model ({esm_dim} dim)...")
+         print(f"  Loading Sequence Model ({esm_dim} dim, 1024 hidden)...")
          try:
              seq_model.load_state_dict(torch.load(seq_path, map_location=device))
          except Exception as e:
-             print(f"  [!] Sequence load failed: {e}. Trying auto-adjust...")
-             # Fallback if checkpoint doesn't match current class precisely
+             print(f"  [!] Sequence load failed: {e}")
     seq_model.eval()
 
-    # Graph Model: Dynamic Input detection (494 or 491 dims)
+    # Graph Model (High Capacity GraphSAGE)
     in_channels = graph_data.x.shape[1]
     print(f"  Detected Graph Input Channels: {in_channels}")
     if graph_model_path.exists():
-         print(f"  Loading Graph Model (in_channels={in_channels}, hidden=128)...")
+         print(f"  Loading Graph Model (256 hidden)...")
          state_dict = torch.load(graph_model_path, map_location=device, weights_only=False)
-         
-         # Auto-detect architecture by inspecting state_dict keys
          is_gin = any("convs" in k for k in state_dict.keys())
-         
-         if is_gin:
-             from src.models.graph_model import GINLinkPredictor
-             graph_model = GINLinkPredictor(in_channels=in_channels, hidden_channels=128).to(device)
-             print("  [OK] Initializing GIN architecture (Dynamic Detection).")
-         else:
-             from src.models.graph_model import GATLinkPredictor
-             graph_model = GATLinkPredictor(in_channels=in_channels, hidden_channels=128, heads=4).to(device)
-             print("  [OK] Initializing GAT architecture (Dynamic Detection).")
-             
-         try:
-             graph_model.load_state_dict(state_dict)
-             print("  [SUCCESS] Graph Model state_dict loaded.")
-         except Exception as e:
-             print(f"  [CRITICAL] Graph load failed: {e}")
-             return
+         graph_model = (GINLinkPredictor if is_gin else GATLinkPredictor)(in_channels=in_channels, hidden_channels=256).to(device)
+         graph_model.load_state_dict(state_dict)
     graph_model.eval()
 
-    ensemble_model = None
-    if ensemble_path.exists():
-         ensemble_model = joblib.load(ensemble_path)
+    ensemble_model = joblib.load(ensemble_path) if ensemble_path.exists() else None
 
     # Prepare batch data
-    batch_emb1 = []
-    batch_emb2 = []
-    g_src = []
-    g_dst = []
-    labels = []
-
+    batch_emb1, batch_emb2, g_src, g_dst, labels = [], [], [], [], []
     for _, row in filtered_df.iterrows():
         p1, p2, label = row["protein1"], row["protein2"], row["label"]
         e1, e2 = embeddings[p1], embeddings[p2]
@@ -206,12 +182,8 @@ def evaluate_models():
         e1_base = e1.mean(dim=0) if e1.dim() > 1 else e1
         e2_base = e2.mean(dim=0) if e2.dim() > 1 else e2
         
-        # Add Bio features (must match training input_dim)
-        b1 = bio_mapping.get(p1, torch.zeros(bio_dim))
-        b2 = bio_mapping.get(p2, torch.zeros(bio_dim))
-        
-        batch_emb1.append(torch.cat([e1_base, b1]))
-        batch_emb2.append(torch.cat([e2_base, b2]))
+        batch_emb1.append(e1_base)
+        batch_emb2.append(e2_base)
         g_src.append(node_mapping[p1])
         g_dst.append(node_mapping[p2])
         labels.append(label)

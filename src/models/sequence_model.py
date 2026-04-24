@@ -1,18 +1,17 @@
 import torch
 import torch.nn as nn
-
+import torch.nn.functional as F
 
 class SequencePPIModel(nn.Module):
-    def __init__(self, input_dim: int = 480, hidden_dim: int = 768, dropout: float = 0.3):
+    def __init__(self, input_dim=480, hidden_dim=1024, dropout=0.3):
         """
-        Stable Symmetric MLP for PPI Prediction.
-        Focuses on ESM embeddings as biological features are currently sparse.
+        Ultra-High Capacity Symmetric MLP for Sequence-Based PPI Prediction.
+        Designed to reach 92%+ base accuracy.
         """
         super().__init__()
-        # Symmetric Features: [A+B, A*B, |A-B|, max(A,B)]
-        # This covers almost all pairwise relationships
         self.feature_dim = input_dim * 4
         
+        # Input layer
         self.input_proj = nn.Sequential(
             nn.Linear(self.feature_dim, hidden_dim),
             nn.LayerNorm(hidden_dim),
@@ -20,12 +19,14 @@ class SequencePPIModel(nn.Module):
             nn.Dropout(dropout),
         )
 
-        # Residual Blocks
+        # Deep Residual Architecture
         self.res1 = nn.Sequential(
             nn.Linear(hidden_dim, hidden_dim),
             nn.BatchNorm1d(hidden_dim),
             nn.GELU(),
             nn.Dropout(dropout),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.BatchNorm1d(hidden_dim)
         )
         
         self.res2 = nn.Sequential(
@@ -33,24 +34,27 @@ class SequencePPIModel(nn.Module):
             nn.BatchNorm1d(hidden_dim // 2),
             nn.GELU(),
             nn.Dropout(dropout),
+            nn.Linear(hidden_dim // 2, hidden_dim // 2),
+            nn.BatchNorm1d(hidden_dim // 2)
         )
 
         self.skip_proj = nn.Linear(hidden_dim, hidden_dim // 2)
 
         self.head = nn.Sequential(
-            nn.Linear(hidden_dim // 2, 256),
+            nn.Linear(hidden_dim // 2, 512),
             nn.GELU(),
-            nn.Dropout(dropout / 2),
+            nn.Dropout(dropout),
+            nn.Linear(512, 256),
+            nn.GELU(),
             nn.Linear(256, 1),
         )
 
     def forward(self, emb1, emb2):
-        # Ensure we only use the ESM part if bio was appended
-        # ESM-2 8M is 480 dims
+        # ESM-2 embeddings (480 dims)
         emb1 = emb1[:, :480]
         emb2 = emb2[:, :480]
 
-        # Symmetric operators
+        # Symmetric operators for orientation-invariance
         f_sum = emb1 + emb2
         f_prod = emb1 * emb2
         f_diff = torch.abs(emb1 - emb2)
@@ -58,8 +62,12 @@ class SequencePPIModel(nn.Module):
         
         x = torch.cat([f_sum, f_prod, f_diff, f_max], dim=1)
         
+        # Forward pass with residuals
         x = self.input_proj(x)
-        x = x + self.res1(x)
-        x = self.skip_proj(x) + self.res2(x)
+        identity = x
+        x = F.gelu(self.res1(x) + identity)
+        
+        identity = self.skip_proj(x)
+        x = F.gelu(self.res2(x) + identity)
         
         return self.head(x)
