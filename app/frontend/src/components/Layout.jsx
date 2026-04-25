@@ -157,7 +157,7 @@ const Layout = ({ children }) => {
                     <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center text-white shadow-lg shadow-emerald-200">
                       <Activity size={16} />
                     </div>
-                    <span className="logo-cursive text-xl">Trans<span className="text-emerald-500">Graph</span></span>
+                    <span className="logo-cursive text-xl">Trans<span className="text-emerald-500">Graph PPI</span></span>
                   </motion.div>
                 </>
               )}

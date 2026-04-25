@@ -1,0 +1,58 @@
+\contentsline {chapter}{\hbox to\@tempdima {\hfil }Acknowledgement}{i}{}%
+\contentsline {chapter}{\hbox to\@tempdima {\hfil }Abstract}{ii}{}%
+\contentsline {chapter}{\hbox to\@tempdima {\hfil }Table of Contents}{iv}{}%
+\contentsline {chapter}{\hbox to\@tempdima {\hfil }List of Figures}{v}{}%
+\contentsline {chapter}{\hbox to\@tempdima {\hfil }List of Tables}{vi}{}%
+\contentsline {chapter}{\numberline {1}Introduction}{1}{}%
+\contentsline {section}{\numberline {1.1}Background}{1}{}%
+\contentsline {section}{\numberline {1.2}Problem statement}{1}{}%
+\contentsline {section}{\numberline {1.3}Objectives}{2}{}%
+\contentsline {section}{\numberline {1.4}Scope and Importance of Project}{2}{}%
+\contentsline {section}{\numberline {1.5}Feasibility Study}{3}{}%
+\contentsline {subsection}{\numberline {1.5.1}Technical Feasibility}{4}{}%
+\contentsline {subsection}{\numberline {1.5.2}Operational Feasibility}{4}{}%
+\contentsline {subsection}{\numberline {1.5.3}Economic Feasibility}{4}{}%
+\contentsline {chapter}{\numberline {2}Literature Survey}{5}{}%
+\contentsline {section}{\numberline {2.1}Introduction}{5}{}%
+\contentsline {section}{\numberline {2.2}Sequence-Based PPI Prediction and Drug Discovery (Charih et al., 2025)}{5}{}%
+\contentsline {section}{\numberline {2.3}Survey on Deep Networks for Sequence-Based PPI (Mewara \& Lalwani, 2022)}{6}{}%
+\contentsline {section}{\numberline {2.4}Deep Learning Models Plateau at Accuracy 0.65 (Reim et al., 2025)}{6}{}%
+\contentsline {section}{\numberline {2.5}MM-StackEns: Multimodal Stacked Generalization for PPI (Albu et al., 2023)}{7}{}%
+\contentsline {section}{\numberline {2.6}ESM-2: Evolutionary Scale Modeling for Protein Language (Lin et al., 2023)}{7}{}%
+\contentsline {section}{\numberline {2.7}Graph Attention Networks (Veličković et al., 2018)}{8}{}%
+\contentsline {section}{\numberline {2.8}Beyond Simple Concatenation: PLM for Multi-Chain PPI (Alsamkary et al., 2025)}{8}{}%
+\contentsline {section}{\numberline {2.9}PFMBench – Protein Foundation Model Benchmark (Gao et al., 2025)}{8}{}%
+\contentsline {section}{\numberline {2.10}ESM2-Driven PPI with Global-Local Topology (Liu \& Zhang, 2025)}{9}{}%
+\contentsline {section}{\numberline {2.11}Drug Discovery: PPI using Decoder-Only Transformers (Maurya \& Chatterjee, 2025)}{9}{}%
+\contentsline {section}{\numberline {2.12}Summary and Novelty of TransGraph-PPI}{9}{}%
+\contentsline {section}{\numberline {2.13}Comparison of existing methods / Summary}{10}{}%
+\contentsline {section}{\numberline {2.14}Proposed system}{10}{}%
+\contentsline {section}{\numberline {2.15}Comparison of existing methods / Summary}{12}{}%
+\contentsline {chapter}{\numberline {3}Methodology}{13}{}%
+\contentsline {section}{\numberline {3.1}Overall System Architecture}{13}{}%
+\contentsline {section}{\numberline {3.2}Data Collection Module}{15}{}%
+\contentsline {section}{\numberline {3.3}Data Preprocessing and Feature Extraction}{15}{}%
+\contentsline {section}{\numberline {3.4}Base Learner 1: ESM-2 + MLP}{15}{}%
+\contentsline {section}{\numberline {3.5}Base Learner 2: Graph Neural Networks (GAT/GIN)}{16}{}%
+\contentsline {section}{\numberline {3.6}Ensemble Strategy}{17}{}%
+\contentsline {section}{\numberline {3.7}Performance Evaluation}{17}{}%
+\contentsline {section}{\numberline {3.8}Drug Target Identification}{18}{}%
+\contentsline {chapter}{\numberline {4}Implementation}{19}{}%
+\contentsline {section}{\numberline {4.1}Software Requirements and Justification}{19}{}%
+\contentsline {section}{\numberline {4.2}Hardware Requirements and Justification}{19}{}%
+\contentsline {section}{\numberline {4.3}Software Requirements Specification (SRS)}{19}{}%
+\contentsline {subsection}{\numberline {4.3.1}Functional Requirements}{19}{}%
+\contentsline {subsection}{\numberline {4.3.2}Non-Functional Requirements}{20}{}%
+\contentsline {section}{\numberline {4.4}Module-wise Algorithms and Procedures}{20}{}%
+\contentsline {chapter}{\numberline {5}Experimental Results and Discussion}{24}{}%
+\contentsline {section}{\numberline {5.1}Performance Metrics and Comparison}{24}{}%
+\contentsline {section}{\numberline {5.2}Detailed Evaluation}{25}{}%
+\contentsline {section}{\numberline {5.3}Interpretability and Case Studies}{26}{}%
+\contentsline {chapter}{\numberline {6}Conclusion and Future Work}{27}{}%
+\contentsline {section}{\numberline {6.1}Conclusion}{27}{}%
+\contentsline {section}{\numberline {6.2}Future Work}{27}{}%
+\contentsline {chapter}{References}{29}{}%
+\contentsline {chapter}{\numberline {A}User Documentation and Screenshots}{31}{}%
+\contentsline {section}{\numberline {A.1}System Setup}{31}{}%
+\contentsline {section}{\numberline {A.2}Training Procedure}{31}{}%
+\contentsline {section}{\numberline {A.3}Application Output Screenshots}{31}{}%

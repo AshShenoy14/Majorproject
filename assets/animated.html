@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>TransGraph-PPI Project Timeline</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+    * { font-family: 'Inter', sans-serif; box-sizing: border-box; }
+    body { background: #f0f4f8; }
+
+    .page-wrapper {
+      background: linear-gradient(135deg, #f8f9ff 0%, #f0f4ff 50%, #fff8f0 100%);
+      min-width: 1280px;
+      padding: 24px 28px 28px;
+    }
+
+    /* Header */
+    .header-card {
+      background: white;
+      border-radius: 12px;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      min-width: 180px;
+    }
+    .header-icon-box {
+      width: 44px; height: 44px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 22px;
+    }
+
+    /* Timeline Table */
+    .gantt-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+    }
+
+    .gantt-table th {
+      font-weight: 700;
+      text-align: center;
+      padding: 0;
+    }
+
+    .phase-col { width: 110px; min-width: 110px; }
+    .task-col { width: 210px; min-width: 210px; }
+
+    /* Month header colors */
+    .month-jan { background: #7c3aed; }
+    .month-feb { background: #2563eb; }
+    .month-mar { background: #0891b2; }
+    .month-apr { background: #16a34a; }
+    .month-may { background: #ea580c; }
+
+    .week-header { background: #1e2a4a; }
+
+    /* Phase row colors */
+    .phase-01 { background: linear-gradient(135deg, #f3f0ff, #ede9fe); border-left: 4px solid #7c3aed; }
+    .phase-02 { background: linear-gradient(135deg, #eff6ff, #dbeafe); border-left: 4px solid #2563eb; }
+    .phase-03 { background: linear-gradient(135deg, #f0fdfa, #ccfbf1); border-left: 4px solid #0891b2; }
+    .phase-04 { background: linear-gradient(135deg, #f0fdf4, #dcfce7); border-left: 4px solid #16a34a; }
+    .phase-05 { background: linear-gradient(135deg, #fff7ed, #fed7aa); border-left: 4px solid #ea580c; }
+
+    /* Gantt bars */
+    .bar {
+      height: 14px;
+      border-radius: 7px;
+      display: block;
+    }
+
+    .bar-purple { background: linear-gradient(90deg, #8b5cf6, #7c3aed); }
+    .bar-blue { background: linear-gradient(90deg, #3b82f6, #2563eb); }
+    .bar-teal { background: linear-gradient(90deg, #06b6d4, #0891b2); }
+    .bar-green { background: linear-gradient(90deg, #22c55e, #16a34a); }
+    .bar-orange { background: linear-gradient(90deg, #f97316, #ea580c); }
+
+    /* Week cell */
+    .week-cell {
+      width: 36px; min-width: 36px;
+      border-left: 1px dashed #d1d5db;
+      position: relative;
+      vertical-align: middle;
+      padding: 4px 2px;
+    }
+    .week-cell:first-of-type { border-left: none; }
+
+    .task-cell {
+      vertical-align: middle;
+      padding: 6px 8px 6px 12px;
+      border-top: 1px solid #e5e7eb;
+    }
+
+    .phase-cell {
+      vertical-align: middle;
+      padding: 10px 8px;
+      border-top: 1px solid #e5e7eb;
+      border-right: 1px solid #e5e7eb;
+    }
+
+    /* Dots in header */
+    .header-dots span {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    /* Star marker */
+    .star-marker {
+      position: absolute;
+      bottom: -2px;
+      font-size: 18px;
+      color: #16a34a;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    /* Footer icons */
+    .footer-icon {
+      width: 36px; height: 36px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+    }
+
+    /* Gantt bar container */
+    .bar-container {
+      position: relative;
+      height: 14px;
+      width: 100%;
+    }
+
+    .task-bullet {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 6px;
+      flex-shrink: 0;
+      margin-top: 3px;
+    }
+
+    .month-divider {
+      border-left: 2px solid rgba(255,255,255,0.3);
+    }
+
+    /* Scrollable for smaller screens */
+    .scroll-wrap {
+      overflow-x: auto;
+    }
+
+    .presentation-label {
+      position: absolute;
+      bottom: -22px;
+      left: 50%;
+      transform: translateX(-50%);
+      white-space: nowrap;
+      font-size: 10px;
+      font-weight: 700;
+      color: #16a34a;
+    }
+  </style>
+</head>
+<body>
+<div class="scroll-wrap">
+<div class="page-wrapper">
+
+  <!-- ===== HEADER ===== -->
+  <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:18px;">
+
+    <!-- Left card: Project Start -->
+    <div class="header-card">
+      <div class="header-icon-box" style="background:#f3f0ff;">
+        <span style="font-size:22px;"></span>
+      </div>
+      <div>
+        <div style="font-size:12px; font-weight:600; color:#6b7280;">Project Start</div>
+        <div style="font-size:16px; font-weight:800; color:#7c3aed;">05 Jan 2026</div>
+      </div>
+    </div>
+
+    <!-- Center title -->
+    <div style="text-align:center; flex:1; padding: 0 20px;">
+      <div style="font-size:30px; font-weight:900; color:#1e2a4a; letter-spacing:-0.5px;">TransGraph-PPI Project Timeline</div>
+      <div style="font-size:15px; font-weight:600; color:#4b5563; margin-top:2px; display:flex; align-items:center; justify-content:center; gap:8px;">
+        <span style="flex:1; height:2px; background:linear-gradient(90deg,transparent,#7c3aed); display:inline-block; max-width:120px;"></span>
+        Jan 2026 – Sept 2026
+        <span style="flex:1; height:2px; background:linear-gradient(90deg,#7c3aed,transparent); display:inline-block; max-width:120px;"></span>
+      </div>
+      <!-- Dots -->
+      <div class="header-dots" style="margin-top:6px; display:flex; align-items:center; justify-content:center; gap:8px;">
+        <span style="background:#7c3aed;"></span>
+        <span style="background:#2563eb;"></span>
+        <span style="background:#0891b2;"></span>
+        <span style="background:#ea580c;"></span>
+      </div>
+    </div>
+
+    <!-- Right card: Presentation -->
+    <div class="header-card">
+      <div class="header-icon-box" style="background:#f0fdf4;">
+        <span style="font-size:22px;"></span>
+      </div>
+      <div>
+        <div style="font-size:12px; font-weight:600; color:#6b7280;">Presentation</div>
+        <div style="font-size:16px; font-weight:800; color:#16a34a;">25 Apr 2026</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== GANTT TABLE ===== -->
+  <div style="border-radius:14px; overflow:hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.10);">
+  <table class="gantt-table" style="width:100%; table-layout:fixed;">
+    <colgroup>
+      <col style="width:110px;">
+      <col style="width:200px;">
+      <!-- JAN: 5 weeks -->
+      <col style="width:36px;"><col style="width:36px;"><col style="width:36px;"><col style="width:36px;"><col style="width:36px;">
+      <!-- FEB: 4 weeks -->
+      <col style="width:36px;"><col style="width:36px;"><col style="width:36px;"><col style="width:36px;">
+      <!-- MAR: 5 weeks -->
+      <col style="width:36px;"><col style="width:36px;"><col style="width:36px;"><col style="width:36px;"><col style="width:36px;">
+      <!-- APR: 4 weeks -->
+      <col style="width:36px;"><col style="width:36px;"><col style="width:36px;"><col style="width:36px;">
+      <!-- MAY-SEPT -->
+      <col style="min-width:130px; width:auto;">
+    </colgroup>
+    <thead>
+      <!-- Row 1: Month headers -->
+      <tr>
+        <th rowspan="2" style="background:#1e2a4a; color:white; font-size:11px; font-weight:800; letter-spacing:1px; padding:10px 6px; text-align:center;">PHASE</th>
+        <th rowspan="2" style="background:#1e2a4a; color:white; font-size:11px; font-weight:800; letter-spacing:1px; padding:10px 6px; text-align:center; border-left:2px solid #374151;">TASK</th>
+        <!-- JAN -->
+        <th colspan="5" style="background:#7c3aed; color:white; font-size:12px; font-weight:800; padding:8px 4px; letter-spacing:0.5px;">JAN 2026</th>
+        <!-- FEB -->
+        <th colspan="4" style="background:#2563eb; color:white; font-size:12px; font-weight:800; padding:8px 4px; letter-spacing:0.5px; border-left:2px solid rgba(255,255,255,0.3);">FEB 2026</th>
+        <!-- MAR -->
+        <th colspan="5" style="background:#0891b2; color:white; font-size:12px; font-weight:800; padding:8px 4px; letter-spacing:0.5px; border-left:2px solid rgba(255,255,255,0.3);">MAR 2026</th>
+        <!-- APR -->
+        <th colspan="4" style="background:#16a34a; color:white; font-size:12px; font-weight:800; padding:8px 4px; letter-spacing:0.5px; border-left:2px solid rgba(255,255,255,0.3);">APR 2026</th>
+        <!-- MAY-SEPT -->
+        <th style="background:#ea580c; color:white; font-size:12px; font-weight:800; padding:8px 4px; letter-spacing:0.5px; border-left:2px solid rgba(255,255,255,0.3);">MAY – SEPT 2026</th>
+      </tr>
+      <!-- Row 2: Week headers -->
+      <tr style="background:#1e2a4a; color:#9ca3af; font-size:10px; font-weight:700;">
+        <!-- JAN weeks -->
+        <td style="text-align:center; padding:4px 2px; border-left:1px solid #374151;">W1</td>
+        <td style="text-align:center; padding:4px 2px; border-left:1px dashed #374151;">W2</td>
+        <td style="text-align:center; padding:4px 2px; border-left:1px dashed #374151;">W3</td>
+        <td style="text-align:center; padding:4px 2px; border-left:1px dashed #374151;">W4</td>
+        <td style="text-align:center; padding:4px 2px; border-left:1px dashed #374151;">W5</td>
+        <!-- FEB weeks -->
+        <td style="text-align:center; padding:4px 2px; border-left:2px solid #4b5563;">W1</td>
+        <td style="text-align:center; padding:4px 2px; border-left:1px dashed #374151;">W2</td>
+        <td style="text-align:center; padding:4px 2px; border-left:1px dashed #374151;">W3</td>
+        <td style="text-align:center; padding:4px 2px; border-left:1px dashed #374151;">W4</td>
+        <!-- MAR weeks -->
+        <td style="text-align:center; padding:4px 2px; border-left:2px solid #4b5563;">W1</td>
+        <td style="text-align:center; padding:4px 2px; border-left:1px dashed #374151;">W2</td>
+        <td style="text-align:center; padding:4px 2px; border-left:1px dashed #374151;">W3</td>
+        <td style="text-align:center; padding:4px 2px; border-left:1px dashed #374151;">W4</td>
+        <td style="text-align:center; padding:4px 2px; border-left:1px dashed #374151;">W5</td>
+        <!-- APR weeks -->
+        <td style="text-align:center; padding:4px 2px; border-left:2px solid #4b5563;">W1</td>
+        <td style="text-align:center; padding:4px 2px; border-left:1px dashed #374151;">W2</td>
+        <td style="text-align:center; padding:4px 2px; border-left:1px dashed #374151;">W3</td>
+        <td style="text-align:center; padding:4px 2px; border-left:1px dashed #374151;">W4</td>
+        <!-- MAY-SEPT -->
+        <td style="text-align:center; padding:4px 2px; border-left:2px solid #4b5563;"></td>
+      </tr>
+    </thead>
+    <tbody>
+
+      <!-- ===== PHASE 01: RESEARCH PHASE ===== -->
+      <!-- Task 1: Problem Identification -->
+      <tr>
+        <td rowspan="3" class="phase-cell" style="background:linear-gradient(135deg,#f5f3ff,#ede9fe); border-left:4px solid #7c3aed; text-align:center; border-right:1px solid #e5e7eb;">
+          <div style="font-size:22px; font-weight:900; color:#7c3aed; line-height:1;">01</div>
+          <div style="font-size:9px; font-weight:800; color:#5b21b6; letter-spacing:0.5px; margin-top:4px;">RESEARCH</div>
+          <div style="font-size:9px; font-weight:800; color:#5b21b6; letter-spacing:0.5px;">PHASE</div>
+          <div style="font-size:22px; margin-top:6px;"></div>
+        </td>
+        <td class="task-cell" style="background:linear-gradient(135deg,#fdfcff,#f5f3ff);">
+          <div style="display:flex; align-items:flex-start;">
+            <span class="task-bullet" style="background:#7c3aed;"></span>
+            <span style="font-size:11px; color:#374151; font-weight:500;">Problem Identification</span>
+          </div>
+        </td>
+        <!-- JAN W1: bar spans W1 -->
+        <td class="week-cell" style="background:#fafbff;"><div class="bar bar-purple" style="width:100%;"></div></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <!-- FEB -->
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <!-- MAR -->
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <!-- APR -->
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <!-- MAY-SEPT -->
+        <td class="week-cell" style="background:#fff7ed;"></td>
+      </tr>
+
+      <!-- Task 2: Literature Survey -->
+      <tr>
+        <td class="task-cell" style="background:linear-gradient(135deg,#fdfcff,#f5f3ff);">
+          <div style="display:flex; align-items:flex-start;">
+            <span class="task-bullet" style="background:#7c3aed;"></span>
+            <span style="font-size:11px; color:#374151; font-weight:500;">Literature Survey</span>
+          </div>
+        </td>
+        <!-- JAN W2-W4 bar -->
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"><div class="bar bar-purple" style="width:100%;"></div></td>
+        <td class="week-cell" style="background:#fafbff;"><div class="bar bar-purple" style="width:100%;"></div></td>
+        <td class="week-cell" style="background:#fafbff;"><div class="bar bar-purple" style="width:100%;"></div></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#fff7ed;"></td>
+      </tr>
+
+      <!-- Task 3: Finalizing Problem Statement -->
+      <tr>
+        <td class="task-cell" style="background:linear-gradient(135deg,#fdfcff,#f5f3ff);">
+          <div style="display:flex; align-items:flex-start;">
+            <span class="task-bullet" style="background:#7c3aed;"></span>
+            <span style="font-size:11px; color:#374151; font-weight:500;">Finalizing Problem Statement</span>
+          </div>
+        </td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"><div class="bar bar-purple" style="width:100%;"></div></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#fff7ed;"></td>
+      </tr>
+
+      <!-- ===== PHASE 02: PLANNING & PROPOSAL ===== -->
+      <!-- Task 4: Project Proposal -->
+      <tr>
+        <td rowspan="3" class="phase-cell" style="background:linear-gradient(135deg,#eff6ff,#dbeafe); border-left:4px solid #2563eb; text-align:center; border-right:1px solid #e5e7eb; border-top:2px solid #e5e7eb;">
+          <div style="font-size:22px; font-weight:900; color:#2563eb; line-height:1;">02</div>
+          <div style="font-size:9px; font-weight:800; color:#1d4ed8; letter-spacing:0.5px; margin-top:4px;">PLANNING &</div>
+          <div style="font-size:9px; font-weight:800; color:#1d4ed8; letter-spacing:0.5px;">PROPOSAL</div>
+          <div style="font-size:22px; margin-top:6px;"></div>
+        </td>
+        <td class="task-cell" style="background:linear-gradient(135deg,#f8fbff,#eff6ff); border-top:2px solid #e5e7eb;">
+          <div style="display:flex; align-items:flex-start;">
+            <span class="task-bullet" style="background:#2563eb;"></span>
+            <span style="font-size:11px; color:#374151; font-weight:500;">Project Proposal</span>
+          </div>
+        </td>
+        <!-- JAN W5 -->
+        <td class="week-cell" style="background:#fafbff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#fafbff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#fafbff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#fafbff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#fafbff; border-top:2px solid #e5e7eb;"><div class="bar bar-blue" style="width:100%;"></div></td>
+        <!-- FEB W1-W2 -->
+        <td class="week-cell" style="background:#f0f4ff; border-top:2px solid #e5e7eb;"><div class="bar bar-blue" style="width:100%;"></div></td>
+        <td class="week-cell" style="background:#f0f4ff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0f4ff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0f4ff; border-top:2px solid #e5e7eb;"></td>
+        <!-- MAR -->
+        <td class="week-cell" style="background:#f0fbff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0fbff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0fbff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0fbff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0fbff; border-top:2px solid #e5e7eb;"></td>
+        <!-- APR -->
+        <td class="week-cell" style="background:#f0fff4; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0fff4; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0fff4; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0fff4; border-top:2px solid #e5e7eb;"></td>
+        <!-- MAY-SEPT -->
+        <td class="week-cell" style="background:#fff7ed; border-top:2px solid #e5e7eb;"></td>
+      </tr>
+
+      <!-- Task 5: Data Collection -->
+      <tr>
+        <td class="task-cell" style="background:linear-gradient(135deg,#f8fbff,#eff6ff);">
+          <div style="display:flex; align-items:flex-start;">
+            <span class="task-bullet" style="background:#2563eb;"></span>
+            <span style="font-size:11px; color:#374151; font-weight:500;">Data Collection<br><span style="color:#6b7280; font-size:10px;">(STRING/BioGRID/UniProt)</span></span>
+          </div>
+        </td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <!-- FEB W2-W3 -->
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"><div class="bar bar-blue" style="width:100%;"></div></td>
+        <td class="week-cell" style="background:#f0f4ff;"><div class="bar bar-blue" style="width:100%;"></div></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#fff7ed;"></td>
+      </tr>
+
+      <!-- Task 6: Documentation + Screenshots -->
+      <tr>
+        <td class="task-cell" style="background:linear-gradient(135deg,#f8fbff,#eff6ff);">
+          <div style="display:flex; align-items:flex-start;">
+            <span class="task-bullet" style="background:#2563eb;"></span>
+            <span style="font-size:11px; color:#374151; font-weight:500;">Documentation + Screenshots<br><span style="color:#6b7280; font-size:10px;">(Start)</span></span>
+          </div>
+        </td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <!-- FEB W1 → FEB W4 -->
+        <td class="week-cell" style="background:#f0f4ff;"><div class="bar bar-blue" style="width:100%;"></div></td>
+        <td class="week-cell" style="background:#f0f4ff;"><div class="bar bar-blue" style="width:100%;"></div></td>
+        <td class="week-cell" style="background:#f0f4ff;"><div class="bar bar-blue" style="width:100%;"></div></td>
+        <td class="week-cell" style="background:#f0f4ff;"><div class="bar bar-blue" style="width:100%;"></div></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#fff7ed;"></td>
+      </tr>
+
+      <!-- ===== PHASE 03: MODEL DEVELOPMENT ===== -->
+      <!-- Task 7: Data Preprocessing -->
+      <tr>
+        <td rowspan="5" class="phase-cell" style="background:linear-gradient(135deg,#f0fdfa,#ccfbf1); border-left:4px solid #0891b2; text-align:center; border-right:1px solid #e5e7eb; border-top:2px solid #e5e7eb;">
+          <div style="font-size:22px; font-weight:900; color:#0891b2; line-height:1;">03</div>
+          <div style="font-size:9px; font-weight:800; color:#0e7490; letter-spacing:0.5px; margin-top:4px;">MODEL</div>
+          <div style="font-size:9px; font-weight:800; color:#0e7490; letter-spacing:0.5px;">DEVELOPMENT</div>
+          <div style="font-size:22px; margin-top:6px;"></div>
+        </td>
+        <td class="task-cell" style="background:linear-gradient(135deg,#f7fffe,#f0fdfa); border-top:2px solid #e5e7eb;">
+          <div style="display:flex; align-items:flex-start;">
+            <span class="task-bullet" style="background:#0891b2;"></span>
+            <span style="font-size:11px; color:#374151; font-weight:500;">Data Preprocessing</span>
+          </div>
+        </td>
+        <td class="week-cell" style="background:#fafbff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#fafbff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#fafbff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#fafbff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#fafbff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0f4ff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0f4ff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0f4ff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0f4ff; border-top:2px solid #e5e7eb;"></td>
+        <!-- MAR W1-W2 -->
+        <td class="week-cell" style="background:#f0fbff; border-top:2px solid #e5e7eb;"><div class="bar bar-teal" style="width:100%;"></div></td>
+        <td class="week-cell" style="background:#f0fbff; border-top:2px solid #e5e7eb;"><div class="bar bar-teal" style="width:100%;"></div></td>
+        <td class="week-cell" style="background:#f0fbff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0fbff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0fbff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0fff4; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0fff4; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0fff4; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0fff4; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#fff7ed; border-top:2px solid #e5e7eb;"></td>
+      </tr>
+
+      <!-- Task 8: ESM-2 Embeddings -->
+      <tr>
+        <td class="task-cell" style="background:linear-gradient(135deg,#f7fffe,#f0fdfa);">
+          <div style="display:flex; align-items:flex-start;">
+            <span class="task-bullet" style="background:#0891b2;"></span>
+            <span style="font-size:11px; color:#374151; font-weight:500;">ESM-2 Embeddings</span>
+          </div>
+        </td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <!-- MAR W2-W3 -->
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"><div class="bar bar-teal" style="width:100%;"></div></td>
+        <td class="week-cell" style="background:#f0fbff;"><div class="bar bar-teal" style="width:100%;"></div></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#fff7ed;"></td>
+      </tr>
+
+      <!-- Task 9: MLP Model -->
+      <tr>
+        <td class="task-cell" style="background:linear-gradient(135deg,#f7fffe,#f0fdfa);">
+          <div style="display:flex; align-items:flex-start;">
+            <span class="task-bullet" style="background:#0891b2;"></span>
+            <span style="font-size:11px; color:#374151; font-weight:500;">MLP Model (Base Learner 1)</span>
+          </div>
+        </td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <!-- MAR W2-W4 -->
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"><div class="bar bar-teal" style="width:100%;"></div></td>
+        <td class="week-cell" style="background:#f0fbff;"><div class="bar bar-teal" style="width:100%;"></div></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#fff7ed;"></td>
+      </tr>
+
+      <!-- Task 10: GAT Model -->
+      <tr>
+        <td class="task-cell" style="background:linear-gradient(135deg,#f7fffe,#f0fdfa);">
+          <div style="display:flex; align-items:flex-start;">
+            <span class="task-bullet" style="background:#0891b2;"></span>
+            <span style="font-size:11px; color:#374151; font-weight:500;">GAT Model (Base Learner 2)</span>
+          </div>
+        </td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <!-- MAR W3-W4 -->
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"><div class="bar bar-teal" style="width:100%;"></div></td>
+        <td class="week-cell" style="background:#f0fbff;"><div class="bar bar-teal" style="width:100%;"></div></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#fff7ed;"></td>
+      </tr>
+
+      <!-- Task 11: Ensemble Model -->
+      <tr>
+        <td class="task-cell" style="background:linear-gradient(135deg,#f7fffe,#f0fdfa);">
+          <div style="display:flex; align-items:flex-start;">
+            <span class="task-bullet" style="background:#0891b2;"></span>
+            <span style="font-size:11px; color:#374151; font-weight:500;">Ensemble Model<br><span style="color:#6b7280; font-size:10px;">(XGBoost Meta Learner)</span></span>
+          </div>
+        </td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <!-- MAR W4-W5 -->
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"><div class="bar bar-teal" style="width:100%;"></div></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#fff7ed;"></td>
+      </tr>
+
+      <!-- ===== PHASE 04: EVALUATION ===== -->
+      <!-- Task 12: Metrics Calculation -->
+      <tr>
+        <td rowspan="5" class="phase-cell" style="background:linear-gradient(135deg,#f0fdf4,#dcfce7); border-left:4px solid #16a34a; text-align:center; border-right:1px solid #e5e7eb; border-top:2px solid #e5e7eb;">
+          <div style="font-size:22px; font-weight:900; color:#16a34a; line-height:1;">04</div>
+          <div style="font-size:9px; font-weight:800; color:#15803d; letter-spacing:0.5px; margin-top:4px;">EVALUATION</div>
+          <div style="font-size:9px; font-weight:800; color:#15803d; letter-spacing:0.5px;">(BEFORE</div>
+          <div style="font-size:9px; font-weight:800; color:#15803d; letter-spacing:0.5px;">PRESENTATION)</div>
+          <div style="font-size:22px; margin-top:6px;"></div>
+        </td>
+        <td class="task-cell" style="background:linear-gradient(135deg,#f7fff9,#f0fdf4); border-top:2px solid #e5e7eb;">
+          <div style="display:flex; align-items:flex-start;">
+            <span class="task-bullet" style="background:#16a34a;"></span>
+            <span style="font-size:11px; color:#374151; font-weight:500;">Metrics Calculation</span>
+          </div>
+        </td>
+        <td class="week-cell" style="background:#fafbff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#fafbff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#fafbff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#fafbff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#fafbff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0f4ff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0f4ff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0f4ff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0f4ff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0fbff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0fbff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0fbff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0fbff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0fbff; border-top:2px solid #e5e7eb;"></td>
+        <!-- APR W1-W2 -->
+        <td class="week-cell" style="background:#f0fff4; border-top:2px solid #e5e7eb;"><div class="bar bar-green" style="width:100%;"></div></td>
+        <td class="week-cell" style="background:#f0fff4; border-top:2px solid #e5e7eb;"><div class="bar bar-green" style="width:100%;"></div></td>
+        <td class="week-cell" style="background:#f0fff4; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0fff4; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#fff7ed; border-top:2px solid #e5e7eb;"></td>
+      </tr>
+
+      <!-- Task 13: Threshold Optimization -->
+      <tr>
+        <td class="task-cell" style="background:linear-gradient(135deg,#f7fff9,#f0fdf4);">
+          <div style="display:flex; align-items:flex-start;">
+            <span class="task-bullet" style="background:#16a34a;"></span>
+            <span style="font-size:11px; color:#374151; font-weight:500;">Threshold Optimization</span>
+          </div>
+        </td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <!-- APR W2-W3 -->
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#f0fff4;"><div class="bar bar-green" style="width:100%;"></div></td>
+        <td class="week-cell" style="background:#f0fff4;"><div class="bar bar-green" style="width:100%;"></div></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#fff7ed;"></td>
+      </tr>
+
+      <!-- Task 14: SHAP + Network Analysis -->
+      <tr>
+        <td class="task-cell" style="background:linear-gradient(135deg,#f7fff9,#f0fdf4);">
+          <div style="display:flex; align-items:flex-start;">
+            <span class="task-bullet" style="background:#16a34a;"></span>
+            <span style="font-size:11px; color:#374151; font-weight:500;">SHAP + Network Analysis</span>
+          </div>
+        </td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <!-- APR W2 only -->
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#f0fff4;"><div class="bar bar-green" style="width:100%;"></div></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#fff7ed;"></td>
+      </tr>
+
+      <!-- Task 15: Dashboard/Visualizations -->
+      <tr>
+        <td class="task-cell" style="background:linear-gradient(135deg,#f7fff9,#f0fdf4);">
+          <div style="display:flex; align-items:flex-start;">
+            <span class="task-bullet" style="background:#16a34a;"></span>
+            <span style="font-size:11px; color:#374151; font-weight:500;">Dashboard / Visualizations</span>
+          </div>
+        </td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <!-- APR W3 -->
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#f0fff4;"><div class="bar bar-green" style="width:100%;"></div></td>
+        <td class="week-cell" style="background:#fff7ed;"></td>
+      </tr>
+
+      <!-- Task 16: Presentation (Internal Viva) -->
+      <tr>
+        <td class="task-cell" style="background:linear-gradient(135deg,#f7fff9,#f0fdf4);">
+          <div style="display:flex; align-items:flex-start;">
+            <span class="task-bullet" style="background:#16a34a;"></span>
+            <span style="font-size:11px; color:#16a34a; font-weight:700;">PRESENTATION (Internal Viva)</span>
+          </div>
+        </td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <!-- APR W4: star marker -->
+        <td class="week-cell" style="background:#f0fff4; position:relative;">
+          <div style="position:relative; text-align:center;">
+            <span style="font-size:20px; color:#16a34a; display:block; line-height:1;">⭐</span>
+            <span style="font-size:9px; font-weight:700; color:#16a34a; white-space:nowrap; position:absolute; left:50%; transform:translateX(-50%); top:20px;">25 Apr 2026</span>
+          </div>
+        </td>
+        <td class="week-cell" style="background:#fff7ed;"></td>
+      </tr>
+
+      <!-- ===== PHASE 05: POST-PRESENTATION ===== -->
+      <!-- Task 17: Improvements & Modifications -->
+      <tr>
+        <td rowspan="3" class="phase-cell" style="background:linear-gradient(135deg,#fff7ed,#fed7aa); border-left:4px solid #ea580c; text-align:center; border-right:1px solid #e5e7eb; border-top:2px solid #e5e7eb;">
+          <div style="font-size:22px; font-weight:900; color:#ea580c; line-height:1;">05</div>
+          <div style="font-size:9px; font-weight:800; color:#c2410c; letter-spacing:0.5px; margin-top:4px;">POST-PRESENTATION</div>
+          <div style="font-size:9px; font-weight:800; color:#c2410c; letter-spacing:0.5px;">WORK</div>
+          <div style="font-size:9px; font-weight:800; color:#c2410c; letter-spacing:0.5px;">(IMPLEMENTATION</div>
+          <div style="font-size:9px; font-weight:800; color:#c2410c; letter-spacing:0.5px;">& REPORT)</div>
+          <div style="font-size:22px; margin-top:6px;"></div>
+        </td>
+        <td class="task-cell" style="background:linear-gradient(135deg,#fffbf7,#fff7ed); border-top:2px solid #e5e7eb;">
+          <div style="display:flex; align-items:flex-start;">
+            <span class="task-bullet" style="background:#ea580c;"></span>
+            <span style="font-size:11px; color:#374151; font-weight:500;">Improvements & Modifications</span>
+          </div>
+        </td>
+        <td class="week-cell" style="background:#fafbff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#fafbff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#fafbff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#fafbff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#fafbff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0f4ff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0f4ff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0f4ff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0f4ff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0fbff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0fbff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0fbff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0fbff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0fbff; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0fff4; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0fff4; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0fff4; border-top:2px solid #e5e7eb;"></td>
+        <td class="week-cell" style="background:#f0fff4; border-top:2px solid #e5e7eb;"></td>
+        <!-- MAY-SEPT: long orange bar -->
+        <td class="week-cell" style="background:#fff7ed; border-top:2px solid #e5e7eb; padding:4px 6px;">
+          <div class="bar bar-orange" style="width:75%;"></div>
+        </td>
+      </tr>
+
+      <!-- Task 18: Final Implementation -->
+      <tr>
+        <td class="task-cell" style="background:linear-gradient(135deg,#fffbf7,#fff7ed);">
+          <div style="display:flex; align-items:flex-start;">
+            <span class="task-bullet" style="background:#ea580c;"></span>
+            <span style="font-size:11px; color:#374151; font-weight:500;">Final Implementation</span>
+          </div>
+        </td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <!-- MAY-SEPT -->
+        <td class="week-cell" style="background:#fff7ed; padding:4px 6px;">
+          <div class="bar bar-orange" style="width:88%; margin-left:12%;"></div>
+        </td>
+      </tr>
+
+      <!-- Task 19: Report Writing & Submission -->
+      <tr>
+        <td class="task-cell" style="background:linear-gradient(135deg,#fffbf7,#fff7ed);">
+          <div style="display:flex; align-items:flex-start;">
+            <span class="task-bullet" style="background:#ea580c;"></span>
+            <span style="font-size:11px; color:#374151; font-weight:500;">Report Writing & Submission</span>
+          </div>
+        </td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#fafbff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0f4ff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fbff;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <td class="week-cell" style="background:#f0fff4;"></td>
+        <!-- MAY-SEPT: full width bar -->
+        <td class="week-cell" style="background:#fff7ed; padding:4px 6px;">
+          <div class="bar bar-orange" style="width:100%;"></div>
+        </td>
+      </tr>
+
+    </tbody>
+  </table>
+  </div>
+
+  <!-- ===== FOOTER ===== -->
+  <div style="display:flex; gap:12px; margin-top:18px; align-items:stretch;">
+
+    <!-- Objective -->
+    <div style="flex:1; background:white; border-radius:12px; padding:14px 14px; box-shadow:0 2px 8px rgba(0,0,0,0.07); display:flex; gap:10px; align-items:flex-start;">
+      <div style="font-size:26px; flex-shrink:0;"></div>
+      <div>
+        <div style="font-size:12px; font-weight:800; color:#1e2a4a; margin-bottom:4px;">Objective</div>
+        <div style="font-size:10.5px; color:#4b5563; line-height:1.4;">Predict Protein–Protein Interactions with high accuracy & explainability</div>
+      </div>
+    </div>
+
+    <!-- Datasets -->
+    <div style="flex:1; background:white; border-radius:12px; padding:14px 14px; box-shadow:0 2px 8px rgba(0,0,0,0.07); display:flex; gap:10px; align-items:flex-start;">
+      <div style="font-size:26px; flex-shrink:0;"></div>
+      <div>
+        <div style="font-size:12px; font-weight:800; color:#1e2a4a; margin-bottom:4px;">Datasets</div>
+        <div style="font-size:10.5px; color:#4b5563; line-height:1.4;">STRING, BioGRID, UniProt, ChEMBL</div>
+      </div>
+    </div>
+
+    <!-- Models -->
+    <div style="flex:1; background:white; border-radius:12px; padding:14px 14px; box-shadow:0 2px 8px rgba(0,0,0,0.07); display:flex; gap:10px; align-items:flex-start;">
+      <div style="font-size:26px; flex-shrink:0;"></div>
+      <div>
+        <div style="font-size:12px; font-weight:800; color:#1e2a4a; margin-bottom:4px;">Models</div>
+        <div style="font-size:10.5px; color:#4b5563; line-height:1.4;">ESM-2, MLP, GAT, XGBoost Ensemble</div>
+      </div>
+    </div>
+
+    <!-- Evaluation -->
+    <div style="flex:1; background:white; border-radius:12px; padding:14px 14px; box-shadow:0 2px 8px rgba(0,0,0,0.07); display:flex; gap:10px; align-items:flex-start;">
+      <div style="font-size:26px; flex-shrink:0;"></div>
+      <div>
+        <div style="font-size:12px; font-weight:800; color:#1e2a4a; margin-bottom:4px;">Evaluation</div>
+        <div style="font-size:10.5px; color:#4b5563; line-height:1.4;">Metrics, Threshold Tuning, SHAP, Network Analysis</div>
+      </div>
+    </div>
+
+    <!-- Outcome -->
+    <div style="flex:1; background:white; border-radius:12px; padding:14px 14px; box-shadow:0 2px 8px rgba(0,0,0,0.07); display:flex; gap:10px; align-items:flex-start;">
+      <div style="font-size:26px; flex-shrink:0;"></div>
+      <div>
+        <div style="font-size:12px; font-weight:800; color:#1e2a4a; margin-bottom:4px;">Outcome</div>
+        <div style="font-size:10.5px; color:#4b5563; line-height:1.4;">Accurate PPI Prediction, Network Insights & Drug Target Identification</div>
+      </div>
+    </div>
+
+    <!-- Project Goal (highlighted) -->
+    <div style="flex:1.3; background:linear-gradient(135deg,#eff6ff,#f0fdf4); border-radius:12px; padding:14px 14px; box-shadow:0 2px 8px rgba(0,0,0,0.10); display:flex; gap:10px; align-items:flex-start; border:1.5px solid #e0e7ef;">
+      <div style="font-size:26px; flex-shrink:0;"></div>
+      <div>
+        <div style="font-size:12px; font-weight:800; color:#1e2a4a; margin-bottom:4px;">Project Goal</div>
+        <div style="font-size:10.5px; color:#374151; line-height:1.4;">Build a robust, explainable and real-world applicable system for PPI prediction and analysis.</div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+</div>
+</body>
+</html>
