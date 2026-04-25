@@ -72,17 +72,17 @@ def train_ensemble(seq_model_path, graph_model_path, graph_data_path):
                 print("Detected GIN architecture for Graph Model.")
                 graph_model = GINLinkPredictor(in_channels=in_channels, hidden_channels=128).to(device)
             else:
-                print("Detected GAT architecture for Graph Model.")
-                graph_model = GATLinkPredictor(in_channels=in_channels, hidden_channels=128, heads=4).to(device)
+                print("Detected SAGEConv architecture for Graph Model.")
+                graph_model = GATLinkPredictor(in_channels=in_channels, hidden_channels=256).to(device)
                 
             graph_model.load_state_dict(state_dict)
             print(f"Loaded Graph Model from {graph_model_path}")
         except Exception as e:
-            print(f"Failed to detect/load graph model: {e}. Defaulting to GAT.")
-            graph_model = GATLinkPredictor(in_channels=in_channels, hidden_channels=128, heads=4).to(device)
+            print(f"Failed to detect/load graph model: {e}. Defaulting to SAGEConv.")
+            graph_model = GATLinkPredictor(in_channels=in_channels, hidden_channels=256).to(device)
     else:
-        print(f"Graph model not found at {graph_model_path}. Defaulting to GAT.")
-        graph_model = GATLinkPredictor(in_channels=in_channels, hidden_channels=128, heads=4).to(device)
+        print(f"Graph model not found at {graph_model_path}. Defaulting to SAGEConv.")
+        graph_model = GATLinkPredictor(in_channels=in_channels, hidden_channels=256).to(device)
     
     graph_model.eval()
 

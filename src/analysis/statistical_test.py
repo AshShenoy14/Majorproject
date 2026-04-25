@@ -86,9 +86,19 @@ def run_p_test(n_iterations=10):
         seq_model.load_state_dict(torch.load(seq_path, map_location=device))
     seq_model.eval()
 
-    graph_model = GATLinkPredictor(in_channels=graph_data.x.shape[1], hidden_channels=128, heads=4).to(device)
+    # Auto-detect graph model architecture from checkpoint
+    in_channels = graph_data.x.shape[1]
     if graph_model_path.exists():
-        graph_model.load_state_dict(torch.load(graph_model_path, map_location=device))
+        state_dict = torch.load(graph_model_path, map_location=device)
+        is_gin = any("convs" in k for k in state_dict.keys())
+        if is_gin:
+            from src.models.graph_model import GINLinkPredictor
+            graph_model = GINLinkPredictor(in_channels=in_channels, hidden_channels=128).to(device)
+        else:
+            graph_model = GATLinkPredictor(in_channels=in_channels, hidden_channels=256).to(device)
+        graph_model.load_state_dict(state_dict)
+    else:
+        graph_model = GATLinkPredictor(in_channels=in_channels, hidden_channels=256).to(device)
     graph_model.eval()
 
     # Pre-calculate probabilities for the whole set to speed up bootstrapping

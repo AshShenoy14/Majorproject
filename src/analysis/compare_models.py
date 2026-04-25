@@ -159,14 +159,19 @@ def evaluate_models():
              print(f"  [!] Sequence load failed: {e}")
     seq_model.eval()
 
-    # Graph Model (High Capacity GraphSAGE)
+    # Graph Model (auto-detect architecture from checkpoint)
     in_channels = graph_data.x.shape[1]
     print(f"  Detected Graph Input Channels: {in_channels}")
     if graph_model_path.exists():
-         print(f"  Loading Graph Model (256 hidden)...")
+         print(f"  Loading Graph Model...")
          state_dict = torch.load(graph_model_path, map_location=device, weights_only=False)
          is_gin = any("convs" in k for k in state_dict.keys())
-         graph_model = (GINLinkPredictor if is_gin else GATLinkPredictor)(in_channels=in_channels, hidden_channels=256).to(device)
+         if is_gin:
+             print(f"  Detected GIN architecture (128 hidden).")
+             graph_model = GINLinkPredictor(in_channels=in_channels, hidden_channels=128).to(device)
+         else:
+             print(f"  Detected SAGEConv architecture (256 hidden).")
+             graph_model = GATLinkPredictor(in_channels=in_channels, hidden_channels=256).to(device)
          graph_model.load_state_dict(state_dict)
     graph_model.eval()
 

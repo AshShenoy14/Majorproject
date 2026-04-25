@@ -134,7 +134,7 @@ def train(
     # ── Model, Optimizer, Loss ───────────────────────────────────────────
     if model_type == "GIN":
         from src.models.graph_model import GINLinkPredictor
-        model = GINLinkPredictor(in_channels=data.x.shape[1], hidden_channels=256).to(device)
+        model = GINLinkPredictor(in_channels=data.x.shape[1], hidden_channels=128).to(device)
     else:
         model = GATLinkPredictor(in_channels=data.x.shape[1], hidden_channels=256).to(device)
     
@@ -199,8 +199,8 @@ def train(
         # Step 2: Link Prediction (Edge Chunking for Memory Stability)
         src, dst = train_edge_label_index
         num_train_edges = src.size(0)
-        # Increased chunk size for better CPU utilization and gradient stability
-        chunk_size = 10000 
+        # Reduced chunk size to prevent OOM from nn.Bilinear backward ([chunk, 256, 256] gradient)
+        chunk_size = 1000 
         
         epoch_train_loss = 0
         for i in range(0, num_train_edges, chunk_size):
@@ -247,7 +247,7 @@ def train(
             z_val = model.encode(data.x, data.edge_index)
             
             # Chunked validation to prevent space overflow
-            val_outputs = chunked_decode(model, z_val, val_edge_label_index, chunk_size=500)
+            val_outputs = chunked_decode(model, z_val, val_edge_label_index, chunk_size=1000)
             val_loss = F.binary_cross_entropy_with_logits(val_outputs.squeeze(), val_labels).item()
             val_probs = torch.sigmoid(val_outputs.squeeze()).cpu().numpy()
             y_true = val_labels.cpu().numpy()

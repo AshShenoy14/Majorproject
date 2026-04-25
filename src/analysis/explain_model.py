@@ -36,7 +36,7 @@ def explain_prediction(protein1_id: str, protein2_id: str):
     if is_gin:
         model = GINLinkPredictor(in_channels=data.x.shape[1], hidden_channels=128).to(device)
     else:
-        model = GATLinkPredictor(in_channels=data.x.shape[1], hidden_channels=128, heads=4).to(device)
+        model = GATLinkPredictor(in_channels=data.x.shape[1], hidden_channels=256).to(device)
         
     model.load_state_dict(state_dict)
     model.eval()

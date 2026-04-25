@@ -559,26 +559,6 @@ The development ecosystem is centered around Python 3.10+, utilizing PyTorch and
 \section{Hardware Requirements and Justification}
 While the framework is designed for computational efficiency and can be trained on consumer-grade hardware such as an \textbf{NVIDIA RTX 3050 (4GB VRAM)} or a high-end multi-core CPU, the use of professional-grade GPUs like the \textbf{NVIDIA RTX 4090} significantly accelerates the generation of embeddings from the 33-layer ESM-2 transformer and handles large-scale graph interactomes with ease. A minimum of 16GB RAM is recommended to manage high-density interaction networks.
 
-\section{Software Requirements Specification (SRS)}
-This section details the functional and non-functional requirements as outlined in the SRS document, ensuring the system meets the biological and computational standards for PPI prediction.
-
-\subsection{Functional Requirements}
-\begin{itemize}
-    \item \textbf{Data Ingestion}: The system must support importing large-scale interaction networks from STRING and BioGRID in CSV or TSV formats.
-    \item \textbf{Sequence Processing}: The framework must handle raw FASTA sequences, performing automated cleaning and tokenization for the ESM-2 transformer.
-    \item \textbf{Hybrid Modeling}: The system must execute parallel training of the MLP-based sequence encoder and the Graph Attention Network (GAT).
-    \item \textbf{Ensemble Stacking}: A meta-learner must be implemented to unify base learner outputs, providing a single probability score for every protein pair.
-    \item \textbf{Interpretability}: The system must generate SHAP value plots to visualize the contribution of specific amino acid residues to the prediction.
-\end{itemize}
-
-\subsection{Non-Functional Requirements}
-\begin{itemize}
-    \item \textbf{Accuracy}: The model must achieve an AUROC of at least 0.90 on high-confidence human interaction datasets.
-    \item \textbf{Scalability}: The system architecture should be capable of processing interactomes with over 20,000 proteins and 1 million interactions.
-    \item \textbf{Robustness}: The framework must handle sparse network data by relying on sequence semantics when topological features are unavailable.
-    \item \textbf{Usability}: The implementation should provide clear logging and visualization of training metrics (Loss, Accuracy, F1-score).
-\end{itemize}
-
 \section{Module-wise Algorithms and Procedures}
 The core logic of TransGraph-PPI is encapsulated in three primary modules: the ESM-2 sequence encoder, the Graph Attention training loop, and the XGBoost ensemble stacking strategy.
 
@@ -632,19 +612,6 @@ The core logic of TransGraph-PPI is encapsulated in three primary modules: the E
 \end{algorithmic}
 \end{algorithm}
 
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.8\textwidth]{pic/zero_shot_eval.png}
-\caption{Zero-Shot Generalization Evaluator: Validating Cross-Species Interaction Prediction}
-\label{fig:zero-shot-eval}
-\end{figure}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.8\textwidth]{pic/tsne_plot.png}
-\caption{ESM-2 Embedding Visualization (t-SNE Plot)}
-\label{fig:tsne}
-\end{figure}
 
 \begin{table}[H]
 \centering
@@ -870,17 +837,6 @@ The following screenshots demonstrate the fully functional TransGraph-PPI resear
 \caption{TransGraph-PPI Interactive Dashboard: Production-Grade Performance Metrics}
 \end{figure}
 
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.95\textwidth]{pic/zero_shot_eval.png}
-\caption{Zero-Shot Generalization Evaluator: Cross-Species Interaction Prediction}
-\end{figure}
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.95\textwidth]{pic/esm2_pipeline.png}
-\caption{ESM-2 Embedding Extraction Interface}
-\end{figure}
 
 \begin{figure}[H]
 \centering
@@ -918,10 +874,5 @@ The following screenshots demonstrate the fully functional TransGraph-PPI resear
 \caption{Ensemble Stacking Strategy Output}
 \end{figure}
 
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.95\textwidth]{pic/correlation_matrix_bin.png}
-\caption{Feature Correlation Matrix for Binary Interaction Prediction}
-\end{figure}
 
 \end{document}

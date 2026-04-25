@@ -11,11 +11,12 @@ Write-Host "--- Step 2: Training Ultra-High Capacity Sequence Model ---" -Foregr
 # Using 40 epochs for the deeper 1024-dim architecture
 python -u src/training/train_sequence_model.py --embedding_path data/processed/embeddings.pt --epochs 40 --batch_size 128 --lr 0.001
 
-Write-Host "--- Step 3: Training Neighborhood-Aware Graph Model (GraphSAGE) ---" -ForegroundColor Cyan
-# SAGE is more robust for link prediction on large graphs
-python -u src/training/train_graph_model.py --graph_path data/processed/ppi_graph.pt --model_type GAT --epochs 30 --lr 0.0005
+Write-Host "--- Step 3: Training Graph Model (SAGEConv) ---" -ForegroundColor Cyan
+# SAGEConv with 256 hidden, --cpu-friendly for memory-safe training
+python -u src/training/train_graph_model.py --graph_path data/processed/ppi_graph.pt --model_type GAT --epochs 30 --lr 0.0005 --cpu-friendly
 
 Write-Host "--- Step 4: Training Deep Stacking Ensemble (XGBoost Meta-Learner) ---" -ForegroundColor Cyan
 python -u src/training/train_ensemble.py
 
+Write-Host "--- Step 5: Model Comparison & Evaluation ---" -ForegroundColor Cyan
 python -u src/analysis/compare_models.py

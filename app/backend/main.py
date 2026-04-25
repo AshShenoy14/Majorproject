@@ -101,24 +101,24 @@ async def load_system():
             if graph_path.exists():
                 try:
                     state_dict = torch.load(graph_path, map_location=device)
-                    # Auto-detect architecture: GIN uses 'convs', GAT uses 'conv1'
+                    # Auto-detect architecture: GIN uses 'convs', SAGEConv uses 'conv1'
                     is_gin = any("convs" in k for k in state_dict.keys())
                     
                     if is_gin:
                         print("Detected GIN architecture for Graph Model.")
                         models["graph_model"] = GINLinkPredictor(in_channels=in_channels, hidden_channels=128).to(device)
                     else:
-                        print("Detected GAT architecture for Graph Model.")
-                        models["graph_model"] = GATLinkPredictor(in_channels=in_channels, hidden_channels=128, heads=4).to(device)
+                        print("Detected SAGEConv architecture for Graph Model.")
+                        models["graph_model"] = GATLinkPredictor(in_channels=in_channels, hidden_channels=256).to(device)
                     
                     models["graph_model"].load_state_dict(state_dict)
                     print("Graph Model loaded.")
                 except Exception as e:
                     print(f"Warning: Could not load Graph Model weights ({e}). Initializing default architecture.")
-                    models["graph_model"] = GATLinkPredictor(in_channels=in_channels, hidden_channels=128, heads=4).to(device)
+                    models["graph_model"] = GATLinkPredictor(in_channels=in_channels, hidden_channels=256).to(device)
             else:
-                print("Warning: Graph Model weights not found. Defaulting to GAT.")
-                models["graph_model"] = GATLinkPredictor(in_channels=in_channels, hidden_channels=128, heads=4).to(device)
+                print("Warning: Graph Model weights not found. Defaulting to SAGEConv.")
+                models["graph_model"] = GATLinkPredictor(in_channels=in_channels, hidden_channels=256).to(device)
             
             models["graph_model"].eval()
             
