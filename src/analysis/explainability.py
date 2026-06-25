@@ -18,19 +18,35 @@ class PPIExplainer:
 
     def explain_prediction(self, seq_prob: float, graph_prob: float, conf_seq: float, conf_graph: float, disagreement: float, max_conf: float, bio_score: float):
         """
-        Explains a single prediction made by the ensemble using the 7 features.
-        Features: [seq, graph, conf_seq, conf_graph, disagreement, max_conf, bio_score]
+        Explains a single prediction made by the ensemble using the 8 features.
+        Features: [seq, graph, conf_seq, conf_graph, disagreement, max_conf, consensus, bio_score]
         """
         if self.explainer is None:
-            return np.array([[0.0] * 7])
+            return np.array([[0.0] * 8])
             
-        # Matrix matching the features the meta-learner was trained on
-        X = np.array([[seq_prob, graph_prob, conf_seq, conf_graph, disagreement, max_conf, bio_score]])
+        # Calculate consensus (must match ensemble_model.py logic)
+        consensus = seq_prob * graph_prob
         
-        # Handle legacy models (4 or 5 features)
-        n_expected = getattr(self.model, "n_features_in_", 7)
-        if n_expected < 7:
-            X = X[:, :n_expected]
+        # Matrix matching the features the meta-learner was trained on (8 features)
+        X = np.array([[
+            seq_prob, 
+            graph_prob, 
+            conf_seq, 
+            conf_graph, 
+            disagreement, 
+            max_conf, 
+            consensus, 
+            bio_score
+        ]])
+        
+        # Handle legacy models or feature count mismatch
+        n_expected = getattr(self.model, "n_features_in_", 8)
+        if X.shape[1] != n_expected:
+            print(f"Warning: Feature count mismatch. Expected {n_expected}, got {X.shape[1]}. Truncating/Padding.")
+            if X.shape[1] > n_expected:
+                X = X[:, :n_expected]
+            else:
+                X = np.pad(X, ((0, 0), (0, n_expected - X.shape[1])), 'constant')
             
         shap_values = self.explainer.shap_values(X)
         
@@ -41,7 +57,7 @@ class PPIExplainer:
              
         return shap_values
 
-    def save_summary_plot(self, X: np.ndarray, feature_names=["ESM-MLP", "GAT", "|ESM-0.5|", "|GAT-0.5|", "Disagreement", "Max Conf", "Bio Localization"], title="SHAP Summary Plot", output_path="shap_summary.png"):
+    def save_summary_plot(self, X: np.ndarray, feature_names=["ESM-MLP", "GAT", "|ESM-0.5|", "|GAT-0.5|", "Disagreement", "Max Conf", "Consensus", "Bio Localization"], title="SHAP Summary Plot", output_path="shap_summary.png"):
         """
         Generates and saves a SHAP summary plot for a batch of predictions.
         """

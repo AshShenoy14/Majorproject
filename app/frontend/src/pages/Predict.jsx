@@ -4,7 +4,7 @@ import {
   Search, Activity, BarChart3, Info, CheckCircle2, 
   XCircle, AlertCircle, Loader2, ChevronRight, 
   ShieldCheck, Cpu, Database, Terminal as TerminalIcon,
-  Zap, ArrowRightLeft, LayoutGrid, Box
+  Zap, ArrowRightLeft, LayoutGrid, Box, BookOpen
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, 
