@@ -24,7 +24,7 @@ import {
   Minimize as NeutralIcon
 } from '@mui/icons-material';
 import { motion, AnimatePresence } from 'framer-motion';
-import axios from 'axios';
+import { ppiService } from '../services/api';
 
 const MutationScanner = ({ protein1, protein2, isDark }) => {
   const [mutations, setMutations] = useState([
@@ -58,12 +58,13 @@ const MutationScanner = ({ protein1, protein2, isDark }) => {
     setDesigning(true);
     setError(null);
     try {
-      const resp = await axios.post('http://localhost:8000/analysis/optimize', {
-        protein1_id: protein1.id,
-        protein1_seq: protein1.seq,
-        protein2_id: protein2.id,
-        protein2_seq: protein2.seq
-      }, { params: { mode } });
+      const resp = await ppiService.optimize(
+        protein1.id,
+        protein1.seq,
+        protein2.id,
+        protein2.seq,
+        mode
+      );
       
       const suggestions = resp.data.suggestions;
       setMutations(suggestions.map(s => ({
@@ -87,27 +88,27 @@ const MutationScanner = ({ protein1, protein2, isDark }) => {
     setError(null);
     setVulnerability(null);
     try {
-      const payload = {
-        protein1_id: protein1.id,
-        protein1_seq: protein1.seq,
-        protein2_id: protein2.id,
-        protein2_seq: protein2.seq,
-        mutations: mutations.map(m => ({
+      const resp = await ppiService.mutate(
+        protein1.id,
+        protein1.seq,
+        protein2.id,
+        protein2.seq,
+        mutations.map(m => ({
           ...m,
           protein: parseInt(m.protein),
           pos: parseInt(m.pos)
         })).filter(m => m.pos && m.orig && m.mut)
-      };
-
-      const resp = await axios.post('http://localhost:8000/analysis/mutate', payload);
+      );
       setResults(resp.data.mutation_results);
 
       // Check Pathway Vulnerability for the most disruptive mutation
       const maxDisrupt = resp.data.mutation_results.sort((a, b) => a.impact_delta - b.impact_delta)[0];
       if (maxDisrupt && maxDisrupt.impact_delta < -0.1) {
-          const vResp = await axios.get('http://localhost:8000/analysis/vulnerability', {
-              params: { p1: protein1.id, p2: protein2.id, delta: maxDisrupt.impact_delta }
-          });
+          const vResp = await ppiService.getVulnerability(
+              protein1.id,
+              protein2.id,
+              maxDisrupt.impact_delta
+          );
           setVulnerability(vResp.data);
       }
     } catch (err) {

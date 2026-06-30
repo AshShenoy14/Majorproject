@@ -1,5 +1,4 @@
-import { useState, useEffect } from 'react';
-import axios from 'axios';
+import { ppiService } from '../services/api';
 import {
     Box,
     Button,
@@ -52,7 +51,7 @@ const RealDataVerifier = () => {
     const fetchNetwork = async () => {
         setLoadingNetwork(true);
         try {
-            const res = await axios.get('http://localhost:8000/network?limit=50'); // Increased limit
+            const res = await ppiService.getNetwork(50); // Increased limit
             setNetworkNodes(res.data.nodes || []);
         } catch (e) {
             console.error("Failed to fetch network", e);
@@ -66,7 +65,7 @@ const RealDataVerifier = () => {
         setSelectedProtein(nodeId);
         setLoadingTargets(true);
         try {
-            const res = await axios.get(`http://localhost:8000/drug_targets?proteins=${nodeId}`);
+            const res = await ppiService.getDrugTargets(nodeId);
             setTargets(res.data);
         } catch (e) {
             console.error("Failed to fetch targets", e);

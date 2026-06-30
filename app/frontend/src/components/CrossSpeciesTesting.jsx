@@ -15,6 +15,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { AutoGraph as GraphIcon, Biotech as BioIcon, CheckCircle as CheckIcon } from '@mui/icons-material';
 import axios from 'axios';
+import { ppiService } from '../services/api';
 import InteractionVisualizer from './InteractionVisualizer';
 
 // Known Non-Human Interactions for Evaluation
@@ -80,7 +81,7 @@ const CrossSpeciesTesting = () => {
                 protein2_seq: seq2
             };
             
-            const response = await axios.post('http://localhost:8000/predict', payload);
+            const response = await ppiService.predict(testCase.p1, testCase.p2, seq1, seq2);
             setResultMap(prev => ({...prev, [index]: response.data}));
             
         } catch (err) {

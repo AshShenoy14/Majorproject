@@ -63,27 +63,11 @@ const DrugInsights = () => {
         console.error("Drug insights error:", err);
         setError("Failed to load drug target insights.");
         // #region agent log
-        fetch('http://127.0.0.1:7656/ingest/a2c6930f-0198-499d-9920-7d735f885f13', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Debug-Session-Id': 'e579db'
-          },
-          body: JSON.stringify({
-            sessionId: 'e579db',
-            runId: 'pre-fix',
-            hypothesisId: 'H1',
-            location: 'DrugInsights.jsx:fetchData',
-            message: 'Error fetching drug targets',
-            data: {
-              baseURL: ppiService?.defaults?.baseURL || null,
-              endpoint: '/drug_targets',
-              errorMessage: err?.message || null,
-              errorCode: err?.code || null
-            },
-            timestamp: Date.now()
-          })
-        }).catch(() => {});
+        ppiService.logTelemetry('DrugInsights.jsx:fetchData', 'Error fetching drug targets', {
+          endpoint: '/drug_targets',
+          errorMessage: err?.message || null,
+          errorCode: err?.code || null
+        });
         // #endregion
       } finally {
         setLoading(false);

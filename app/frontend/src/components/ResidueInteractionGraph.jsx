@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { Box, Typography, Paper, CircularProgress, Chip, Stack } from '@mui/material';
 import ForceGraph2D from 'react-force-graph-2d';
-import axios from 'axios';
+import { ppiService } from '../services/api';
 
 const ResidueInteractionGraph = ({ proteinId, sequence, isDark }) => {
     const [data, setData] = useState(null);
@@ -14,10 +14,7 @@ const ResidueInteractionGraph = ({ proteinId, sequence, isDark }) => {
             if (!proteinId) return;
             setLoading(true);
             try {
-                const resp = await axios.post('http://localhost:8000/analysis/residue_graph', {
-                    protein_id: proteinId,
-                    sequence: sequence
-                });
+                const resp = await ppiService.getResidueGraph(proteinId, sequence);
                 setData(resp.data);
             } catch (err) {
                 console.error("Failed to fetch RIG:", err);

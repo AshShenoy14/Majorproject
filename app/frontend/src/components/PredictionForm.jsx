@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import { ppiService } from '../services/api';
 import {
   Box,
   Button,
@@ -136,7 +136,7 @@ const PredictionForm = () => {
           throw new Error("No valid pairs found in CSV.");
         }
 
-        const response = await axios.post('http://localhost:8000/predict_batch', { pairs });
+        const response = await ppiService.predictBatch(pairs);
         setBatchResults(response.data);
         // Set the first one as active result
         if (response.data.length > 0) {
@@ -196,7 +196,7 @@ const PredictionForm = () => {
         protein1_seq: seq1,
         protein2_seq: seq2,
       };
-      const response = await axios.post('http://localhost:8000/predict', payload);
+      const response = await ppiService.predict(id1 || "Protein A", id2 || "Protein B", seq1, seq2);
       setResult(response.data);
       saveToHistory({ id1: id1 || "Protein A", id2: id2 || "Protein B", result: response.data });
       
@@ -214,8 +214,8 @@ const PredictionForm = () => {
     try {
       if (p1 && p2) {
         const [bioRes, feasRes] = await Promise.all([
-          axios.get(`http://localhost:8000/bio/metadata?proteins=${p1},${p2}`),
-          axios.get(`http://localhost:8000/bio/feasibility?p1=${p1}&p2=${p2}`)
+          ppiService.getBioMetadata(`${p1},${p2}`),
+          ppiService.getFeasibility(p1, p2)
         ]);
         setBioInfo(bioRes.data);
         setFeasibility(feasRes.data);
@@ -228,7 +228,7 @@ const PredictionForm = () => {
   const fetchAiInsight = async (p1, p2) => {
     try {
       const msg = `Tell me a brief, fascinating biological fact about the interaction between ${p1} and ${p2}. Why is it important in human health? Limit to 2 sentences.`;
-      const res = await axios.post('http://localhost:8000/chat', { message: msg });
+      const res = await ppiService.sendChatMessage(msg);
       setAiInsight(res.data.response);
     } catch (e) {
       console.error("AI Insight failed", e);
