@@ -35,6 +35,26 @@ from app.backend.schemas import (
     ResidueGraphRequest, ChatRequest, ChatResponse
 )
 
+import torch.nn.functional as F
+
+def insert_novel_node_knn(novel_emb, existing_embs, k=2):
+    """
+    Computes cosine similarity between a novel protein embedding and existing graph node embeddings,
+    returning the keys/IDs of the top-k nearest neighbors.
+    """
+    if not existing_embs:
+        return []
+    similarities = {}
+    novel_emb_cpu = novel_emb.cpu().float()
+    for node_id, emb in existing_embs.items():
+        emb_cpu = emb.cpu().float()
+        sim = F.cosine_similarity(novel_emb_cpu.unsqueeze(0), emb_cpu.unsqueeze(0)).item()
+        similarities[node_id] = sim
+    
+    # Sort by similarity descending
+    sorted_neighbors = sorted(similarities.items(), key=lambda x: x[1], reverse=True)
+    return [node_id for node_id, _ in sorted_neighbors[:k]]
+
 app = FastAPI(title="TransGraph-PPI API", description="Hybrid Ensemble PPI Prediction System with Real Data")
 
 # CORS configuration
@@ -246,9 +266,9 @@ async def predict_interaction(pair: ProteinPair):
             # Apply sigmoid to raw logits (model outputs logits, not probabilities)
             seq_prob = torch.sigmoid(models["seq_model"](e1_final, e2_final)).item()
             
-        # 4. Graph Prediction (with Mapping Resilience)
+        # 4. Graph Prediction (with Mapping Resilience and KNN Cold-Start)
         graph_prob = 0.5 
-        if "mapping" in data_cache:
+        if "mapping" in data_cache and "graph" in data_cache:
             m_p1 = managers["id_mapper"].resolve_to_graph_id(p1, set(data_cache["mapping"].keys()))
             m_p2 = managers["id_mapper"].resolve_to_graph_id(p2, set(data_cache["mapping"].keys()))
             
@@ -261,6 +281,45 @@ async def predict_interaction(pair: ProteinPair):
                 with torch.no_grad():
                     g_out = models["graph_model"](data_cache["graph"].x, data_cache["graph"].edge_index, edge_label_index)
                     graph_prob = torch.sigmoid(g_out).item()
+            else:
+                # One or both proteins are missing from the pre-constructed graph (Cold-Start)
+                # Build or retrieve the cached node embeddings dictionary
+                if "existing_embeddings" not in data_cache:
+                    esm_dim = data_cache["graph"].x.shape[1] - 3
+                    data_cache["existing_embeddings"] = {
+                        pid: data_cache["graph"].x[idx, :esm_dim].cpu()
+                        for pid, idx in data_cache["mapping"].items()
+                    }
+                
+                k = 2  # default top-k nearest neighbors
+                
+                # Retrieve or find indices for P1
+                if m_p1 in data_cache["mapping"]:
+                    nb_indices1 = [data_cache["mapping"][m_p1]]
+                else:
+                    nb_p1 = insert_novel_node_knn(embs[p1], data_cache["existing_embeddings"], k=k)
+                    nb_indices1 = [data_cache["mapping"][n] for n in nb_p1]
+                
+                # Retrieve or find indices for P2
+                if m_p2 in data_cache["mapping"]:
+                    nb_indices2 = [data_cache["mapping"][m_p2]]
+                else:
+                    nb_p2 = insert_novel_node_knn(embs[p2], data_cache["existing_embeddings"], k=k)
+                    nb_indices2 = [data_cache["mapping"][n] for n in nb_p2]
+                
+                # Form edge pairs for GAT prediction across all neighbor combinations
+                src_indices = []
+                dst_indices = []
+                for idx1 in nb_indices1:
+                    for idx2 in nb_indices2:
+                        src_indices.append(idx1)
+                        dst_indices.append(idx2)
+                
+                if src_indices and dst_indices:
+                    edge_label_index = torch.tensor([src_indices, dst_indices], dtype=torch.long).to(models["esm"].device)
+                    with torch.no_grad():
+                        g_out = models["graph_model"](data_cache["graph"].x, data_cache["graph"].edge_index, edge_label_index)
+                        graph_prob = torch.sigmoid(g_out).mean().item()
         
         # 5. Final Prediction (Ensemble or Simple Average)
         final_prob = (seq_prob + graph_prob) / 2.0
