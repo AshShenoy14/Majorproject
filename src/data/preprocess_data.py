@@ -58,10 +58,46 @@ def load_sequences(fasta_file: str) -> dict:
         seqs[seq_id] = str(record.seq)
     return seqs
 
-def generate_hard_negatives(positive_df: pd.DataFrame, all_proteins: List[str], ratio: float = 0.5) -> pd.DataFrame:
+def load_localization_cache() -> dict:
+    """
+    Loads biological localization cache as a dictionary of protein_id -> set of locations.
+    """
+    loc_dict = {}
+    try:
+        from src.utils.paths import PROCESSED_DATA_DIR
+        cache_path = PROCESSED_DATA_DIR / "bio_metadata_cache.csv"
+        if cache_path.exists():
+            df = pd.read_csv(cache_path).fillna("")
+            for _, row in df.iterrows():
+                pid = str(row.get("protein_id", "")).strip()
+                loc_str = str(row.get("localization", "")).strip()
+                if pid and loc_str:
+                    locs = {x.strip().lower() for x in loc_str.split(";") if x.strip()}
+                    if locs:
+                        loc_dict[pid] = locs
+            print(f"Loaded {len(loc_dict)} protein localizations from cache.")
+    except Exception as e:
+        print(f"Warning: Could not load localization cache ({e})")
+    return loc_dict
+
+def is_co_localized(p1: str, p2: str, loc_dict: dict) -> bool:
+    """
+    Returns True if p1 and p2 share at least one subcellular localization.
+    If either protein has no localization data, defaults to True to prevent over-filtering.
+    """
+    if not loc_dict:
+        return True
+    locs1 = loc_dict.get(p1)
+    locs2 = loc_dict.get(p2)
+    if not locs1 or not locs2:
+        return True
+    return len(locs1.intersection(locs2)) > 0
+
+def generate_hard_negatives(positive_df: pd.DataFrame, all_proteins: List[str], ratio: float = 0.5, loc_dict: dict = None) -> pd.DataFrame:
     """
     Generates 'hard' negative samples using Common Neighbors strategy.
     Pairs that share neighbors but don't interact are harder to distinguish.
+    Filtered by subcellular co-localization if loc_dict is provided.
     """
     print("Generating hard negative samples (Common Neighbors)...")
     from collections import defaultdict
@@ -91,42 +127,50 @@ def generate_hard_negatives(positive_df: pd.DataFrame, all_proteins: List[str], 
                 u_c, v_c = (u, v) if u < v else (v, u)
                 
                 if (u_c, v_c) not in positive_pairs and (u_c, v_c) not in hard_negatives:
-                    hard_negatives.add((u_c, v_c))
-                    if len(hard_negatives) >= num_needed:
-                        break
+                    if loc_dict is None or is_co_localized(u_c, v_c, loc_dict):
+                        hard_negatives.add((u_c, v_c))
+                        if len(hard_negatives) >= num_needed:
+                            break
             if len(hard_negatives) >= num_needed: break
             
     print(f"Generated {len(hard_negatives)} hard negatives.")
     return pd.DataFrame(list(hard_negatives), columns=["protein1", "protein2"])
 
-def generate_negative_samples(positive_df: pd.DataFrame, all_proteins: List[str], ratio: float = 1.0, hard_ratio: float = 0.5) -> pd.DataFrame:
+def generate_negative_samples(positive_df: pd.DataFrame, all_proteins: List[str], ratio: float = 1.0, hard_ratio: float = 0.5, loc_dict: dict = None) -> pd.DataFrame:
     """
     Generates negative samples by mixing random (easy) and common-neighbor (hard) pairs.
+    Each pair is constrained to share subcellular localization.
     """
-    num_hard = int(len(positive_df) * ratio * hard_ratio)
-    num_easy = int(len(positive_df) * ratio) - num_hard
+    total_needed = int(len(positive_df) * ratio)
     
-    hard_df = generate_hard_negatives(positive_df, all_proteins, ratio=hard_ratio)
+    hard_df = generate_hard_negatives(positive_df, all_proteins, ratio=hard_ratio, loc_dict=loc_dict)
+    num_hard = len(hard_df)
+    num_easy = total_needed - num_hard
     
-    print(f"Generating {num_easy} easy (random) negative samples...")
+    print(f"Generating {num_easy} easy (random) negative samples with localization constraints...")
     positive_pairs = set(zip(positive_df["protein1"], positive_df["protein2"]))
     hard_pairs = set(zip(hard_df["protein1"], hard_df["protein2"]))
     negative_pairs = set()
     
     all_proteins_arr = np.array(all_proteins)
-    while len(negative_pairs) < num_easy:
+    max_attempts = num_easy * 50
+    attempts = 0
+    
+    while len(negative_pairs) < num_easy and attempts < max_attempts:
         p1 = np.random.choice(all_proteins_arr, num_easy, replace=True)
         p2 = np.random.choice(all_proteins_arr, num_easy, replace=True)
         
         for u, v in zip(p1, p2):
+            attempts += 1
             if u == v: continue
             if u > v: u, v = v, u
             
             if (u, v) not in positive_pairs and (u, v) not in hard_pairs and (u, v) not in negative_pairs:
-                negative_pairs.add((u, v))
-                if len(negative_pairs) >= num_easy:
-                    break
-                    
+                if loc_dict is None or is_co_localized(u, v, loc_dict):
+                    negative_pairs.add((u, v))
+                    if len(negative_pairs) >= num_easy:
+                        break
+                        
     easy_df = pd.DataFrame(list(negative_pairs), columns=["protein1", "protein2"])
     return pd.concat([easy_df, hard_df], ignore_index=True)
 
@@ -142,8 +186,11 @@ def preprocess_data(min_score: int = 900, hard_ratio: float = 0.5):
     unique_proteins = set(inte_df["protein1"]).union(set(inte_df["protein2"]))
     print(f"Found {len(unique_proteins)} unique proteins in positive set.")
     
+    # 3. Load localization cache
+    loc_dict = load_localization_cache()
+    
     # 4. Generate Negatives
-    neg_df = generate_negative_samples(inte_df, list(unique_proteins), ratio=1.0, hard_ratio=hard_ratio)
+    neg_df = generate_negative_samples(inte_df, list(unique_proteins), ratio=1.0, hard_ratio=hard_ratio, loc_dict=loc_dict)
     
     # 5. Labeling
     inte_df["label"] = 1
