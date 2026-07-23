@@ -36,17 +36,58 @@ def configure_runtime(force_cpu: bool = False, cpu_threads: int = None) -> str:
 
     return device
 
+_quantized_model_cache = {}
+
+def get_quantized_esm_embedding(sequence: str, model_name: str = "facebook/esm2_t30_150M_UR50D") -> torch.Tensor:
+    """
+    Retrieves the mean-pooled ESM embedding for a single sequence using dynamic INT8 quantization on CPU.
+    """
+    global _quantized_model_cache
+    if model_name not in _quantized_model_cache:
+        try:
+            tokenizer = AutoTokenizer.from_pretrained(model_name, local_files_only=True)
+            model = AutoModel.from_pretrained(model_name, local_files_only=True)
+        except Exception:
+            tokenizer = AutoTokenizer.from_pretrained(model_name)
+            model = AutoModel.from_pretrained(model_name)
+        
+        # Apply dynamic quantization to Linear layers for CPU inference
+        quantized_model = torch.quantization.quantize_dynamic(
+            model, {torch.nn.Linear}, dtype=torch.qint8
+        )
+        _quantized_model_cache[model_name] = (tokenizer, quantized_model)
+        
+    tokenizer, model = _quantized_model_cache[model_name]
+    inputs = tokenizer(sequence, return_tensors="pt")
+    
+    with torch.no_grad():
+        outputs = model(**inputs)
+        embeddings = outputs.last_hidden_state.mean(dim=1).squeeze(0)
+        
+    return embeddings
+
+
 class ESMFeatureExtractor:
-    def __init__(self, model_name: str = "facebook/esm2_t12_35M_UR50D", device: str = "cpu"):
+    def __init__(self, model_name: str = "facebook/esm2_t12_35M_UR50D", device: str = "cpu", quantize: bool = False):
         self.device = device
-        print(f"Loading ESM-2 model: {model_name} on {device}...")
+        self.quantize = quantize
+        print(f"Loading ESM-2 model: {model_name} on {device} (quantize={quantize})...")
         try:
             self.tokenizer = AutoTokenizer.from_pretrained(model_name, local_files_only=True)
-            self.model = AutoModel.from_pretrained(model_name, local_files_only=True).to(device)
+            model = AutoModel.from_pretrained(model_name, local_files_only=True)
         except Exception as e:
             print(f"Offline load failed ({e}), attempting regular load...")
             self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-            self.model = AutoModel.from_pretrained(model_name).to(device)
+            model = AutoModel.from_pretrained(model_name)
+            
+        if self.quantize and self.device == "cpu":
+            print("Applying dynamic INT8 quantization to ESM-2 model...")
+            self.model = torch.quantization.quantize_dynamic(
+                model, {torch.nn.Linear}, dtype=torch.qint8
+            )
+        else:
+            self.model = model.to(device)
+            
         self.model.eval()
 
     def get_embeddings(self, sequences: Dict[str, str], batch_size: int = 4, save_path: str = None) -> Dict[str, torch.Tensor]:
