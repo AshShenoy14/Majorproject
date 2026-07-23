@@ -689,7 +689,12 @@ async def get_residue_graph(request: ResidueGraphRequest):
                 raise HTTPException(status_code=404, detail="Sequence not found")
             sequence = seq_dict[protein_id]
             
-        return analyzers["residue_graph"].generate_rig(sequence)
+        uniprot_id = None
+        if "id_mapper" in managers:
+            uniprot_maps = managers["id_mapper"].ensp_to_uniprot([protein_id])
+            uniprot_id = uniprot_maps.get(protein_id)
+            
+        return analyzers["residue_graph"].generate_rig(sequence, uniprot_id=uniprot_id)
     except HTTPException as he:
         raise he
     except Exception as e:
