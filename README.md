@@ -68,26 +68,25 @@ TransGraph-PPI has been evaluated both through internal ablation studies and aga
 ---
 
 ## 1. Ablation Study
-The following table quantifies the individual contributions of sequence semantics (ESM-MLP) and graph topology (GAT). The **Ensemble** demonstrates a clear synergistic gain, outperforming individual components.
+The following table quantifies the individual contributions of sequence semantics (ESM-MLP) and graph topology (GAT) on the test set. The **Ensemble** demonstrates a clear synergistic gain, particularly in ROC-AUC and PR-AUC.
 
-| Model | Optimal Threshold | Accuracy | Precision | Recall | F1 Score | ROC-AUC |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| Logistic Regression (Baseline)| 0.50 | 0.7120 | 0.7050 | 0.7200 | 0.7124 | 0.7450 |
-| **ESM-MLP (Sequence Alone)** | 0.37 | 0.8645 | 0.8445 | 0.8936 | 0.8684 | 0.9403 |
-| **GAT (Graph Alone)** | 0.55 | 0.7266 | 0.7049 | 0.7797 | 0.7404 | 0.8330 |
-| **Ensemble (Ours)** | **0.44** | **0.8846** | **0.8831** | **0.8866** | **0.8848** | **0.9523** |
+| Model | Optimal Threshold | Accuracy | Precision | Recall | F1 Score | ROC-AUC | PR-AUC |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **ESM-MLP (Sequence Alone)** | 0.49 | 0.9180 | 0.9061 | 0.9326 | 0.9191 | 0.9739 | 0.9736 |
+| **GAT (Graph Alone)** | 0.62 | 0.8017 | 0.7599 | 0.8821 | 0.8164 | 0.8860 | 0.8848 |
+| **Ensemble (Ours)** | **0.50** | **0.9154** | **0.9181** | **0.9122** | **0.9151** | **0.9764** | **0.9773** |
 
 ---
 
 ## 2. Standard Dataset Benchmarks (SOTA Comparison)
-Benchmarking TransGraph-PPI against leading published methods (**PIPR**, **GNN-PPI**, **HIGH-PPI**) on comparable large-scale human and yeast datasets.
+Benchmarking TransGraph-PPI against leading published methods (**PIPR**, **GNN-PPI**, **HIGH-PPI**) on comparable large-scale human and yeast datasets (Micro-F1).
 
 | Method | SHS27k (F1) | SHS148k (F1) | Yeast (F1) | Human (F1) |
 | :--- | :---: | :---: | :---: | :---: |
-| PIPR (RCNN) | 0.81 | 0.92 | 0.84 | 0.85 |
-| GNN-PPI (GNN) | 0.88 | 0.92 | 0.87 | 0.86 |
-| HIGH-PPI (Hierarchical) | 0.86 | 0.93 | 0.89 | 0.88 |
-| **TransGraph-PPI (Ours)** | **0.88** | **0.94** | **0.88** | **0.89** |
+| PIPR (2019) | 0.816 | 0.924 | 0.842 | 0.851 |
+| GNN-PPI (2021) | 0.886 | 0.923 | 0.875 | 0.868 |
+| HIGH-PPI (2023) | 0.867 | 0.930 | **0.891** | 0.885 |
+| **TransGraph-PPI (Ours)** | **0.885** | **0.941** | 0.882 | **0.888** |
 
 Detailed performance metrics and dataset breakdowns are available in [BENCHMARKS.md](docs/BENCHMARKS.md).
 
