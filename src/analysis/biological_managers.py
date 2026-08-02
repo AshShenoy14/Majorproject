@@ -92,12 +92,21 @@ class BiologicalManager:
                         paths, families, domains = [], [], []
                         for comment in res.get("comments", []):
                             ctype = comment.get("commentType")
+                            val = ""
+                            if "texts" in comment and comment["texts"]:
+                                val = comment["texts"][0].get("value", "")
+                            elif "note" in comment and isinstance(comment["note"], dict) and "texts" in comment["note"] and comment["note"]["texts"]:
+                                val = comment["note"]["texts"][0].get("value", "")
+                            
+                            if not val:
+                                continue
+                                
                             if ctype == "PATHWAY":
-                                paths.append(comment.get("note", {}).get("texts", [{}])[0].get("value", ""))
+                                paths.append(val)
                             elif ctype == "SIMILARITY":
-                                families.append(comment.get("note", {}).get("texts", [{}])[0].get("value", ""))
+                                families.append(val)
                             elif ctype == "DOMAIN":
-                                domains.append(comment.get("note", {}).get("texts", [{}])[0].get("value", ""))
+                                domains.append(val)
                         
                         new_data.append({
                             "protein_id": ensp,
