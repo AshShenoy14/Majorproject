@@ -85,6 +85,49 @@ class AlphaFoldFetcher:
                         })
         return coords
 
+    def parse_cb_coordinates(self, pdb_path: Path) -> List[Dict[str, Any]]:
+        """
+        Parses coordinates of C-beta (CB) atoms for all residues, falling back to C-alpha (CA) for Glycine.
+        """
+        if not pdb_path or not pdb_path.exists():
+            return []
+            
+        residue_atoms = {}
+        with open(pdb_path, "r", encoding="utf-8") as f:
+            for line in f:
+                if line.startswith("ATOM  ") or line.startswith("ATOM "):
+                    atom_name = line[12:16].strip()
+                    if atom_name in ("CA", "CB"):
+                        res_name = line[17:20].strip()
+                        chain_id = line[21].strip()
+                        res_seq = int(line[22:26].strip())
+                        x = float(line[30:38].strip())
+                        y = float(line[38:46].strip())
+                        z = float(line[46:54].strip())
+                        
+                        atom_info = {
+                            "res_seq": res_seq,
+                            "res_name": res_name,
+                            "chain_id": chain_id,
+                            "atom_name": atom_name,
+                            "x": x,
+                            "y": y,
+                            "z": z
+                        }
+                        
+                        if res_seq not in residue_atoms:
+                            residue_atoms[res_seq] = {}
+                        residue_atoms[res_seq][atom_name] = atom_info
+
+        coords = []
+        for res_seq in sorted(residue_atoms.keys()):
+            atoms = residue_atoms[res_seq]
+            if "CB" in atoms:
+                coords.append(atoms["CB"])
+            elif "CA" in atoms:
+                coords.append(atoms["CA"])
+        return coords
+
     def calculate_contact_map(self, coords: List[Dict[str, Any]], threshold: float = 8.0) -> List[Tuple[int, int, float]]:
         """
         Calculates contacts between residues based on 3D distance of CA atoms.

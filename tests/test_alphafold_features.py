@@ -25,6 +25,16 @@ def test_alphafold_fetcher_integration():
     assert "y" in first_coord
     assert "z" in first_coord
     
+    # Parse CB Coordinates
+    cb_coords = fetcher.parse_cb_coordinates(pdb_path)
+    assert len(cb_coords) > 0
+    assert len(cb_coords) == len(coords)  # since all residues should map to either CB or CA fallback
+    first_cb = cb_coords[0]
+    assert "res_seq" in first_cb
+    assert "x" in first_cb
+    assert "y" in first_cb
+    assert "z" in first_cb
+    
     # Calculate Contact Map (standard 8.0 A threshold)
     contacts = fetcher.calculate_contact_map(coords, threshold=8.0)
     assert len(contacts) > 0

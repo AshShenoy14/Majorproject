@@ -49,7 +49,9 @@ class ResidueGraphGenerator:
                 fetcher = AlphaFoldFetcher()
                 pdb_path = fetcher.download_pdb(uniprot_id)
                 if pdb_path:
-                    coords = fetcher.parse_ca_coordinates(pdb_path)
+                    coords = fetcher.parse_cb_coordinates(pdb_path)
+                    if not coords:
+                        coords = fetcher.parse_ca_coordinates(pdb_path)
                     if coords:
                         pdb_contacts = fetcher.calculate_contact_map(coords, threshold=8.0)
                         use_3d = True
