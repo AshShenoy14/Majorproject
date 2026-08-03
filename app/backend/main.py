@@ -55,7 +55,18 @@ def insert_novel_node_knn(novel_emb, existing_embs, k=2):
     sorted_neighbors = sorted(similarities.items(), key=lambda x: x[1], reverse=True)
     return [node_id for node_id, _ in sorted_neighbors[:k]]
 
-app = FastAPI(title="TransGraph-PPI API", description="Hybrid Ensemble PPI Prediction System with Real Data")
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await load_system()
+    yield
+
+app = FastAPI(
+    title="TransGraph-PPI API",
+    description="Hybrid Ensemble PPI Prediction System with Real Data",
+    lifespan=lifespan
+)
 
 # CORS configuration
 origins = [
@@ -81,7 +92,6 @@ data_cache = {}
 analyzers = {}
 explainer = None # Global explainer instance
 
-@app.on_event("startup")
 async def load_system():
     try:
         print("Loading TransGraph-PPI System...")

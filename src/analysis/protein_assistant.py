@@ -8,7 +8,7 @@ import re
 import random
 import os
 from typing import Optional, Dict, List
-import google.generativeai as genai
+from google import genai
 from dotenv import load_dotenv
 
 # Load environment variables (for GEMINI_API_KEY)
@@ -17,11 +17,11 @@ load_dotenv()
 # Configure Gemini
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
-    MODEL = genai.GenerativeModel('gemini-1.5-pro')
+    CLIENT = genai.Client(api_key=GEMINI_API_KEY)
 else:
-    MODEL = None
+    CLIENT = None
     print("Warning: GEMINI_API_KEY not found in .env. Falling back to rule-based assistant.")
+
 
 
 # --- Curated Protein Knowledge Base ---
@@ -205,7 +205,7 @@ class ProteinAssistant:
             return self.get_greeting()
 
         # 2. Try Gemini AI if configured
-        if MODEL:
+        if CLIENT:
             try:
                 # Prepare context from our curated knowledge
                 context = "You are a Protein Biology Expert for the TransGraph-PPI project. "
@@ -218,7 +218,10 @@ class ProteinAssistant:
                 
                 prompt = f"{context}\n\nUser Question: {question}\n\nAssistant:"
                 
-                response = MODEL.generate_content(prompt)
+                response = CLIENT.models.generate_content(
+                    model='gemini-1.5-pro',
+                    contents=prompt
+                )
                 
                 if response and response.text:
                     return {
@@ -270,12 +273,33 @@ class ProteinAssistant:
 
     def _search_protein(self, query: str) -> Optional[dict]:
         """Search for a specific protein in the knowledge base."""
+        # Normalize query: lowercase and strip punctuation
+        q_clean = re.sub(r'[^\w\s-]', ' ', query.lower())
+        
         for key, data in PROTEIN_KNOWLEDGE.items():
-            # Match by gene name, common name, or ENSP ID
-            synonyms = [key.lower(), data["common_name"].lower()]
+            # Build list of synonym terms
+            synonyms = [key.lower()]
+            
+            # Split common name by common delimiters: /, (, ), comma
+            cleaned_common = re.sub(r'[\(\)]', ' ', data["common_name"].lower())
+            for part in re.split(r'[/,]', cleaned_common):
+                part_stripped = part.strip()
+                if part_stripped:
+                    synonyms.append(part_stripped)
+            
+            # Add ENSP IDs
             synonyms.extend([e.lower() for e in data.get("ensp_ids", [])])
-
-            if any(syn in query for syn in synonyms) or key.lower() in query:
+            
+            # Check if any synonym matches as a whole phrase or word in the query
+            matched = False
+            for syn in synonyms:
+                # Match it as whole words
+                pattern = r'\b' + re.escape(syn) + r'\b'
+                if re.search(pattern, q_clean):
+                    matched = True
+                    break
+                    
+            if matched:
                 # Build comprehensive response
                 response = f"## {data['common_name']} ({key})\n\n"
                 response += f"**🔬 Function:** {data['function']}\n\n"

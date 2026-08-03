@@ -1,6 +1,6 @@
 import requests
-import gzip
-import shutil
+# import gzip
+# import shutil
 import os
 import sys
 
