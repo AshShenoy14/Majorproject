@@ -119,84 +119,93 @@ const Predict = () => {
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row h-[calc(100vh-180px)] gap-6 overflow-hidden">
+      <div className="flex flex-col lg:flex-row min-h-[calc(100vh-160px)] gap-6 pb-8">
         
         {/* LEFT: Scientific Control Sidebar */}
-        <aside className="w-full lg:w-[400px] flex flex-col gap-6 h-full overflow-y-auto no-scrollbar">
-          <div className="bg-white border border-slate-100 rounded-[2.5rem] p-8 shadow-xl relative overflow-hidden group">
+        <aside className="w-full lg:w-[380px] flex flex-col gap-6">
+          <div className="bg-white border border-slate-100 rounded-[2.5rem] p-6 shadow-xl relative overflow-hidden group">
             <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:opacity-[0.06] transition-opacity text-slate-900">
               <Cpu size={80} />
             </div>
             
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-3 bg-gradient-to-br from-emerald-400 to-teal-600 rounded-2xl text-white shadow-lg shadow-emerald-200">
-                <Zap size={22} fill="currentColor" />
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2.5 bg-gradient-to-br from-emerald-400 to-teal-600 rounded-2xl text-white shadow-lg shadow-emerald-200">
+                <Zap size={20} fill="currentColor" />
               </div>
               <div>
-                <h2 className="text-xl font-black text-slate-800 tracking-tight">Analysis Portal</h2>
+                <h2 className="text-lg font-black text-slate-800 tracking-tight">Analysis Portal</h2>
                 <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Model: ESM2-GAT-FUSION-V2</p>
               </div>
             </div>
 
-            {/* FEATURE 2: Preset Case Studies Dropdown */}
-            <div className="mb-6">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 mb-2 block flex items-center gap-1">
+            {/* FEATURE 2: Preset Case Studies Select Dropdown */}
+            <div className="mb-4">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 mb-1.5 flex items-center gap-1">
                 <Sparkles size={12} className="text-amber-500" /> Demo Case Studies
               </label>
-              <div className="grid grid-cols-1 gap-2">
+              <select
+                value={selectedCase || ''}
+                onChange={(e) => {
+                  const c = CASE_STUDIES.find(cs => cs.label === e.target.value);
+                  if (c) handleSelectCase(c);
+                }}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-700 font-bold focus:border-emerald-500 focus:bg-white outline-none cursor-pointer"
+              >
+                <option value="" disabled>-- Select a Demo Case Study --</option>
                 {CASE_STUDIES.map((c, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => handleSelectCase(c)}
-                    className={`text-left px-4 py-2.5 rounded-xl border text-xs transition-all ${selectedCase === c.label ? 'bg-emerald-50 border-emerald-500 text-emerald-900 font-bold shadow-sm' : 'bg-slate-50 border-slate-100 text-slate-600 hover:bg-slate-100'}`}
-                  >
-                    <div className="font-bold">{c.label}</div>
-                    <div className="text-[10px] text-slate-400 line-clamp-1">{c.desc}</div>
-                  </button>
+                  <option key={i} value={c.label}>
+                    {c.label} ({c.protein1} & {c.protein2})
+                  </option>
                 ))}
-              </div>
+              </select>
             </div>
 
-            <form onSubmit={handlePredict} className="space-y-6">
-              <div className="space-y-2">
+            <form onSubmit={handlePredict} className="space-y-4">
+              <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Protein Alpha ID</label>
                 <div className="relative">
                   <input 
                     value={protein1}
                     onChange={(e) => setProtein1(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 text-slate-700 font-mono text-sm focus:border-emerald-500 focus:bg-white outline-none transition-all shadow-inner"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 font-mono text-sm focus:border-emerald-500 focus:bg-white outline-none transition-all shadow-inner"
                     placeholder="ENSP..."
                   />
-                  <Database size={16} className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-300" />
+                  <Database size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" />
                 </div>
               </div>
 
-              <div className="flex justify-center -my-3">
-                <div className="w-10 h-10 rounded-full bg-white border border-slate-100 flex items-center justify-center text-emerald-500 shadow-xl z-10 hover:rotate-180 transition-transform duration-500">
-                  <ArrowRightLeft size={16} />
-                </div>
+              <div className="flex justify-center -my-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setProtein1(protein2);
+                    setProtein2(protein1);
+                  }}
+                  className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-emerald-500 shadow-md z-10 hover:rotate-180 transition-transform duration-500"
+                >
+                  <ArrowRightLeft size={14} />
+                </button>
               </div>
 
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Protein Beta ID</label>
                 <div className="relative">
                   <input 
                     value={protein2}
                     onChange={(e) => setProtein2(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 text-slate-700 font-mono text-sm focus:border-emerald-500 focus:bg-white outline-none transition-all shadow-inner"
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 font-mono text-sm focus:border-emerald-500 focus:bg-white outline-none transition-all shadow-inner"
                     placeholder="ENSP..."
                   />
-                  <Database size={16} className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-300" />
+                  <Database size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" />
                 </div>
               </div>
 
               <button 
                 type="submit" 
                 disabled={loading}
-                className="w-full bg-gradient-to-r from-emerald-500 via-teal-500 to-indigo-500 hover:from-emerald-400 hover:to-indigo-400 text-white font-black py-5 rounded-2xl transition-all shadow-2xl shadow-indigo-200 flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50 uppercase tracking-widest text-xs"
+                className="w-full bg-gradient-to-r from-emerald-500 via-teal-500 to-indigo-500 hover:from-emerald-400 hover:to-indigo-400 text-white font-black py-4 rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 uppercase tracking-widest text-xs mt-2"
               >
-                {loading ? <Loader2 className="animate-spin" size={20} /> : <Zap size={20} />}
+                {loading ? <Loader2 className="animate-spin" size={18} /> : <Zap size={18} />}
                 Predict Interaction
               </button>
             </form>

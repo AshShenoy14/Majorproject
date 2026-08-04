@@ -4,6 +4,49 @@ import { PerspectiveCamera, OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { motion, AnimatePresence } from 'framer-motion';
 
+const BackgroundNodes = ({ count = 35 }) => {
+  const nodes = useMemo(() => {
+    const temp = [];
+    for (let i = 0; i < count; i++) {
+      temp.push({
+        position: [
+          (Math.random() - 0.5) * 25,
+          (Math.random() - 0.5) * 25,
+          (Math.random() - 0.5) * 15 - 5
+        ],
+        scale: Math.random() * 0.4 + 0.1,
+        speed: Math.random() * 0.005 + 0.002
+      });
+    }
+    return temp;
+  }, [count]);
+
+  const groupRef = useRef();
+
+  useFrame(() => {
+    if (groupRef.current) {
+      groupRef.current.rotation.y += 0.002;
+      groupRef.current.rotation.x += 0.001;
+    }
+  });
+
+  return (
+    <group ref={groupRef}>
+      {nodes.map((node, i) => (
+        <mesh key={i} position={node.position} scale={node.scale}>
+          <sphereGeometry args={[1, 16, 16]} />
+          <meshBasicMaterial
+            color={i % 3 === 0 ? "#2dd4bf" : i % 3 === 1 ? "#a78bfa" : "#38bdf8"}
+            transparent
+            opacity={0.25}
+            wireframe={i % 2 === 0}
+          />
+        </mesh>
+      ))}
+    </group>
+  );
+};
+
 const Helix = ({ count = 40, radius = 2, height = 8 }) => {
   const points = useMemo(() => {
     const p = [];
@@ -79,9 +122,10 @@ const ProteinPreloader = ({ progress, onComplete }) => {
           className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-[#020617] overflow-hidden"
         >
           {/* Ambient Background Gradient */}
-          <div className="absolute inset-0 z-0 opacity-30">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-teal-500/10 blur-[120px] rounded-full" />
-            <div className="absolute top-1/4 left-1/4 w-[400px] h-[400px] bg-violet-500/5 blur-[100px] rounded-full" />
+          <div className="absolute inset-0 z-0 opacity-40 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-[#030712] to-[#020617]">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[900px] bg-teal-500/15 blur-[140px] rounded-full" />
+            <div className="absolute top-1/4 left-1/3 w-[500px] h-[500px] bg-violet-600/10 blur-[120px] rounded-full" />
+            <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-sky-500/10 blur-[100px] rounded-full" />
           </div>
 
           <div className="relative z-10 w-full flex-1 min-h-0">
@@ -90,6 +134,7 @@ const ProteinPreloader = ({ progress, onComplete }) => {
               <ambientLight intensity={0.6} />
               <pointLight position={[10, 10, 10]} intensity={1.5} />
               <spotLight position={[-10, 10, 10]} angle={0.15} penumbra={1} intensity={1.5} />
+              <BackgroundNodes count={40} />
               <Helix />
               <OrbitControls enableZoom={false} enablePan={false} autoRotate autoRotateSpeed={1} />
             </Canvas>
