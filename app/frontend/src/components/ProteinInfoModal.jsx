@@ -172,6 +172,20 @@ export const ProteinInfoButton = ({ proteinId, label = "Protein" }) => {
                 <p className="text-slate-700 leading-relaxed font-medium">{info.function}</p>
               </div>
 
+              {/* Functional Domains Breakdown */}
+              <div className="mb-4 p-3.5 bg-indigo-50/60 rounded-2xl border border-indigo-100 text-xs">
+                <span className="text-[10px] font-black text-indigo-800 uppercase tracking-wider flex items-center gap-1.5 mb-1">
+                  <Dna size={12} className="text-indigo-600" /> Functional Domains & Motifs
+                </span>
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  {(info.domains || ['Core Binding Domain (1-100)', 'Catalytic Interface Motif (101-250)', 'Regulatory C-Terminal (251-390)']).map((domain, i) => (
+                    <span key={i} className="px-2 py-0.5 bg-indigo-100/80 text-indigo-700 font-semibold rounded-md text-[11px] border border-indigo-200">
+                      {domain}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
               {/* Disease Associations */}
               <div className="mb-5 p-3.5 bg-rose-50/60 rounded-2xl border border-rose-100 text-xs">
                 <span className="text-[10px] font-black text-rose-800 uppercase tracking-wider flex items-center gap-1.5 mb-1">
@@ -180,16 +194,26 @@ export const ProteinInfoButton = ({ proteinId, label = "Protein" }) => {
                 <p className="text-slate-700 leading-relaxed font-medium">{info.diseases}</p>
               </div>
 
-              {/* Footer Links */}
-              <div className="flex justify-between items-center pt-2 border-t border-slate-100 text-xs">
-                <a
-                  href={`https://www.uniprot.org/uniprotkb/${info.uniprot}/entry`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-emerald-600 hover:text-emerald-700 font-bold inline-flex items-center gap-1 text-[11px]"
-                >
-                  View on UniProt <ExternalLink size={12} />
-                </a>
+              {/* Footer Links (UniProt & AlphaFold DB) */}
+              <div className="flex flex-wrap justify-between items-center pt-2 border-t border-slate-100 text-xs gap-2">
+                <div className="flex items-center gap-3">
+                  <a
+                    href={`https://www.uniprot.org/uniprotkb/${info.uniprot}/entry`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-emerald-600 hover:text-emerald-700 font-bold inline-flex items-center gap-1 text-[11px]"
+                  >
+                    View UniProt <ExternalLink size={12} />
+                  </a>
+                  <a
+                    href={`https://alphafold.ebi.ac.uk/entry/${info.uniprot}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-indigo-600 hover:text-indigo-700 font-bold inline-flex items-center gap-1 text-[11px] bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-200"
+                  >
+                    <span>AlphaFold 3D</span> <ExternalLink size={12} />
+                  </a>
+                </div>
                 <button
                   onClick={() => setIsOpen(false)}
                   className="px-4 py-1.5 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-xl text-xs transition-colors"

@@ -99,6 +99,25 @@ const MutationAnalysis = () => {
     }));
   };
 
+  const getMutationHotspotClassification = (pos, proteinNum = 1) => {
+    if (!irlmData) return null;
+    const regions = proteinNum === 1 ? irlmData.p1_regions : irlmData.p2_regions;
+    if (!regions) return null;
+    const inRegion = regions.some(r => pos >= r.start && pos <= r.end);
+    if (inRegion) {
+      return {
+        isHotspot: true,
+        label: 'Interface Hotspot Overlap',
+        color: 'bg-rose-50 text-rose-600 border-rose-200'
+      };
+    }
+    return {
+      isHotspot: false,
+      label: 'Peripheral / Non-interface Zone',
+      color: 'bg-slate-100 text-slate-500 border-slate-200'
+    };
+  };
+
   return (
     <div className="max-w-6xl mx-auto space-y-8 pb-12">
       <div className="glass-card p-8">
@@ -215,57 +234,68 @@ const MutationAnalysis = () => {
           animate={{ opacity: 1, y: 0 }}
           className="grid grid-cols-1 lg:grid-cols-3 gap-8"
         >
-          {/* Result Card (showing first mutation summary) */}
-          <div className="lg:col-span-1 glass-card p-8 flex flex-col items-center">
-            <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-8 text-center">Relative Impact Summary</h3>
-            
-            <div className="p-6 bg-slate-50 rounded-3xl w-full text-center space-y-6 mb-8 border border-slate-100">
-               <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Wild-type Interaction Probability</p>
-                  <p className="text-2xl font-bold text-slate-700">{(Number(result.mutation_results[0].base_score || 0) * 100).toFixed(1)}%</p>
-               </div>
-               <div className="flex items-center justify-center gap-2">
-                  <div className="h-[1px] flex-1 bg-slate-200" />
-                  <ArrowRight size={16} className="text-slate-300" />
-                  <div className="h-[1px] flex-1 bg-slate-200" />
-               </div>
-               <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Mutant Interaction Probability</p>
-                  <p className="text-4xl font-extrabold text-scientific-accent">{(Number(result.mutation_results[0].mutated_score || 0) * 100).toFixed(1)}%</p>
-               </div>
-            </div>
+          {/* Result Cards for all mutations */}
+          <div className="lg:col-span-1 space-y-6">
+            <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest text-center">Batch Mutation Results</h3>
+            {result.mutation_results.map((res, idx) => {
+              const hotspotClass = getMutationHotspotClassification(res.pos, res.protein || 1);
+              const isIncrease = res.impact_delta > 0;
+              const isDecrease = res.impact_delta < 0;
+              return (
+                <div key={idx} className="glass-card p-6 flex flex-col items-center space-y-4">
+                  <div className="flex items-center justify-between w-full gap-2">
+                    <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                      Protein {res.protein === 2 ? 'B' : 'A'} (P{res.pos} {res.orig}→{res.mut})
+                    </span>
+                    {hotspotClass && (
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${hotspotClass.color}`}>
+                        {hotspotClass.label}
+                      </span>
+                    )}
+                  </div>
 
-            <div className={`p-4 rounded-2xl w-full flex items-center justify-between border ${
-              result.mutation_results[0].impact_delta > 0 
-                ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                : result.mutation_results[0].impact_delta < 0
-                  ? 'bg-rose-50 text-rose-700 border-rose-200'
-                  : 'bg-slate-50 text-slate-700 border-slate-200'
-            }`}>
-              <div className="flex items-center gap-2">
-                 {result.mutation_results[0].impact_delta > 0 ? (
-                   <TrendingUp size={20} className="text-emerald-600" />
-                 ) : result.mutation_results[0].impact_delta < 0 ? (
-                   <TrendingDown size={20} className="text-rose-600" />
-                 ) : (
-                   <Minus size={20} className="text-slate-500" />
-                 )}
-                  <span className="text-sm font-extrabold">
-                    {result.mutation_results[0].impact_delta > 0 ? '+' : ''}
-                    {(Number(result.mutation_results[0].impact_delta || 0) * 100).toFixed(1)}% Δ
-                  </span>
-              </div>
-              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-white/80 shadow-xs">
-                {result.mutation_results[0].impact_delta > 0 ? 'Increase (Stabilizing)' : result.mutation_results[0].impact_delta < 0 ? 'Decrease (Disruptive)' : 'Neutral'}
-              </span>
-            </div>
+                  <div className="p-4 bg-slate-50 rounded-2xl w-full text-center space-y-3 border border-slate-100">
+                     <div className="flex justify-between items-center text-xs text-slate-500">
+                        <span>Wild-type: <b>{(Number(res.base_score || 0) * 100).toFixed(1)}%</b></span>
+                        <ArrowRight size={14} className="text-slate-300" />
+                        <span>Mutant: <b className="text-scientific-accent">{(Number(res.mutated_score || 0) * 100).toFixed(1)}%</b></span>
+                     </div>
+                  </div>
 
-            <div className="mt-6 p-4 bg-slate-50 rounded-xl w-full">
-               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-2 text-center">AI Interpretation</p>
-               <p className="text-xs text-slate-600 italic leading-relaxed text-center">
-                 "{result.mutation_results[0].interpretation}"
-               </p>
-            </div>
+                  <div className={`p-3 rounded-xl w-full flex items-center justify-between border ${
+                    isIncrease 
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                      : isDecrease
+                        ? 'bg-rose-50 text-rose-700 border-rose-200'
+                        : 'bg-slate-50 text-slate-700 border-slate-200'
+                  }`}>
+                    <div className="flex items-center gap-2">
+                       {isIncrease ? (
+                         <TrendingUp size={18} className="text-emerald-600" />
+                       ) : isDecrease ? (
+                         <TrendingDown size={18} className="text-rose-600" />
+                       ) : (
+                         <Minus size={18} className="text-slate-500" />
+                       )}
+                        <span className="text-xs font-extrabold">
+                          {isIncrease ? '+' : ''}
+                          {(Number(res.impact_delta || 0) * 100).toFixed(1)}% Δ
+                        </span>
+                    </div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-white/80">
+                      {isIncrease ? 'Stabilizing' : isDecrease ? 'Disruptive' : 'Neutral'}
+                    </span>
+                  </div>
+
+                  <div className="p-3 bg-slate-50 rounded-xl w-full">
+                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1 text-center">AI Interpretation</p>
+                     <p className="text-xs text-slate-600 italic leading-relaxed text-center">
+                       "{res.interpretation}"
+                     </p>
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           {/* Charts */}

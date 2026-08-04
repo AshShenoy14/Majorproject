@@ -31,12 +31,14 @@ const IRLMVisualizer = ({
     seq1 = "",
     seq2 = "",
     mutations = [],
-    isDark = true
+    isDark = true,
+    onSelectResidue = null
 }) => {
     const visualizerRef = useRef();
     const [selectedResidue, setSelectedResidue] = useState(null);
     const [exporting, setExporting] = useState(false);
     const [activeTab, setActiveTab] = useState('heatmap'); // 'heatmap' | 'matrix'
+    const [zoomLevel, setZoomLevel] = useState(1.0); // Sequence zoom factor (0.75 - 1.75)
 
     if (!irlmData) return null;
 
@@ -130,9 +132,23 @@ const IRLMVisualizer = ({
                             }}
                         />
                     </Box>
-                    <Typography variant="caption" color="text.secondary">
-                        Total Length: {total} aa
-                    </Typography>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                        <Typography variant="caption" color="text.secondary">
+                            Total Length: {total} aa
+                        </Typography>
+                        <Chip
+                            label="Zoom -"
+                            size="small"
+                            onClick={() => setZoomLevel(prev => Math.max(0.75, prev - 0.2))}
+                            sx={{ fontSize: '0.65rem', height: 20, cursor: 'pointer' }}
+                        />
+                        <Chip
+                            label="Zoom +"
+                            size="small"
+                            onClick={() => setZoomLevel(prev => Math.min(1.75, prev + 0.2))}
+                            sx={{ fontSize: '0.65rem', height: 20, cursor: 'pointer' }}
+                        />
+                    </Stack>
                 </Stack>
 
                 {/* Scrollable Sequence Box */}
@@ -181,10 +197,15 @@ const IRLMVisualizer = ({
                                 placement="top"
                             >
                                 <Box
-                                    onClick={() => setSelectedResidue({ proteinName, aa, pos, score, isInRegion, mutInfo })}
+                                    onClick={() => {
+                                        const resData = { proteinName, proteinNum, aa, pos, score, isInRegion, mutInfo };
+                                        setSelectedResidue(resData);
+                                        if (onSelectResidue) onSelectResidue(resData);
+                                    }}
                                     sx={{
-                                        minWidth: 26,
-                                        height: 42,
+                                        minWidth: Math.round(26 * zoomLevel),
+                                        height: Math.round(42 * zoomLevel),
+                                        fontSize: `${0.75 * zoomLevel}rem`,
                                         display: 'flex',
                                         flexDirection: 'column',
                                         alignItems: 'center',
