@@ -15,6 +15,7 @@ import html2pdf from 'html2pdf.js';
 import { ppiService } from '../services/api';
 import Protein3DView from '../components/Protein3DView';
 import ProteinInfoButton from '../components/ProteinInfoModal';
+import IRLMVisualizer from '../components/IRLMVisualizer';
 
 const CASE_STUDIES = [
   { label: "🎯 Oncology (TP53 & MDM2)", p1: "ENSP00000269305", p2: "ENSP00000258149", desc: "Tumor suppressor binding regulating cell cycle & apoptosis." },
@@ -32,6 +33,7 @@ const Predict = () => {
   const [selectedCase, setSelectedCase] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
+  const [irlmData, setIrlmData] = useState(null);
   const [error, setError] = useState(null);
   const [logs, setLogs] = useState([]);
   const [latency, setLatency] = useState(42);
@@ -58,6 +60,7 @@ const Predict = () => {
     if (e) e.preventDefault();
     setLoading(true);
     setError(null);
+    setIrlmData(null);
     setLogs([]);
     const startTime = performance.now();
     
@@ -78,6 +81,15 @@ const Predict = () => {
       setLatency(elapsed);
       addLog(`Ensemble Meta-Learner Converged in ${elapsed}ms.`, "success");
       setResult(response.data);
+
+      try {
+        addLog("Localizing Interaction Regions (IRLM)...", "process");
+        const locRes = await ppiService.localizeInteractionRegions(p1, p2, s1, s2, response.data.interaction_probability);
+        setIrlmData(locRes.data);
+        addLog("IRLM Region Localization Complete.", "success");
+      } catch (locErr) {
+        console.warn("IRLM localization failed:", locErr);
+      }
     } catch (err) {
       addLog("Execution Fault: " + (err.response?.data?.detail || "Unknown"), "error");
       setError(err.response?.data?.detail || "Prediction failed.");
@@ -465,6 +477,18 @@ const Predict = () => {
                     </div>
 
                   </div>
+
+                  {/* IRLM INTERACTION REGION VISUALIZER SECTION */}
+                  {irlmData && (
+                    <IRLMVisualizer 
+                      irlmData={irlmData} 
+                      id1={protein1} 
+                      id2={protein2} 
+                      seq1={seq1} 
+                      seq2={seq2} 
+                      isDark={true}
+                    />
+                  )}
                 </div>
               </motion.div>
             )}

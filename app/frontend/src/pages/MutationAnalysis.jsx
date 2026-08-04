@@ -25,6 +25,7 @@ import {
   Area
 } from 'recharts';
 import { ppiService } from '../services/api';
+import IRLMVisualizer from '../components/IRLMVisualizer';
 
 const MutationAnalysis = () => {
   const [protein1, setProtein1] = useState('ENSP00000327694');
@@ -32,6 +33,7 @@ const MutationAnalysis = () => {
   const [mutations, setMutations] = useState([{ protein: 1, pos: 45, orig: 'A', mut: 'T' }]);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
+  const [irlmData, setIrlmData] = useState(null);
   const [error, setError] = useState(null);
 
   const addMutation = () => {
@@ -67,6 +69,19 @@ const MutationAnalysis = () => {
 
       const response = await ppiService.mutate(protein1, null, protein2, null, formattedMutations);
       setResult(response.data);
+
+      try {
+        const locRes = await ppiService.localizeInteractionRegions(
+          protein1, 
+          protein2, 
+          null, 
+          null, 
+          response.data.mutation_results[0]?.base_score || 0.5
+        );
+        setIrlmData(locRes.data);
+      } catch (locErr) {
+        console.warn("IRLM region localization in mutation scan failed:", locErr);
+      }
     } catch (err) {
       setError(err.response?.data?.detail || "Mutation scan failed. Ensure correct IDs and residue positions.");
     } finally {
@@ -333,6 +348,19 @@ const MutationAnalysis = () => {
                </div>
             </div>
           </div>
+
+          {/* IRLM VISUALIZER WITH MUTATION OVERLAYS */}
+          {irlmData && (
+            <div className="lg:col-span-3">
+              <IRLMVisualizer 
+                irlmData={irlmData} 
+                id1={protein1} 
+                id2={protein2} 
+                mutations={mutations} 
+                isDark={false} 
+              />
+            </div>
+          )}
         </motion.div>
       )}
     </div>

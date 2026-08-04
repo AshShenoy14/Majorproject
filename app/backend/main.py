@@ -32,7 +32,7 @@ from src.utils.bio_encoder import BioFeatureEncoder
 from app.backend.schemas import (
     ProteinPair, PredictionResponse, NetworkResponse, BatchPredictionRequest,
     MutationRequest, MutationAnalysisResponse, BioMetaResponse, FeasibilityResponse,
-    ResidueGraphRequest, ChatRequest, ChatResponse
+    ResidueGraphRequest, ChatRequest, ChatResponse, IRLMRequest, IRLMResponse, InteractionRegion
 )
 
 import torch.nn.functional as F
@@ -186,11 +186,13 @@ async def load_system():
         if "seq_model" in models and "esm" in models:
             from src.analysis.hotspot_analyzer import HotspotAnalyzer
             from src.analysis.residue_graph_generator import ResidueGraphGenerator
+            from src.analysis.irlm_analyzer import IRLMAnalyzer
             
             analyzers["mutation"] = MutationAnalyzer(models["seq_model"], models["esm"], managers["bio"], managers["bio_encoder"])
             analyzers["hotspot"] = HotspotAnalyzer(models["seq_model"], models["esm"], managers["bio"], managers["bio_encoder"])
             analyzers["residue_graph"] = ResidueGraphGenerator(device=device)
-            print("Mutation and Novel Analyzers Ready.")
+            analyzers["irlm"] = IRLMAnalyzer(esm_extractor=models.get("esm"), graph_model=models.get("graph_model"), device=device)
+            print("Mutation, Novel, and IRLM Analyzers Ready.")
 
         # 5. Biological Manager Ready (already initialized above)
         print("Biological Manager Ready (Bio + Cache).")
@@ -589,7 +591,98 @@ async def scan_mutations(request: MutationRequest):
             p2_id, sequences[p2_id],
             [m.dict() for m in request.mutations]
         )
+
+        if "irlm" in analyzers:
+            try:
+                graph_data = data_cache.get("graph")
+                mapping = data_cache.get("mapping")
+                irlm_data = analyzers["irlm"].localize_interaction_regions(
+                    p1_id=p1_id,
+                    p1_seq=sequences[p1_id],
+                    p2_id=p2_id,
+                    p2_seq=sequences[p2_id],
+                    esm_extractor=models.get("esm"),
+                    seq_model=models.get("seq_model"),
+                    graph_model=models.get("graph_model"),
+                    graph_data=graph_data,
+                    mapping=mapping,
+                    id_mapper=managers.get("id_mapper")
+                )
+                results = analyzers["irlm"].annotate_mutations_with_irlm(results, irlm_data)
+            except Exception as irlm_err:
+                print(f"Warning: IRLM annotation failed during mutation analysis: {irlm_err}")
+
         return results
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/analysis/localize",
+          response_model=IRLMResponse,
+          summary="Localize Interaction Regions (IRLM)",
+          description="Identifies key binding regions and hotspot residues using cross-attention and graph-gated features.",
+          tags=["Analysis"])
+async def localize_interaction_regions(request: IRLMRequest):
+    """
+    Computes residue-level cross-attention and graph-gated features to localize interaction regions and hotspots.
+    """
+    if "irlm" not in analyzers:
+        raise HTTPException(status_code=503, detail="IRLM Analyzer not initialized")
+    
+    try:
+        sequences = {}
+        to_fetch = []
+        p1_id, p1_seq = request.protein1_id, request.protein1_seq
+        p2_id, p2_seq = request.protein2_id, request.protein2_seq
+
+        if p1_id and not p1_seq: to_fetch.append(p1_id)
+        elif p1_id: sequences[p1_id] = p1_seq
+
+        if p2_id and not p2_seq: to_fetch.append(p2_id)
+        elif p2_id: sequences[p2_id] = p2_seq
+
+        if to_fetch:
+            sequences.update(managers["sequence"].get_sequences(to_fetch))
+        
+        p1_seq_final = sequences.get(p1_id, p1_seq)
+        p2_seq_final = sequences.get(p2_id, p2_seq)
+
+        if not p1_seq_final or not p2_seq_final:
+            raise HTTPException(status_code=400, detail="Protein sequences are required for region localization.")
+
+        graph_data = data_cache.get("graph")
+        mapping = data_cache.get("mapping")
+
+        irlm_result = analyzers["irlm"].localize_interaction_regions(
+            p1_id=p1_id or "Protein1",
+            p1_seq=p1_seq_final,
+            p2_id=p2_id or "Protein2",
+            p2_seq=p2_seq_final,
+            esm_extractor=models.get("esm"),
+            seq_model=models.get("seq_model"),
+            graph_model=models.get("graph_model"),
+            graph_data=graph_data,
+            mapping=mapping,
+            id_mapper=managers.get("id_mapper"),
+            base_probability=request.base_probability
+        )
+
+        return IRLMResponse(
+            protein1_regions=[InteractionRegion(**r) for r in irlm_result["protein1_regions"]],
+            protein2_regions=[InteractionRegion(**r) for r in irlm_result["protein2_regions"]],
+            protein1_hotspots=irlm_result["protein1_hotspots"],
+            protein2_hotspots=irlm_result["protein2_hotspots"],
+            attention_map_shape=irlm_result["attention_map_shape"],
+            protein_A_region=irlm_result.get("protein_A_region"),
+            protein_B_region=irlm_result.get("protein_B_region"),
+            protein_A_importance_scores=irlm_result.get("protein_A_importance_scores"),
+            protein_B_importance_scores=irlm_result.get("protein_B_importance_scores"),
+            top_residue_pairs=irlm_result.get("top_residue_pairs"),
+            region_confidence=irlm_result.get("region_confidence")
+        )
     except HTTPException as he:
         raise he
     except Exception as e:
@@ -790,5 +883,6 @@ async def chat_with_assistant(request: ChatRequest):
 
 
 if __name__ == "__main__":
+    # Auto-reload trigger
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
 

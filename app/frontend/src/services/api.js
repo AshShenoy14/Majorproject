@@ -64,6 +64,15 @@ export const ppiService = {
   getVulnerability: (p1, p2, delta) => 
     api.get(`/analysis/vulnerability?p1=${p1}&p2=${p2}&delta=${delta}`),
 
+  localizeInteractionRegions: (p1_id, p2_id, p1_seq = null, p2_seq = null, base_prob = 0.5) =>
+    api.post('/analysis/localize', {
+      protein1_id: p1_id,
+      protein2_id: p2_id,
+      protein1_seq: p1_seq,
+      protein2_seq: p2_seq,
+      base_probability: base_prob
+    }),
+
   // AI Assistant
   getChatGreeting: () => api.get('/chat/greeting'),
   sendChatMessage: (message) => api.post('/chat', { message }),

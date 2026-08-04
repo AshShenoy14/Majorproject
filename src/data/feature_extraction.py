@@ -161,6 +161,23 @@ class ESMFeatureExtractor:
                 
         return embeddings
 
+    def get_residue_embeddings(self, sequence: str, max_length: int = 1024) -> torch.Tensor:
+        """
+        Extracts unpooled residue-level hidden representations [seq_len, hidden_dim]
+        for a single protein sequence (stripping BOS and EOS special tokens).
+        """
+        seq = sequence[:max_length]
+        inputs = self.tokenizer(seq, return_tensors="pt", padding=False, truncation=True, max_length=max_length+2)
+        inputs = {k: v.to(self.device) for k, v in inputs.items()}
+        
+        with torch.no_grad():
+            outputs = self.model(**inputs)
+            # Stripping BOS (index 0) and EOS (index -1)
+            residue_embeddings = outputs.last_hidden_state[0, 1:-1, :]
+            
+        return residue_embeddings
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Extract ESM embeddings for protein sequences")
     parser.add_argument("--batch-size", type=int, default=4,

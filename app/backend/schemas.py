@@ -55,7 +55,35 @@ class MutationResult(BaseModel):
     mutated_score: float = Field(..., description="Interaction probability after mutation")
     impact_delta: float = Field(..., description="Change in probability (mutated - base)")
     interpretation: str = Field(..., description="Qualitative impact of the mutation")
+    is_in_interaction_region: Optional[bool] = Field(None, description="Whether mutation is in a predicted interaction region")
+    interaction_region: Optional[str] = Field(None, description="Region label if in interaction region")
     error: Optional[str] = None
+
+class IRLMRequest(BaseModel):
+    protein1_id: Optional[str] = Field(None, description="Identifier for protein 1", json_schema_extra={"example": "ENSP00000327694"})
+    protein2_id: Optional[str] = Field(None, description="Identifier for protein 2", json_schema_extra={"example": "ENSP00000373627"})
+    protein1_seq: Optional[str] = Field(None, description="Sequence for protein 1")
+    protein2_seq: Optional[str] = Field(None, description="Sequence for protein 2")
+    base_probability: float = Field(0.5, description="Base interaction probability")
+
+class InteractionRegion(BaseModel):
+    start: int
+    end: int
+    score: float
+    sequence_snippet: str
+
+class IRLMResponse(BaseModel):
+    protein1_regions: List[InteractionRegion]
+    protein2_regions: List[InteractionRegion]
+    protein1_hotspots: List[int]
+    protein2_hotspots: List[int]
+    attention_map_shape: List[int]
+    protein_A_region: Optional[List[int]] = None
+    protein_B_region: Optional[List[int]] = None
+    protein_A_importance_scores: Optional[List[float]] = None
+    protein_B_importance_scores: Optional[List[float]] = None
+    top_residue_pairs: Optional[List[Dict[str, Any]]] = None
+    region_confidence: Optional[float] = None
 
 class MutationAnalysisResponse(BaseModel):
     protein1: str
