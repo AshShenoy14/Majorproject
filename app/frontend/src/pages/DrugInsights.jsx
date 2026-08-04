@@ -97,6 +97,19 @@ const DrugInsights = () => {
 
   return (
     <div className="space-y-8 pb-12">
+      {/* Quick Explanatory Guide Banner */}
+      <div className="bg-slate-900 border border-emerald-500/30 text-slate-200 p-6 rounded-[2rem] flex items-start gap-4 shadow-xl">
+        <div className="p-3 bg-emerald-500/20 rounded-2xl text-emerald-400 font-black text-xs uppercase tracking-widest shrink-0">
+          How to Use
+        </div>
+        <div className="space-y-1.5 text-xs leading-relaxed">
+          <h4 className="font-bold text-white text-sm">Understanding Drug Target Analysis</h4>
+          <p><strong className="text-emerald-400">1. Topological Centrality (Hubs):</strong> High-scoring proteins (e.g., TP53, MDM2) occupy key network junctions. Disrupting these nodes impacts entire disease pathways.</p>
+          <p><strong className="text-teal-400">2. ChEMBL Database Cross-Referencing:</strong> TransGraph queries ChEMBL to identify known small-molecule inhibitors or FDA-approved drugs for each protein.</p>
+          <p><strong className="text-purple-400">3. Actionable Research:</strong> Filter by <span className="text-emerald-300 font-semibold">"Drug Target"</span> to view proteins with existing drug leads, or <span className="text-purple-300 font-semibold">"High Centrality"</span> for novel targets.</p>
+        </div>
+      </div>
+
       {/* Header & Stats */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 glass-card p-10 bg-scientific-gradient text-white flex justify-between items-center relative overflow-hidden shadow-2xl shadow-emerald-200">

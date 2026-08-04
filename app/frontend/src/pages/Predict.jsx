@@ -14,6 +14,7 @@ import {
 import html2pdf from 'html2pdf.js';
 import { ppiService } from '../services/api';
 import Protein3DView from '../components/Protein3DView';
+import ProteinInfoButton from '../components/ProteinInfoModal';
 
 const CASE_STUDIES = [
   { label: "🎯 Oncology (TP53 & MDM2)", p1: "ENSP00000269305", p2: "ENSP00000258149", desc: "Tumor suppressor binding regulating cell cycle & apoptosis." },
@@ -23,8 +24,11 @@ const CASE_STUDIES = [
 ];
 
 const Predict = () => {
+  const [inputMode, setInputMode] = useState('ids'); // 'ids' | 'sequence' | 'case_studies'
   const [protein1, setProtein1] = useState('ENSP00000327694');
   const [protein2, setProtein2] = useState('ENSP00000373627');
+  const [seq1, setSeq1] = useState('');
+  const [seq2, setSeq2] = useState('');
   const [selectedCase, setSelectedCase] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -64,7 +68,12 @@ const Predict = () => {
     addLog("Analyzing Topological Centrality via GAT...", "process");
 
     try {
-      const response = await ppiService.predict(protein1, protein2);
+      const p1 = protein1.trim() || "Protein_1";
+      const p2 = protein2.trim() || "Protein_2";
+      const s1 = inputMode === 'sequence' ? seq1.trim() : null;
+      const s2 = inputMode === 'sequence' ? seq2.trim() : null;
+
+      const response = await ppiService.predict(p1, p2, s1, s2);
       const elapsed = Math.round(performance.now() - startTime);
       setLatency(elapsed);
       addLog(`Ensemble Meta-Learner Converged in ${elapsed}ms.`, "success");
@@ -138,72 +147,151 @@ const Predict = () => {
               </div>
             </div>
 
-            {/* FEATURE 2: Preset Case Studies Select Dropdown */}
-            <div className="mb-4">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 mb-1.5 flex items-center gap-1">
-                <Sparkles size={12} className="text-amber-500" /> Demo Case Studies
+            {/* Input Method Dropdown Selector */}
+            <div className="mb-4 space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-1">
+                <Sparkles size={12} className="text-emerald-500" /> Input Method
               </label>
               <select
-                value={selectedCase || ''}
+                value={inputMode}
                 onChange={(e) => {
-                  const c = CASE_STUDIES.find(cs => cs.label === e.target.value);
-                  if (c) handleSelectCase(c);
+                  const mode = e.target.value;
+                  setInputMode(mode);
+                  if (mode === 'case_studies' && !selectedCase && CASE_STUDIES.length > 0) {
+                    handleSelectCase(CASE_STUDIES[0]);
+                  }
                 }}
-                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-700 font-bold focus:border-emerald-500 focus:bg-white outline-none cursor-pointer"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 font-bold focus:border-emerald-500 focus:bg-white outline-none cursor-pointer shadow-xs transition-all"
               >
-                <option value="" disabled>-- Select a Demo Case Study --</option>
-                {CASE_STUDIES.map((c, i) => (
-                  <option key={i} value={c.label}>
-                    {c.label} ({c.protein1} & {c.protein2})
-                  </option>
-                ))}
+                <option value="ids">🆔 Use Protein IDs (UniProt / Ensembl)</option>
+                <option value="sequence">🧬 Enter Amino Acid Sequence</option>
+                <option value="case_studies">🎯 Select Case Studies</option>
               </select>
             </div>
 
-            <form onSubmit={handlePredict} className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Protein Alpha ID</label>
-                <div className="relative">
-                  <input 
-                    value={protein1}
-                    onChange={(e) => setProtein1(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 font-mono text-sm focus:border-emerald-500 focus:bg-white outline-none transition-all shadow-inner"
-                    placeholder="ENSP..."
-                  />
-                  <Database size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" />
-                </div>
-              </div>
-
-              <div className="flex justify-center -my-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setProtein1(protein2);
-                    setProtein2(protein1);
+            {/* Case Studies Sub-selector */}
+            {inputMode === 'case_studies' && (
+              <div className="mb-4 bg-emerald-50/70 border border-emerald-200/60 rounded-2xl p-3.5 space-y-2">
+                <label className="text-[10px] font-black text-emerald-700 uppercase tracking-[0.2em] flex items-center gap-1">
+                  <BookOpen size={12} /> Choose Case Study Preset
+                </label>
+                <select
+                  value={selectedCase || ''}
+                  onChange={(e) => {
+                    const c = CASE_STUDIES.find(cs => cs.label === e.target.value);
+                    if (c) handleSelectCase(c);
                   }}
-                  className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-emerald-500 shadow-md z-10 hover:rotate-180 transition-transform duration-500"
+                  className="w-full bg-white border border-emerald-300 rounded-xl px-3 py-2 text-xs text-slate-700 font-bold focus:border-emerald-500 outline-none cursor-pointer"
                 >
-                  <ArrowRightLeft size={14} />
-                </button>
+                  <option value="" disabled>-- Select a Preset --</option>
+                  {CASE_STUDIES.map((c, i) => (
+                    <option key={i} value={c.label}>
+                      {c.label} ({c.p1} & {c.p2})
+                    </option>
+                  ))}
+                </select>
+                {selectedCase && (
+                  <p className="text-[11px] text-slate-600 font-medium italic leading-relaxed pt-1">
+                    {CASE_STUDIES.find(c => c.label === selectedCase)?.desc}
+                  </p>
+                )}
               </div>
+            )}
 
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Protein Beta ID</label>
-                <div className="relative">
-                  <input 
-                    value={protein2}
-                    onChange={(e) => setProtein2(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 font-mono text-sm focus:border-emerald-500 focus:bg-white outline-none transition-all shadow-inner"
-                    placeholder="ENSP..."
-                  />
-                  <Database size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" />
-                </div>
-              </div>
+            <form onSubmit={handlePredict} className="space-y-4">
+              {(inputMode === 'ids' || inputMode === 'case_studies') && (
+                <>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Protein Alpha ID</label>
+                      {protein1 && <ProteinInfoButton proteinId={protein1} label="Info" />}
+                    </div>
+                    <div className="relative">
+                      <input 
+                        value={protein1}
+                        onChange={(e) => setProtein1(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 font-mono text-sm focus:border-emerald-500 focus:bg-white outline-none transition-all shadow-inner"
+                        placeholder="ENSP..."
+                      />
+                      <Database size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-center -my-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProtein1(protein2);
+                        setProtein2(protein1);
+                      }}
+                      className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-emerald-500 shadow-md z-10 hover:rotate-180 transition-transform duration-500 cursor-pointer"
+                    >
+                      <ArrowRightLeft size={14} />
+                    </button>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Protein Beta ID</label>
+                      {protein2 && <ProteinInfoButton proteinId={protein2} label="Info" />}
+                    </div>
+                    <div className="relative">
+                      <input 
+                        value={protein2}
+                        onChange={(e) => setProtein2(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 font-mono text-sm focus:border-emerald-500 focus:bg-white outline-none transition-all shadow-inner"
+                        placeholder="ENSP..."
+                      />
+                      <Database size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {inputMode === 'sequence' && (
+                <>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Protein 1 Identifier / Name</label>
+                    <input 
+                      value={protein1}
+                      onChange={(e) => setProtein1(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-700 font-mono text-xs focus:border-emerald-500 focus:bg-white outline-none transition-all shadow-inner"
+                      placeholder="e.g., Protein_Alpha"
+                    />
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 mt-2 block">Amino Acid Sequence 1</label>
+                    <textarea
+                      rows={3}
+                      value={seq1}
+                      onChange={(e) => setSeq1(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-700 font-mono text-xs focus:border-emerald-500 focus:bg-white outline-none transition-all shadow-inner uppercase"
+                      placeholder="MVLSPADKTNVKAAWGKVGAHAGEYGAEALERM..."
+                    />
+                  </div>
+
+                  <div className="space-y-1.5 pt-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Protein 2 Identifier / Name</label>
+                    <input 
+                      value={protein2}
+                      onChange={(e) => setProtein2(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-700 font-mono text-xs focus:border-emerald-500 focus:bg-white outline-none transition-all shadow-inner"
+                      placeholder="e.g., Protein_Beta"
+                    />
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 mt-2 block">Amino Acid Sequence 2</label>
+                    <textarea
+                      rows={3}
+                      value={seq2}
+                      onChange={(e) => setSeq2(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-700 font-mono text-xs focus:border-emerald-500 focus:bg-white outline-none transition-all shadow-inner uppercase"
+                      placeholder="VHLTPEEKSAVTALWGKVNVDEVGGEALGRLLVVYPWT..."
+                    />
+                  </div>
+                </>
+              )}
 
               <button 
                 type="submit" 
                 disabled={loading}
-                className="w-full bg-gradient-to-r from-emerald-500 via-teal-500 to-indigo-500 hover:from-emerald-400 hover:to-indigo-400 text-white font-black py-4 rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 uppercase tracking-widest text-xs mt-2"
+                className="w-full bg-gradient-to-r from-emerald-500 via-teal-500 to-indigo-500 hover:from-emerald-400 hover:to-indigo-400 text-white font-black py-4 rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 uppercase tracking-widest text-xs mt-2 cursor-pointer"
               >
                 {loading ? <Loader2 className="animate-spin" size={18} /> : <Zap size={18} />}
                 Predict Interaction

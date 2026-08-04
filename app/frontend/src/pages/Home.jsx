@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { 
-  Activity, 
-  Users, 
-  Zap, 
-  CheckCircle, 
+import {
+  Activity,
+  Users,
+  Zap,
+  CheckCircle,
   ArrowRight,
   Database,
   Search,
@@ -14,7 +14,7 @@ import { Link } from 'react-router-dom';
 import { ppiService } from '../services/api';
 
 const StatCard = ({ icon: Icon, label, value, subtext, color }) => (
-  <motion.div 
+  <motion.div
     whileHover={{ y: -5 }}
     className="glass-card p-6 flex flex-col items-start"
   >
@@ -59,21 +59,21 @@ const Home = () => {
       {/* Hero Section */}
       <div className="relative overflow-hidden rounded-[3rem] bg-white min-h-[450px] flex items-center shadow-xl border border-slate-100">
         {/* Background Image with Overlay */}
-        <div 
+        <div
           className="absolute inset-0 z-0 bg-cover bg-center opacity-[0.06]"
           style={{ backgroundImage: "url('/ppi_hero_bg_1777021983794.png')" }}
         />
         <div className="absolute inset-0 z-0 bg-gradient-to-r from-white via-white/40 to-transparent" />
-        
+
         <div className="relative z-10 p-16 max-w-3xl">
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase tracking-[0.2em] mb-8"
           >
             <Zap size={14} className="text-emerald-500" /> AI-Powered Biological Discovery System
           </motion.div>
-          <motion.h1 
+          <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
@@ -81,16 +81,16 @@ const Home = () => {
           >
             Decoding the Language of <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-teal-400">Proteins</span>
           </motion.h1>
-          <motion.p 
+          <motion.p
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
             className="text-xl text-slate-500 mb-10 leading-relaxed font-medium"
           >
-            <span className="font-cursive text-emerald-600 text-2xl">TransGraph PPI</span> is a state-of-the-art hybrid AI framework combining protein language models (ESM-2) 
+            <span className="font-cursive text-emerald-600 text-2xl">TransGraph PPI</span> is a state-of-the-art hybrid AI framework combining protein language models (ESM-2)
             and graph neural networks (GAT) to analyze complex biological interactomes.
           </motion.p>
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
@@ -104,7 +104,7 @@ const Home = () => {
             </Link>
           </motion.div>
         </div>
-        
+
         {/* Floating elements for visual interest */}
         <div className="absolute top-1/4 right-20 w-48 h-48 bg-emerald-100/30 blur-[80px] rounded-full animate-pulse" />
         <div className="absolute bottom-1/4 right-40 w-64 h-64 bg-teal-100/20 blur-[100px] rounded-full animate-pulse delay-700" />
@@ -112,34 +112,130 @@ const Home = () => {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard 
-          icon={Users} 
-          label="Proteins Catalogued" 
-          value={stats.proteins} 
+        <StatCard
+          icon={Users}
+          label="Proteins Catalogued"
+          value={stats.proteins}
           subtext="+124 added this week"
           color="bg-gradient-to-br from-teal-400 to-teal-600"
         />
-        <StatCard 
-          icon={Share2} 
-          label="Interactions Analyzed" 
-          value={stats.interactions} 
+        <StatCard
+          icon={Share2}
+          label="Interactions Analyzed"
+          value={stats.interactions}
           subtext="Verified by STRING DB"
           color="bg-gradient-to-br from-blue-400 to-blue-600"
         />
-        <StatCard 
-          icon={CheckCircle} 
-          label="Model Accuracy" 
-          value={stats.accuracy} 
+        <StatCard
+          icon={CheckCircle}
+          label="Model Accuracy"
+          value={stats.accuracy}
           subtext="Validated on Yeast subset"
           color="bg-gradient-to-br from-purple-400 to-purple-600"
         />
-        <StatCard 
-          icon={Activity} 
-          label="Predictions Logged" 
-          value={stats.predictions} 
+        <StatCard
+          icon={Activity}
+          label="Predictions Logged"
+          value={stats.predictions}
           subtext="System-wide activity"
           color="bg-gradient-to-br from-orange-400 to-orange-600"
         />
+      </div>
+
+      {/* Project Guide & Interactive Overview */}
+      <div className="glass-card p-10 bg-white border border-slate-100 rounded-[2.5rem] shadow-xl space-y-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-6">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-emerald-50 text-emerald-600 text-xs font-bold uppercase tracking-wider mb-2">
+              <Zap size={14} /> Quick Start Guide
+            </div>
+            <h2 className="text-3xl font-black text-slate-800 tracking-tight">
+              What is <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-teal-500">TransGraph-PPI</span>?
+            </h2>
+          </div>
+          <p className="text-slate-500 text-sm max-w-xl font-medium leading-relaxed">
+            Proteins are biological machines in cells. When they bind, they drive life processes—or trigger diseases like cancer.
+            <strong> TransGraph-PPI</strong> uses Transformer AI (ESM-2) + Graph Neural Networks (GAT) to predict protein binding, scan mutation impacts, and discover drug target nodes.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* Card 1 */}
+          <div className="p-6 rounded-2xl bg-slate-50 border border-slate-100 flex flex-col justify-between hover:shadow-md transition-all">
+            <div>
+              <div className="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center font-bold mb-4 shadow-md shadow-emerald-200">
+                1
+              </div>
+              <h4 className="font-bold text-slate-800 text-base mb-1">Interaction Predictor</h4>
+              <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+                Predicts binding probability between two proteins using UniProt IDs or raw amino acid sequences.
+              </p>
+              <div className="bg-white p-3 rounded-xl border border-slate-200 text-[11px] text-slate-600 font-mono">
+                <span className="font-bold text-emerald-600">What to try:</span> Test TP53 (p1) vs MDM2 (p2), or paste sequence <code className="text-teal-600">MTEYKL...</code>
+              </div>
+            </div>
+            <Link to="/predict" className="mt-4 text-xs font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1">
+              Try Predict <ArrowRight size={14} />
+            </Link>
+          </div>
+
+          {/* Card 2 */}
+          <div className="p-6 rounded-2xl bg-slate-50 border border-slate-100 flex flex-col justify-between hover:shadow-md transition-all">
+            <div>
+              <div className="w-10 h-10 rounded-xl bg-teal-500 text-white flex items-center justify-center font-bold mb-4 shadow-md shadow-teal-200">
+                2
+              </div>
+              <h4 className="font-bold text-slate-800 text-base mb-1">Mutation Scanner</h4>
+              <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+                Simulates single amino acid mutations to test if binding increases (Green) or decreases (Red).
+              </p>
+              <div className="bg-white p-3 rounded-xl border border-slate-200 text-[11px] text-slate-600 font-mono">
+                <span className="font-bold text-teal-600">What to try:</span> Enter TP53, pick position 215, mutate Arg (R) → His (H).
+              </div>
+            </div>
+            <Link to="/mutation" className="mt-4 text-xs font-bold text-teal-600 hover:text-teal-700 flex items-center gap-1">
+              Scan Mutation <ArrowRight size={14} />
+            </Link>
+          </div>
+
+          {/* Card 3 */}
+          <div className="p-6 rounded-2xl bg-slate-50 border border-slate-100 flex flex-col justify-between hover:shadow-md transition-all">
+            <div>
+              <div className="w-10 h-10 rounded-xl bg-purple-500 text-white flex items-center justify-center font-bold mb-4 shadow-md shadow-purple-200">
+                3
+              </div>
+              <h4 className="font-bold text-slate-800 text-base mb-1">3D Interactome</h4>
+              <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+                Interactive 3D graph layout showing protein hubs and interaction clusters in spatial force embedding.
+              </p>
+              <div className="bg-white p-3 rounded-xl border border-slate-200 text-[11px] text-slate-600 font-mono">
+                <span className="font-bold text-purple-600">What to try:</span> Drag & zoom 3D nodes; click TP53 to see hub connectivity.
+              </div>
+            </div>
+            <Link to="/network" className="mt-4 text-xs font-bold text-purple-600 hover:text-purple-700 flex items-center gap-1">
+              Explore 3D <ArrowRight size={14} />
+            </Link>
+          </div>
+
+          {/* Card 4 */}
+          <div className="p-6 rounded-2xl bg-slate-50 border border-slate-100 flex flex-col justify-between hover:shadow-md transition-all">
+            <div>
+              <div className="w-10 h-10 rounded-xl bg-blue-500 text-white flex items-center justify-center font-bold mb-4 shadow-md shadow-blue-200">
+                4
+              </div>
+              <h4 className="font-bold text-slate-800 text-base mb-1">Drug Target Insights</h4>
+              <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+                Ranks high-centrality hub proteins and cross-references ChEMBL to identify potential therapeutic drug targets.
+              </p>
+              <div className="bg-white p-3 rounded-xl border border-slate-200 text-[11px] text-slate-600 font-mono">
+                <span className="font-bold text-blue-600">What to try:</span> Filter by "Drug Target" to view FDA-approved drug leads.
+              </div>
+            </div>
+            <Link to="/drug-targets" className="mt-4 text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1">
+              View Drug Targets <ArrowRight size={14} />
+            </Link>
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -155,90 +251,90 @@ const Home = () => {
             </Link>
           </div>
           <div className="aspect-video bg-gradient-to-br from-slate-900 to-slate-950 rounded-[2rem] p-6 flex flex-col justify-between border border-slate-800 overflow-hidden relative group shadow-2xl">
-             {/* Glowing grid background */}
-             <div className="absolute inset-0 opacity-10 pointer-events-none">
-                <div className="grid grid-cols-12 h-full w-full">
-                  {[...Array(48)].map((_, i) => (
-                    <div key={i} className="border border-teal-500/30" />
-                  ))}
-                </div>
-             </div>
+            {/* Glowing grid background */}
+            <div className="absolute inset-0 opacity-10 pointer-events-none">
+              <div className="grid grid-cols-12 h-full w-full">
+                {[...Array(48)].map((_, i) => (
+                  <div key={i} className="border border-teal-500/30" />
+                ))}
+              </div>
+            </div>
 
-             {/* Interactive SVG Network Graph */}
-             <svg className="absolute inset-0 w-full h-full pointer-events-auto" viewBox="0 0 600 350">
-               <defs>
-                 <linearGradient id="edgeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                   <stop offset="0%" stopColor="#10b981" stopOpacity="0.8" />
-                   <stop offset="100%" stopColor="#6366f1" stopOpacity="0.4" />
-                 </linearGradient>
-               </defs>
+            {/* Interactive SVG Network Graph */}
+            <svg className="absolute inset-0 w-full h-full pointer-events-auto" viewBox="0 0 600 350">
+              <defs>
+                <linearGradient id="edgeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#10b981" stopOpacity="0.8" />
+                  <stop offset="100%" stopColor="#6366f1" stopOpacity="0.4" />
+                </linearGradient>
+              </defs>
 
-               {/* Edges */}
-               <line x1="300" y1="175" x2="180" y2="100" stroke="url(#edgeGrad)" strokeWidth="2.5" strokeDasharray="6 3" className="animate-pulse" />
-               <line x1="300" y1="175" x2="420" y2="110" stroke="url(#edgeGrad)" strokeWidth="3" />
-               <line x1="300" y1="175" x2="220" y2="260" stroke="url(#edgeGrad)" strokeWidth="2" strokeDasharray="4 2" />
-               <line x1="300" y1="175" x2="440" y2="250" stroke="url(#edgeGrad)" strokeWidth="2.5" />
-               <line x1="180" y1="100" x2="110" y2="180" stroke="#334155" strokeWidth="1.5" />
-               <line x1="420" y1="110" x2="500" y2="170" stroke="#334155" strokeWidth="1.5" />
-               <line x1="220" y1="260" x2="350" y2="290" stroke="#334155" strokeWidth="1.5" />
+              {/* Edges */}
+              <line x1="300" y1="175" x2="180" y2="100" stroke="url(#edgeGrad)" strokeWidth="2.5" strokeDasharray="6 3" className="animate-pulse" />
+              <line x1="300" y1="175" x2="420" y2="110" stroke="url(#edgeGrad)" strokeWidth="3" />
+              <line x1="300" y1="175" x2="220" y2="260" stroke="url(#edgeGrad)" strokeWidth="2" strokeDasharray="4 2" />
+              <line x1="300" y1="175" x2="440" y2="250" stroke="url(#edgeGrad)" strokeWidth="2.5" />
+              <line x1="180" y1="100" x2="110" y2="180" stroke="#334155" strokeWidth="1.5" />
+              <line x1="420" y1="110" x2="500" y2="170" stroke="#334155" strokeWidth="1.5" />
+              <line x1="220" y1="260" x2="350" y2="290" stroke="#334155" strokeWidth="1.5" />
 
-               {/* Nodes */}
-               {/* Center Node: TP53 */}
-               <g className="cursor-pointer group/node" transform="translate(300, 175)">
-                 <circle r="24" className="fill-emerald-500/20 stroke-emerald-400 stroke-2 animate-ping opacity-75" />
-                 <circle r="18" className="fill-emerald-600 stroke-emerald-300 stroke-2 shadow-lg" />
-                 <text textAnchor="middle" dy="4" fill="#ffffff" fontSize="10" fontWeight="900">TP53</text>
-               </g>
+              {/* Nodes */}
+              {/* Center Node: TP53 */}
+              <g className="cursor-pointer group/node" transform="translate(300, 175)">
+                <circle r="24" className="fill-emerald-500/20 stroke-emerald-400 stroke-2 animate-ping opacity-75" />
+                <circle r="18" className="fill-emerald-600 stroke-emerald-300 stroke-2 shadow-lg" />
+                <text textAnchor="middle" dy="4" fill="#ffffff" fontSize="10" fontWeight="900">TP53</text>
+              </g>
 
-               {/* Node 2: MDM2 */}
-               <g className="cursor-pointer" transform="translate(180, 100)">
-                 <circle r="14" className="fill-teal-600 stroke-teal-300 stroke-2" />
-                 <text textAnchor="middle" dy="4" fill="#ffffff" fontSize="9" fontWeight="800">MDM2</text>
-               </g>
+              {/* Node 2: MDM2 */}
+              <g className="cursor-pointer" transform="translate(180, 100)">
+                <circle r="14" className="fill-teal-600 stroke-teal-300 stroke-2" />
+                <text textAnchor="middle" dy="4" fill="#ffffff" fontSize="9" fontWeight="800">MDM2</text>
+              </g>
 
-               {/* Node 3: BAX */}
-               <g className="cursor-pointer" transform="translate(420, 110)">
-                 <circle r="15" className="fill-indigo-600 stroke-indigo-300 stroke-2" />
-                 <text textAnchor="middle" dy="4" fill="#ffffff" fontSize="9" fontWeight="800">BAX</text>
-               </g>
+              {/* Node 3: BAX */}
+              <g className="cursor-pointer" transform="translate(420, 110)">
+                <circle r="15" className="fill-indigo-600 stroke-indigo-300 stroke-2" />
+                <text textAnchor="middle" dy="4" fill="#ffffff" fontSize="9" fontWeight="800">BAX</text>
+              </g>
 
-               {/* Node 4: BCL2 */}
-               <g className="cursor-pointer" transform="translate(220, 260)">
-                 <circle r="13" className="fill-cyan-600 stroke-cyan-300 stroke-2" />
-                 <text textAnchor="middle" dy="4" fill="#ffffff" fontSize="9" fontWeight="800">BCL2</text>
-               </g>
+              {/* Node 4: BCL2 */}
+              <g className="cursor-pointer" transform="translate(220, 260)">
+                <circle r="13" className="fill-cyan-600 stroke-cyan-300 stroke-2" />
+                <text textAnchor="middle" dy="4" fill="#ffffff" fontSize="9" fontWeight="800">BCL2</text>
+              </g>
 
-               {/* Node 5: AP2A2 */}
-               <g className="cursor-pointer" transform="translate(440, 250)">
-                 <circle r="14" className="fill-purple-600 stroke-purple-300 stroke-2" />
-                 <text textAnchor="middle" dy="4" fill="#ffffff" fontSize="8" fontWeight="800">AP2A2</text>
-               </g>
+              {/* Node 5: AP2A2 */}
+              <g className="cursor-pointer" transform="translate(440, 250)">
+                <circle r="14" className="fill-purple-600 stroke-purple-300 stroke-2" />
+                <text textAnchor="middle" dy="4" fill="#ffffff" fontSize="8" fontWeight="800">AP2A2</text>
+              </g>
 
-               {/* Peripheral Nodes */}
-               <circle cx="110" cy="180" r="8" className="fill-slate-700 stroke-slate-500" />
-               <circle cx="500" cy="170" r="9" className="fill-slate-700 stroke-slate-500" />
-               <circle cx="350" cy="290" r="7" className="fill-slate-700 stroke-slate-500" />
-             </svg>
+              {/* Peripheral Nodes */}
+              <circle cx="110" cy="180" r="8" className="fill-slate-700 stroke-slate-500" />
+              <circle cx="500" cy="170" r="9" className="fill-slate-700 stroke-slate-500" />
+              <circle cx="350" cy="290" r="7" className="fill-slate-700 stroke-slate-500" />
+            </svg>
 
-             {/* Overlay status tags */}
-             <div className="relative z-10 flex justify-between items-start pointer-events-none">
-               <div className="bg-slate-900/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-700 text-[10px] font-mono text-emerald-400 flex items-center gap-2">
-                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                 <span>Topological Density: <strong>0.842</strong></span>
-               </div>
-               <div className="bg-slate-900/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-700 text-[10px] font-mono text-slate-300">
-                 Active Hub: <strong className="text-emerald-400">TP53 (Degree: 42)</strong>
-               </div>
-             </div>
+            {/* Overlay status tags */}
+            <div className="relative z-10 flex justify-between items-start pointer-events-none">
+              <div className="bg-slate-900/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-700 text-[10px] font-mono text-emerald-400 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>Topological Density: <strong>0.842</strong></span>
+              </div>
+              <div className="bg-slate-900/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-700 text-[10px] font-mono text-slate-300">
+                Active Hub: <strong className="text-emerald-400">TP53 (Degree: 42)</strong>
+              </div>
+            </div>
 
-             <div className="relative z-10 flex justify-between items-end pointer-events-none">
-               <div className="text-slate-400 text-xs font-medium">
-                 Click node to view affinity & pathway metadata
-               </div>
-               <Link to="/network" className="pointer-events-auto bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs px-4 py-2 rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-1.5">
-                 LAUNCH 3D INTERACTOME <ArrowRight size={14} />
-               </Link>
-             </div>
+            <div className="relative z-10 flex justify-between items-end pointer-events-none">
+              <div className="text-slate-400 text-xs font-medium">
+                Click node to view affinity & pathway metadata
+              </div>
+              <Link to="/network" className="pointer-events-auto bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs px-4 py-2 rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-1.5">
+                LAUNCH 3D INTERACTOME <ArrowRight size={14} />
+              </Link>
+            </div>
           </div>
         </div>
 
@@ -259,7 +355,7 @@ const Home = () => {
 
           <Link to="/drug-targets" className="block outline-none group">
             <div className="glass-card p-8 hover:bg-white transition-all h-[240px] flex flex-col justify-end relative overflow-hidden">
-               <div className="absolute top-0 right-0 p-8 text-scientific-accent/5 group-hover:text-scientific-accent/10 transition-all duration-500">
+              <div className="absolute top-0 right-0 p-8 text-scientific-accent/5 group-hover:text-scientific-accent/10 transition-all duration-500">
                 <Database size={120} />
               </div>
               <h4 className="text-2xl font-black mb-2 text-slate-800 relative z-10">Drug Insights</h4>

@@ -7,20 +7,32 @@ diseases, drug targets, and the TransGraph-PPI system.
 import re
 import random
 import os
+import requests
 from typing import Optional, Dict, List
 from google import genai
 from dotenv import load_dotenv
 
-# Load environment variables (for GEMINI_API_KEY)
+# Load environment variables
 load_dotenv()
 
-# Configure Gemini
+# Configure LLM Providers
+MISTRAL_API_KEY = os.getenv("MISTRAL_API_KEY")
+MISTRAL_MODEL = os.getenv("MISTRAL_MODEL", "mistral-small-latest")
+MISTRAL_URL = "https://api.mistral.ai/v1/chat/completions"
+
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if GEMINI_API_KEY:
-    CLIENT = genai.Client(api_key=GEMINI_API_KEY)
+    GEMINI_CLIENT = genai.Client(api_key=GEMINI_API_KEY)
 else:
-    CLIENT = None
-    print("Warning: GEMINI_API_KEY not found in .env. Falling back to rule-based assistant.")
+    GEMINI_CLIENT = None
+
+if MISTRAL_API_KEY:
+    print(f"Info: Mistral API initialized as primary AI provider ({MISTRAL_MODEL}).")
+elif GEMINI_API_KEY:
+    print("Info: Gemini API initialized as secondary AI provider.")
+else:
+    print("Warning: Neither MISTRAL_API_KEY nor GEMINI_API_KEY found in .env. Falling back to rule-based assistant.")
+
 
 
 
@@ -196,7 +208,8 @@ class ProteinAssistant:
 
     def answer(self, question: str) -> dict:
         """
-        Process a user question using Gemini AI or fallback to rule-based logic.
+        Process a user question using Mistral API (primary), Gemini AI (fallback),
+        or rule-based knowledge engine (final fallback).
         """
         q = question.lower().strip()
 
@@ -204,34 +217,61 @@ class ProteinAssistant:
         if q in ["hi", "hello", "hey", "help", "start"]:
             return self.get_greeting()
 
-        # 2. Try Gemini AI if configured
-        if CLIENT:
+        # Build context from curated knowledge base if relevant
+        context = "You are an expert Protein Biology Assistant for the TransGraph-PPI project. "
+        context += "Answer user questions clearly, accurately, and concisely using modern biological terminology.\n\n"
+        relevant_keys = [k for k in PROTEIN_KNOWLEDGE.keys() if k.lower() in q]
+        for k in relevant_keys:
+            context += f"Protein {k}: {PROTEIN_KNOWLEDGE[k]['function']}\n"
+
+        # 2. Try Primary Provider: Mistral API
+        if MISTRAL_API_KEY:
             try:
-                # Prepare context from our curated knowledge
-                context = "You are a Protein Biology Expert for the TransGraph-PPI project. "
-                context += "Use the following curated knowledge if relevant, but answer the user's specific question naturally.\n\n"
-                
-                # Sample some knowledge for context (don't send everything to save tokens/time)
-                relevant_keys = [k for k in PROTEIN_KNOWLEDGE.keys() if k.lower() in q]
-                for k in relevant_keys:
-                    context += f"Protein {k}: {PROTEIN_KNOWLEDGE[k]['function']}\n"
-                
+                headers = {
+                    "Authorization": f"Bearer {MISTRAL_API_KEY}",
+                    "Content-Type": "application/json"
+                }
+                payload = {
+                    "model": MISTRAL_MODEL,
+                    "messages": [
+                        {"role": "system", "content": context},
+                        {"role": "user", "content": question}
+                    ],
+                    "temperature": 0.7,
+                    "max_tokens": 512
+                }
+                res = requests.post(MISTRAL_URL, json=payload, headers=headers, timeout=8)
+                if res.status_code == 200:
+                    data = res.json()
+                    ans = data["choices"][0]["message"]["content"]
+                    return {
+                        "response": ans,
+                        "suggestions": random.sample(SUGGESTIONS, 3),
+                        "sources": ["Mistral AI (Primary)", "TransGraph-PPI Knowledge Base"]
+                    }
+                else:
+                    print(f"Mistral API error HTTP {res.status_code}: {res.text}. Falling back to Gemini.")
+            except Exception as e:
+                print(f"Mistral API Exception: {e}. Falling back to Gemini.")
+
+        # 3. Try Fallback Provider: Google Gemini AI
+        if GEMINI_CLIENT:
+            try:
                 prompt = f"{context}\n\nUser Question: {question}\n\nAssistant:"
-                
-                response = CLIENT.models.generate_content(
+                response = GEMINI_CLIENT.models.generate_content(
                     model='gemini-1.5-pro',
                     contents=prompt
                 )
-                
                 if response and response.text:
                     return {
                         "response": response.text,
                         "suggestions": random.sample(SUGGESTIONS, 3),
-                        "sources": ["Google Gemini AI", "TransGraph-PPI Knowledge Base"]
+                        "sources": ["Google Gemini AI (Fallback)", "TransGraph-PPI Knowledge Base"]
                     }
             except Exception as e:
                 print(f"Gemini AI Error: {e}")
-                # Fall through to rule-based
+                # Fall through to rule-based engine
+
 
         # 3. Rule-based fallback (original logic)
         protein_result = self._search_protein(q)
