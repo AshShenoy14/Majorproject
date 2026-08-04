@@ -10,6 +10,8 @@ import NetworkExplorer3D from './pages/Network3D';
 import DrugInsights from './pages/DrugInsights';
 import Assistant from './pages/Assistant';
 import About from './pages/About';
+import Benchmark from './pages/Benchmark';
+import ComparisonMode from './pages/ComparisonMode';
 import ProteinPreloader from './components/ProteinPreloader';
 import CrossSpeciesTesting from './components/CrossSpeciesTesting';
 
@@ -61,6 +63,8 @@ function App() {
                                 <Route path="/assistant" element={<Assistant />} />
                                 <Route path="/about" element={<About />} />
                                 <Route path="/zero-shot" element={<CrossSpeciesTesting />} />
+                                <Route path="/benchmark" element={<Benchmark />} />
+                                <Route path="/compare" element={<ComparisonMode />} />
                             </Routes>
                         </Layout>
                     </Router>

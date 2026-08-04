@@ -128,6 +128,7 @@ const Assistant = () => {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
+  const [predictionContext, setPredictionContext] = useState(null); // injected from Predict page
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -135,6 +136,17 @@ const Assistant = () => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Load prediction context from localStorage (saved by Predict.jsx on prediction)
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('transgraph_last_prediction');
+      if (stored) {
+        const ctx = JSON.parse(stored);
+        setPredictionContext(ctx);
+      }
+    } catch (_) {}
+  }, []);
 
   // Load greeting on mount
   useEffect(() => {
@@ -170,7 +182,14 @@ const Assistant = () => {
     const message = text || input.trim();
     if (!message || loading) return;
 
-    // Add user message
+    // Build context-aware message prefix if a prediction exists
+    let contextualMessage = message;
+    if (predictionContext) {
+      const { p1, p2, prob, esm, gat, conf } = predictionContext;
+      contextualMessage = `[Context: The user just ran TransGraph-PPI prediction for ${p1} ↔ ${p2}. Results: interaction_probability=${(prob*100).toFixed(1)}%, ESM=${(esm*100).toFixed(1)}%, GAT=${(gat*100).toFixed(1)}%, confidence=${(conf*100).toFixed(1)}%. Please use this context to answer the following question.]\n\n${message}`;
+    }
+
+    // Add user message (show without system prefix)
     const userMsg = { type: 'user', text: message, timestamp: new Date() };
     setMessages(prev => [...prev, userMsg]);
     setInput('');
@@ -178,7 +197,7 @@ const Assistant = () => {
     setLoading(true);
 
     try {
-      const res = await ppiService.sendChatMessage(message);
+      const res = await ppiService.sendChatMessage(contextualMessage);
       const assistantMsg = {
         type: 'assistant',
         text: res.data.response,
@@ -234,6 +253,50 @@ const Assistant = () => {
           <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Online</span>
         </div>
       </div>
+
+      {/* Prediction Context Banner */}
+      {predictionContext && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mx-1 mb-3 p-4 bg-teal-50 border border-teal-200 rounded-2xl"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex-1">
+              <p className="text-[10px] font-black text-teal-600 uppercase tracking-widest mb-1.5">
+                🔬 Prediction Context Loaded
+              </p>
+              <p className="text-xs text-teal-800 font-medium">
+                <span className="font-mono">{predictionContext.p1}</span>
+                <span className="mx-2 text-teal-400">↔</span>
+                <span className="font-mono">{predictionContext.p2}</span>
+                <span className="ml-3 px-2 py-0.5 bg-teal-100 text-teal-700 rounded-full text-[9px] font-black">
+                  {(predictionContext.prob * 100).toFixed(1)}% interaction
+                </span>
+              </p>
+            </div>
+            <button
+              onClick={() => { setPredictionContext(null); localStorage.removeItem('transgraph_last_prediction'); }}
+              className="text-teal-400 hover:text-teal-600 text-[10px] font-bold uppercase tracking-wider"
+            >
+              Clear
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2 mt-3">
+            {[
+              `Why did ${predictionContext.p1} and ${predictionContext.p2} interact?`,
+              `What diseases are associated with ${predictionContext.p1}?`,
+              `Suggest drug targets for this interaction.`,
+              `Explain the biological significance of this pair.`
+            ].map((s, i) => (
+              <button key={i} onClick={() => handleSend(s)}
+                className="px-2.5 py-1 bg-teal-100 hover:bg-teal-200 text-teal-700 rounded-lg text-[9px] font-bold transition-all cursor-pointer">
+                {s}
+              </button>
+            ))}
+          </div>
+        </motion.div>
+      )}
 
       {/* Messages Area */}
       <div className="flex-1 overflow-y-auto px-1 space-y-4 pb-4 scrollbar-thin" id="chat-messages">

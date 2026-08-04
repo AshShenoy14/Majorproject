@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Search, Activity, BarChart3, Info, CheckCircle2, 
   XCircle, AlertCircle, Loader2, ChevronRight, 
   ShieldCheck, Cpu, Database, Terminal as TerminalIcon,
   Zap, ArrowRightLeft, LayoutGrid, Box, BookOpen, Download,
-  Sparkles, Gauge, Server, Clock
+  Sparkles, Gauge, Server, Clock, UploadCloud, ToggleLeft, ToggleRight,
+  GraduationCap, FlaskConical, Table2, FileDown
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, 
@@ -40,6 +41,11 @@ const Predict = () => {
   const [logs, setLogs] = useState([]);
   const [latency, setLatency] = useState(42);
   const logEndRef = useRef(null);
+  // ── NEW STATE ──────────────────────────────────────────────
+  const [expertMode, setExpertMode] = useState(false);  // false = Beginner, true = Research
+  const [batchResults, setBatchResults] = useState([]);   // batch CSV results
+  const [batchLoading, setBatchLoading] = useState(false);
+  const fileInputRef = useRef(null);
 
   const addLog = (msg, type = 'info') => {
     setLogs(prev => [...prev, { msg, type, time: new Date().toLocaleTimeString() }].slice(-10));
@@ -97,6 +103,17 @@ const Predict = () => {
       addLog(`Ensemble Meta-Learner Converged in ${elapsed}ms.`, "success");
       setResult(response.data);
 
+      // Save context for the AI Assistant (context-aware chat)
+      try {
+        localStorage.setItem('transgraph_last_prediction', JSON.stringify({
+          p1: p1, p2: p2,
+          prob: response.data.interaction_probability,
+          esm: response.data.esm_probability,
+          gat: response.data.gat_probability,
+          conf: response.data.confidence_score
+        }));
+      } catch (_) {}
+
       try {
         addLog("Localizing Interaction Regions (IRLM)...", "process");
         const locRes = await ppiService.localizeInteractionRegions(p1, p2, s1, s2, response.data.interaction_probability);
@@ -117,7 +134,6 @@ const Predict = () => {
     if (!result) return;
     const element = document.getElementById('scientific-report-content');
     if (!element) return;
-    
     const opt = {
       margin: 0.4,
       filename: `TransGraph_PPI_Report_${protein1}_${protein2}.pdf`,
@@ -127,6 +143,64 @@ const Predict = () => {
     };
     html2pdf().set(opt).from(element).save();
   };
+
+  // ── Batch CSV upload handler ──────────────────────────────
+  const handleBatchUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBatchLoading(true);
+    setBatchResults([]);
+    setResult(null);
+    setIrlmData(null);
+    addLog(`Batch CSV loaded: ${file.name}`, 'info');
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      try {
+        const lines = ev.target.result.split('\n').map(l => l.trim()).filter(Boolean);
+        const pairs = lines
+          .filter(l => !l.startsWith('#'))
+          .map(l => {
+            const [p1, p2] = l.split(',');
+            return p1 && p2 ? { protein1_id: p1.trim(), protein2_id: p2.trim(), protein1_seq: '', protein2_seq: '' } : null;
+          })
+          .filter(Boolean);
+        if (pairs.length === 0) throw new Error('No valid pairs in CSV.');
+        addLog(`Processing ${pairs.length} pairs...`, 'process');
+        const res = await ppiService.predictBatch(pairs);
+        setBatchResults(res.data);
+        addLog(`Batch complete: ${res.data.length} predictions.`, 'success');
+        // Populate single result from first row for main dashboard
+        if (res.data.length > 0) {
+          setProtein1(pairs[0].protein1_id);
+          setProtein2(pairs[0].protein2_id);
+          setResult(res.data[0]);
+        }
+      } catch (err) {
+        addLog('Batch failed: ' + (err.message || 'Unknown error'), 'error');
+        setError('Batch processing failed: ' + (err.message || 'check CSV format (id1,id2 per line)'));
+      } finally {
+        setBatchLoading(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  // ── Batch CSV download ────────────────────────────────────
+  const downloadBatchCSV = useCallback(() => {
+    if (!batchResults.length) return;
+    const header = 'protein1_id,protein2_id,interaction_probability,esm_probability,gat_probability,confidence_score,interacts\n';
+    const rows = batchResults.map(r =>
+      `${r.protein1_id || ''},${r.protein2_id || ''},${r.interaction_probability?.toFixed(4) || ''},${r.esm_probability?.toFixed(4) || ''},${r.gat_probability?.toFixed(4) || ''},${r.confidence_score?.toFixed(4) || ''},${r.interaction_probability > 0.5 ? 'YES' : 'NO'}`
+    ).join('\n');
+    const blob = new Blob([header + rows], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `transgraph_batch_results_${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [batchResults]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -324,6 +398,57 @@ const Predict = () => {
                 Predict Interaction
               </button>
             </form>
+
+            {/* ── Batch Upload Button ────────────── */}
+            <div className="border-t border-slate-100 pt-4 space-y-3">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-1">
+                <UploadCloud size={12} className="text-indigo-400" /> Batch CSV Analysis
+              </label>
+              <button
+                type="button"
+                disabled={batchLoading}
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full bg-slate-50 hover:bg-indigo-50 border border-dashed border-slate-300 hover:border-indigo-400 text-slate-500 hover:text-indigo-600 font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2 text-xs cursor-pointer disabled:opacity-50"
+              >
+                {batchLoading ? <Loader2 className="animate-spin" size={15} /> : <Table2 size={15} />}
+                {batchLoading ? 'Processing...' : 'Upload CSV (id1,id2 per line)'}
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,.txt"
+                className="hidden"
+                onChange={handleBatchUpload}
+              />
+            </div>
+
+            {/* ── Beginner / Research Mode Toggle ── */}
+            <div className="border-t border-slate-100 pt-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  {expertMode ? <FlaskConical size={14} className="text-violet-500" /> : <GraduationCap size={14} className="text-teal-500" />}
+                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
+                    {expertMode ? 'Research Mode' : 'Beginner Mode'}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setExpertMode(v => !v)}
+                  className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${
+                    expertMode ? 'bg-violet-500' : 'bg-teal-400'
+                  }`}
+                >
+                  <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all duration-300 ${
+                    expertMode ? 'left-7' : 'left-1'
+                  }`} />
+                </button>
+              </div>
+              <p className="text-[9px] text-slate-400 mt-1.5 leading-relaxed">
+                {expertMode
+                  ? 'Research: SHAP, IRLM, full metrics visible.'
+                  : 'Beginner: plain-language results, key metrics only.'}
+              </p>
+            </div>
           </div>
 
           {/* Live Telemetry Log */}
@@ -551,8 +676,8 @@ const Predict = () => {
 
                   </div>
 
-                  {/* IRLM INTERACTION REGION VISUALIZER SECTION */}
-                  {irlmData && (
+                  {/* IRLM INTERACTION REGION VISUALIZER SECTION – Research mode only */}
+                  {expertMode && irlmData && (
                     <IRLMVisualizer 
                       irlmData={irlmData} 
                       id1={protein1} 
@@ -563,15 +688,123 @@ const Predict = () => {
                       onSelectResidue={handleResidueSelect}
                     />
                   )}
+
+                  {/* Beginner mode: simplified explanation */}
+                  {!expertMode && irlmData && (
+                    <div className="bg-teal-50 border border-teal-200 rounded-2xl p-6">
+                      <h4 className="text-sm font-black text-teal-700 mb-2 flex items-center gap-2">
+                        <GraduationCap size={16} /> Interaction Region Summary
+                      </h4>
+                      <p className="text-xs text-teal-800 leading-relaxed">
+                        The AI detected <strong>{irlmData.hotspot_residues?.length ?? '?'}</strong> binding hotspot residue pairs
+                        between these two proteins. These are the amino acid positions most likely to physically
+                        touch when the proteins interact.
+                        {irlmData.region_confidence != null && (
+                          <span> The localization model is <strong>{(irlmData.region_confidence * 100).toFixed(0)}% confident</strong> in this region mapping.</span>
+                        )}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
         </main>
       </div>
+
+      {/* ── Batch Results Table ─────────────────────────────────── */}
+      {batchResults.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-[2rem] border border-slate-100 shadow-sm p-8 mt-2"
+        >
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-indigo-50 rounded-xl text-indigo-500"><Table2 size={18} /></div>
+              <div>
+                <h3 className="text-sm font-black text-slate-800 tracking-tight">Batch Prediction Results</h3>
+                <p className="text-[10px] text-slate-400 font-mono">{batchResults.length} pairs processed</p>
+              </div>
+            </div>
+            <button
+              onClick={downloadBatchCSV}
+              className="px-4 py-2 bg-gradient-to-r from-indigo-500 to-violet-500 text-white rounded-xl font-bold text-xs flex items-center gap-2 hover:from-indigo-400 hover:to-violet-400 transition-all shadow-lg shadow-indigo-200 cursor-pointer active:scale-95"
+            >
+              <FileDown size={14} /> Export CSV
+            </button>
+          </div>
+
+          <div className="overflow-x-auto rounded-xl border border-slate-100">
+            <table className="w-full text-xs font-medium">
+              <thead>
+                <tr className="bg-slate-50 text-slate-500">
+                  <th className="text-left px-4 py-3 font-black uppercase tracking-wider">#</th>
+                  <th className="text-left px-4 py-3 font-black uppercase tracking-wider">Protein A</th>
+                  <th className="text-left px-4 py-3 font-black uppercase tracking-wider">Protein B</th>
+                  <th className="text-center px-4 py-3 font-black uppercase tracking-wider">Probability</th>
+                  <th className="text-center px-4 py-3 font-black uppercase tracking-wider">ESM</th>
+                  <th className="text-center px-4 py-3 font-black uppercase tracking-wider">GAT</th>
+                  <th className="text-center px-4 py-3 font-black uppercase tracking-wider">Confidence</th>
+                  <th className="text-center px-4 py-3 font-black uppercase tracking-wider">Interacts?</th>
+                  <th className="text-center px-4 py-3 font-black uppercase tracking-wider">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {batchResults.map((r, i) => (
+                  <motion.tr
+                    key={i}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.04 }}
+                    onClick={() => {
+                      setProtein1(r.protein1_id || protein1);
+                      setProtein2(r.protein2_id || protein2);
+                      setResult(r);
+                      setIrlmData(null);
+                    }}
+                    className="border-t border-slate-50 hover:bg-slate-50/80 transition-colors cursor-pointer group"
+                  >
+                    <td className="px-4 py-3 text-slate-400 font-mono">{i + 1}</td>
+                    <td className="px-4 py-3 font-mono text-slate-700 max-w-[130px] truncate" title={r.protein1_id}>{r.protein1_id || '—'}</td>
+                    <td className="px-4 py-3 font-mono text-slate-700 max-w-[130px] truncate" title={r.protein2_id}>{r.protein2_id || '—'}</td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={`px-2 py-1 rounded-lg font-black text-[10px] ${
+                        r.interaction_probability > 0.7 ? 'bg-emerald-100 text-emerald-700' :
+                        r.interaction_probability > 0.5 ? 'bg-amber-100 text-amber-700' :
+                        'bg-rose-100 text-rose-700'
+                      }`}>
+                        {(r.interaction_probability * 100).toFixed(1)}%
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-center text-slate-600 font-mono">{r.esm_probability != null ? (r.esm_probability * 100).toFixed(1) + '%' : '—'}</td>
+                    <td className="px-4 py-3 text-center text-slate-600 font-mono">{r.gat_probability != null ? (r.gat_probability * 100).toFixed(1) + '%' : '—'}</td>
+                    <td className="px-4 py-3 text-center text-slate-600 font-mono">{r.confidence_score != null ? (r.confidence_score * 100).toFixed(1) + '%' : '—'}</td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={`px-2.5 py-1 rounded-full font-black text-[9px] uppercase tracking-wider ${
+                        r.interaction_probability > 0.5 ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-500'
+                      }`}>
+                        {r.interaction_probability > 0.5 ? '✓ YES' : '✕ NO'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <button className="text-[9px] text-indigo-500 font-black uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity">
+                        View →
+                      </button>
+                    </td>
+                  </motion.tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <p className="text-[10px] text-slate-400 mt-3 text-center">
+            Click any row to load its full result in the workspace above.
+          </p>
+        </motion.div>
+      )}
     </div>
   );
 };
 
 export default Predict;
-
