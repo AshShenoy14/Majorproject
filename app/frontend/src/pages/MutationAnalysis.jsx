@@ -202,11 +202,11 @@ const MutationAnalysis = () => {
         >
           {/* Result Card (showing first mutation summary) */}
           <div className="lg:col-span-1 glass-card p-8 flex flex-col items-center">
-            <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-8 text-center">Relative Impact</h3>
+            <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-8 text-center">Relative Impact Summary</h3>
             
             <div className="p-6 bg-slate-50 rounded-3xl w-full text-center space-y-6 mb-8 border border-slate-100">
                <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Base Probability</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Wild-type Interaction Probability</p>
                   <p className="text-2xl font-bold text-slate-700">{(Number(result.mutation_results[0].base_score || 0) * 100).toFixed(1)}%</p>
                </div>
                <div className="flex items-center justify-center gap-2">
@@ -215,17 +215,34 @@ const MutationAnalysis = () => {
                   <div className="h-[1px] flex-1 bg-slate-200" />
                </div>
                <div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Mutant Probability</p>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Mutant Interaction Probability</p>
                   <p className="text-4xl font-extrabold text-scientific-accent">{(Number(result.mutation_results[0].mutated_score || 0) * 100).toFixed(1)}%</p>
                </div>
             </div>
 
-            <div className={`p-4 rounded-2xl w-full flex items-center justify-between ${result.mutation_results[0].impact_delta < 0 ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+            <div className={`p-4 rounded-2xl w-full flex items-center justify-between border ${
+              result.mutation_results[0].impact_delta > 0 
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                : result.mutation_results[0].impact_delta < 0
+                  ? 'bg-rose-50 text-rose-700 border-rose-200'
+                  : 'bg-slate-50 text-slate-700 border-slate-200'
+            }`}>
               <div className="flex items-center gap-2">
-                 {result.mutation_results[0].impact_delta < 0 ? <TrendingDown size={20} /> : <TrendingUp size={20} />}
-                  <span className="text-sm font-bold">{(Number(result.mutation_results[0].impact_delta || 0) * 100).toFixed(1)}% Delta</span>
+                 {result.mutation_results[0].impact_delta > 0 ? (
+                   <TrendingUp size={20} className="text-emerald-600" />
+                 ) : result.mutation_results[0].impact_delta < 0 ? (
+                   <TrendingDown size={20} className="text-rose-600" />
+                 ) : (
+                   <Minus size={20} className="text-slate-500" />
+                 )}
+                  <span className="text-sm font-extrabold">
+                    {result.mutation_results[0].impact_delta > 0 ? '+' : ''}
+                    {(Number(result.mutation_results[0].impact_delta || 0) * 100).toFixed(1)}% Δ
+                  </span>
               </div>
-              <span className="text-[10px] font-bold uppercase">{result.mutation_results[0].impact_delta < 0 ? 'Disruptive' : 'Stabilizing'}</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-white/80 shadow-xs">
+                {result.mutation_results[0].impact_delta > 0 ? 'Increase (Stabilizing)' : result.mutation_results[0].impact_delta < 0 ? 'Decrease (Disruptive)' : 'Neutral'}
+              </span>
             </div>
 
             <div className="mt-6 p-4 bg-slate-50 rounded-xl w-full">
@@ -240,7 +257,7 @@ const MutationAnalysis = () => {
           <div className="lg:col-span-2 glass-card p-8">
             <div className="flex items-center gap-3 mb-8">
               <Activity className="text-scientific-accent" size={20} />
-              <h4 className="text-lg font-bold text-slate-800">Sequence Impact Profile</h4>
+              <h4 className="text-lg font-bold text-slate-800">ΔProbability (Mutant − Wild-type)</h4>
             </div>
             
             <div className="h-64 mb-6">
@@ -248,7 +265,7 @@ const MutationAnalysis = () => {
                 <AreaChart data={getImpactData()}>
                   <defs>
                     <linearGradient id="colorImpact" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#7C3AED" stopOpacity={0.1}/>
+                      <stop offset="5%" stopColor="#7C3AED" stopOpacity={0.15}/>
                       <stop offset="95%" stopColor="#7C3AED" stopOpacity={0}/>
                     </linearGradient>
                   </defs>
@@ -258,10 +275,22 @@ const MutationAnalysis = () => {
                   <Tooltip 
                     content={({ active, payload }) => {
                       if (active && payload && payload.length) {
+                        const val = Number(payload[0].value || 0);
+                        const isIncrease = val > 0;
+                        const isDecrease = val < 0;
                         return (
-                          <div className="bg-slate-800 text-white p-3 rounded-xl shadow-xl">
-                            <p className="text-xs font-bold mb-1 tracking-tight">Residue {payload[0].payload.pos}</p>
-                            <p className="text-lg font-bold">{(Number(payload[0].value || 0) * 100).toFixed(2)}% Δ</p>
+                          <div className={`p-3 rounded-xl shadow-xl border text-white ${
+                            isIncrease ? 'bg-emerald-900 border-emerald-500' : isDecrease ? 'bg-rose-900 border-rose-500' : 'bg-slate-800 border-slate-600'
+                          }`}>
+                            <p className="text-xs font-bold mb-1 tracking-tight">Residue {payload[0].payload.pos} ({payload[0].payload.orig} → {payload[0].payload.mut})</p>
+                            <p className={`text-lg font-extrabold flex items-center gap-1 ${
+                              isIncrease ? 'text-emerald-300' : isDecrease ? 'text-rose-300' : 'text-slate-200'
+                            }`}>
+                              {isIncrease ? '+' : ''}{(val * 100).toFixed(2)}% Δ
+                            </p>
+                            <p className="text-[10px] uppercase font-bold tracking-wider opacity-80">
+                              {isIncrease ? 'Green = Increase' : isDecrease ? 'Red = Decrease' : 'Neutral'}
+                            </p>
                           </div>
                         );
                       }
@@ -279,6 +308,18 @@ const MutationAnalysis = () => {
                   />
                 </AreaChart>
               </ResponsiveContainer>
+            </div>
+
+            {/* Color Legend */}
+            <div className="flex items-center justify-center gap-6 mb-6 text-xs font-bold">
+               <div className="flex items-center gap-2 text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200">
+                  <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                  <span>Green = Increase (Mutant &gt; Wild-type)</span>
+               </div>
+               <div className="flex items-center gap-2 text-rose-700 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-200">
+                  <div className="w-3 h-3 rounded-full bg-rose-500" />
+                  <span>Red = Decrease (Mutant &lt; Wild-type)</span>
+               </div>
             </div>
 
             <div className="p-4 bg-orange-50 rounded-xl flex gap-3 border border-orange-100">

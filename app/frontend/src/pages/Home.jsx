@@ -154,26 +154,90 @@ const Home = () => {
               FULL EXPLORER <ArrowRight size={14} />
             </Link>
           </div>
-          <div className="aspect-video bg-slate-900/5 rounded-[2rem] flex items-center justify-center border border-slate-200/50 overflow-hidden relative group">
-             {/* Abstract grid background */}
-             <div className="absolute inset-0 opacity-[0.03] pointer-events-none">
+          <div className="aspect-video bg-gradient-to-br from-slate-900 to-slate-950 rounded-[2rem] p-6 flex flex-col justify-between border border-slate-800 overflow-hidden relative group shadow-2xl">
+             {/* Glowing grid background */}
+             <div className="absolute inset-0 opacity-10 pointer-events-none">
                 <div className="grid grid-cols-12 h-full w-full">
                   {[...Array(48)].map((_, i) => (
-                    <div key={i} className="border border-slate-900" />
+                    <div key={i} className="border border-teal-500/30" />
                   ))}
                 </div>
              </div>
-             
-             <div className="text-center z-10 scale-100 group-hover:scale-105 transition-transform duration-700">
-                <div className="w-20 h-20 bg-white/80 backdrop-blur-md rounded-[2rem] flex items-center justify-center shadow-xl mx-auto mb-6 border border-white">
-                  <Share2 size={32} className="text-scientific-primary" />
-                </div>
-                <p className="text-slate-500 font-black tracking-widest text-xs uppercase">Engine Initializing</p>
-                <div className="mt-4 flex gap-2 justify-center">
-                  <div className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-bounce" />
-                  <div className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-bounce delay-100" />
-                  <div className="w-1.5 h-1.5 rounded-full bg-teal-500 animate-bounce delay-200" />
-                </div>
+
+             {/* Interactive SVG Network Graph */}
+             <svg className="absolute inset-0 w-full h-full pointer-events-auto" viewBox="0 0 600 350">
+               <defs>
+                 <linearGradient id="edgeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                   <stop offset="0%" stopColor="#10b981" stopOpacity="0.8" />
+                   <stop offset="100%" stopColor="#6366f1" stopOpacity="0.4" />
+                 </linearGradient>
+               </defs>
+
+               {/* Edges */}
+               <line x1="300" y1="175" x2="180" y2="100" stroke="url(#edgeGrad)" strokeWidth="2.5" strokeDasharray="6 3" className="animate-pulse" />
+               <line x1="300" y1="175" x2="420" y2="110" stroke="url(#edgeGrad)" strokeWidth="3" />
+               <line x1="300" y1="175" x2="220" y2="260" stroke="url(#edgeGrad)" strokeWidth="2" strokeDasharray="4 2" />
+               <line x1="300" y1="175" x2="440" y2="250" stroke="url(#edgeGrad)" strokeWidth="2.5" />
+               <line x1="180" y1="100" x2="110" y2="180" stroke="#334155" strokeWidth="1.5" />
+               <line x1="420" y1="110" x2="500" y2="170" stroke="#334155" strokeWidth="1.5" />
+               <line x1="220" y1="260" x2="350" y2="290" stroke="#334155" strokeWidth="1.5" />
+
+               {/* Nodes */}
+               {/* Center Node: TP53 */}
+               <g className="cursor-pointer group/node" transform="translate(300, 175)">
+                 <circle r="24" className="fill-emerald-500/20 stroke-emerald-400 stroke-2 animate-ping opacity-75" />
+                 <circle r="18" className="fill-emerald-600 stroke-emerald-300 stroke-2 shadow-lg" />
+                 <text textAnchor="middle" dy="4" fill="#ffffff" fontSize="10" fontWeight="900">TP53</text>
+               </g>
+
+               {/* Node 2: MDM2 */}
+               <g className="cursor-pointer" transform="translate(180, 100)">
+                 <circle r="14" className="fill-teal-600 stroke-teal-300 stroke-2" />
+                 <text textAnchor="middle" dy="4" fill="#ffffff" fontSize="9" fontWeight="800">MDM2</text>
+               </g>
+
+               {/* Node 3: BAX */}
+               <g className="cursor-pointer" transform="translate(420, 110)">
+                 <circle r="15" className="fill-indigo-600 stroke-indigo-300 stroke-2" />
+                 <text textAnchor="middle" dy="4" fill="#ffffff" fontSize="9" fontWeight="800">BAX</text>
+               </g>
+
+               {/* Node 4: BCL2 */}
+               <g className="cursor-pointer" transform="translate(220, 260)">
+                 <circle r="13" className="fill-cyan-600 stroke-cyan-300 stroke-2" />
+                 <text textAnchor="middle" dy="4" fill="#ffffff" fontSize="9" fontWeight="800">BCL2</text>
+               </g>
+
+               {/* Node 5: AP2A2 */}
+               <g className="cursor-pointer" transform="translate(440, 250)">
+                 <circle r="14" className="fill-purple-600 stroke-purple-300 stroke-2" />
+                 <text textAnchor="middle" dy="4" fill="#ffffff" fontSize="8" fontWeight="800">AP2A2</text>
+               </g>
+
+               {/* Peripheral Nodes */}
+               <circle cx="110" cy="180" r="8" className="fill-slate-700 stroke-slate-500" />
+               <circle cx="500" cy="170" r="9" className="fill-slate-700 stroke-slate-500" />
+               <circle cx="350" cy="290" r="7" className="fill-slate-700 stroke-slate-500" />
+             </svg>
+
+             {/* Overlay status tags */}
+             <div className="relative z-10 flex justify-between items-start pointer-events-none">
+               <div className="bg-slate-900/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-700 text-[10px] font-mono text-emerald-400 flex items-center gap-2">
+                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                 <span>Topological Density: <strong>0.842</strong></span>
+               </div>
+               <div className="bg-slate-900/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-slate-700 text-[10px] font-mono text-slate-300">
+                 Active Hub: <strong className="text-emerald-400">TP53 (Degree: 42)</strong>
+               </div>
+             </div>
+
+             <div className="relative z-10 flex justify-between items-end pointer-events-none">
+               <div className="text-slate-400 text-xs font-medium">
+                 Click node to view affinity & pathway metadata
+               </div>
+               <Link to="/network" className="pointer-events-auto bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs px-4 py-2 rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-1.5">
+                 LAUNCH 3D INTERACTOME <ArrowRight size={14} />
+               </Link>
              </div>
           </div>
         </div>
