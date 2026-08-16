@@ -441,12 +441,28 @@ async def predict_batch(request: BatchPredictionRequest):
         try:
              res = await predict_interaction(pair)
              results.append(res)
-        except HTTPException as he:
-             raise he
         except Exception as e:
-             # Log the error but continue or fail? We'll fail the batch if one severely errors for now, or just raise.
-             # Ideally we return a partial result, but for simplicity we raise 500
-             raise HTTPException(status_code=500, detail=f"Error processing pair {pair.protein1_id}-{pair.protein2_id}: {str(e)}")
+             p1 = pair.protein1_id
+             p2 = pair.protein2_id
+             print(f"Error in batch for pair {p1}-{p2}: {e}")
+             results.append({
+                 "interaction_probability": 0.0,
+                 "esm_probability": 0.0,
+                 "gat_probability": 0.0,
+                 "confidence_score": 0.0,
+                 "explanation": {
+                     "Sequence_Model_Contribution": 0.0,
+                     "Graph_Model_Contribution": 0.0,
+                     "Model_Used": "Failed",
+                     "SHAP_Values": None,
+                     "Biological_Match": False
+                 },
+                 "gnn_explanation": None,
+                 "protein1_uniprot_id": p1,
+                 "protein2_uniprot_id": p2,
+                 "protein1_seq": pair.protein1_seq or "",
+                 "protein2_seq": pair.protein2_seq or ""
+             })
 
     return results
 

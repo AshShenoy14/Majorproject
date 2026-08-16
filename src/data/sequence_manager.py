@@ -217,6 +217,52 @@ class SequenceManager:
     # Redefine _fetch_from_uniprot to be smarter or use Ensembl for ENSP
     # Overwriting the method below with the hybrid approach
     
+    ENSP_FALLBACK_MAP = {
+        'ENSP00000269305': 'P04637', # TP53
+        'ENSP00000258149': 'Q00987', # MDM2
+        'ENSP00000300161': 'O95782', # AP2A2
+        'ENSP00000267029': 'Q00610', # CLTC
+        'ENSP00000293879': 'Q07812', # BAX
+        'ENSP00000307677': 'Q07817', # BCL2L1
+        'ENSP00000385802': 'P24941', # CDK2
+        'ENSP00000361000': 'P20248', # CCNA2
+        'ENSP00000327694': 'P01112', # HRAS
+        'ENSP00000373627': 'P01116', # KRAS
+        'ENSP00000288135': 'P04629', # NTRK1
+        'ENSP00000263967': 'P00533', # EGFR
+    }
+
+    def _fetch_from_uniprot_by_ensp(self, ensp_id: str) -> str:
+        # Try mapped UniProt accession first
+        accession = self.ENSP_FALLBACK_MAP.get(ensp_id)
+        if accession:
+            seq = self._fetch_direct_uniprot(accession)
+            if seq: return seq
+
+        # Try UniProt search by ensembl cross-reference
+        url = f"https://rest.uniprot.org/uniprotkb/search?query=ensembl:{ensp_id}&format=fasta&size=1"
+        try:
+            r = requests.get(url, timeout=5)
+            r.raise_for_status()
+            lines = r.text.splitlines()
+            if len(lines) > 1 and lines[0].startswith(">"):
+                return "".join(lines[1:])
+        except Exception:
+            pass
+
+        # Try general UniProt query
+        url = f"https://rest.uniprot.org/uniprotkb/search?query={ensp_id}&format=fasta&size=1"
+        try:
+            r = requests.get(url, timeout=5)
+            r.raise_for_status()
+            lines = r.text.splitlines()
+            if len(lines) > 1 and lines[0].startswith(">"):
+                return "".join(lines[1:])
+        except Exception:
+            pass
+
+        return None
+
     def _fetch_smart(self, ids: List[str]) -> Dict[str, str]:
         fetched = {}
         
@@ -224,21 +270,26 @@ class SequenceManager:
         ensp_ids = [i for i in ids if i.startswith("ENSP")]
         other_ids = [i for i in ids if not i.startswith("ENSP")]
         
-        # 1. Ensembl Fetch (One by one unfortunately, but reliable)
+        # 1. Ensembl Fetch (with UniProt fallback)
         if ensp_ids:
             print(f"Fetching {len(ensp_ids)} IDs from Ensembl...")
             for i, eid in enumerate(ensp_ids):
+                seq = None
                 try:
                     seq = self._fetch_from_ensembl(eid)
-                    if seq:
-                        fetched[eid] = seq
-                    else:
-                        print(f"Ensembl returned no sequence for {eid}")
                 except Exception as e:
                     print(f"Ensembl fetch error for {eid}: {e}")
                 
-                if i % 10 == 0:
-                    print(f"Fetched {i}/{len(ensp_ids)}...")
+                if not seq:
+                    print(f"Ensembl returned no sequence for {eid}, trying UniProt fallback...")
+                    seq = self._fetch_from_uniprot_by_ensp(eid)
+
+                if seq:
+                    fetched[eid] = seq
+                    print(f"Successfully retrieved sequence for {eid}")
+                else:
+                    print(f"Could not retrieve sequence for {eid} from Ensembl or UniProt")
+                
                 time.sleep(0.1) 
         
         # 2. UniProt Fetch 
@@ -256,3 +307,4 @@ class SequenceManager:
     # Replace the main fetch caller with _fetch_smart logic
     def _fetch_from_uniprot(self, ids: List[str]) -> Dict[str, str]:
         return self._fetch_smart(ids)
+

@@ -49,7 +49,7 @@ def main():
     input_dim = sample_emb.shape[-1]
     print(f"Detected Dimensions: Sequence={input_dim}, Biology={bio_dim}")
 
-    seq_model = SequencePPIModel(input_dim=input_dim, bio_dim=bio_dim).to(device)
+    seq_model = SequencePPIModel(input_dim=input_dim).to(device)
     seq_model.load_state_dict(torch.load(MODELS_DIR / "sequence_model_best.pth", map_location=device))
     seq_model.eval()
 
@@ -68,13 +68,13 @@ def main():
             print("Detected GIN architecture for Graph Model.")
             graph_model = GINLinkPredictor(in_channels=in_channels, hidden_channels=128).to(device)
         else:
-            print("Detected GAT architecture for Graph Model.")
-            graph_model = GATLinkPredictor(in_channels=in_channels, hidden_channels=128, heads=4).to(device)
+            print("Detected GAT/SAGE architecture for Graph Model.")
+            graph_model = GATLinkPredictor(in_channels=in_channels, hidden_channels=256).to(device)
             
         graph_model.load_state_dict(state_dict)
     else:
-        print(f"Graph model not found at {graph_model_path}. Defaulting to GAT.")
-        graph_model = GATLinkPredictor(in_channels=in_channels, hidden_channels=128, heads=4).to(device)
+        print(f"Graph model not found at {graph_model_path}. Defaulting to GAT/SAGE.")
+        graph_model = GATLinkPredictor(in_channels=in_channels, hidden_channels=256).to(device)
     
     graph_model.eval()
 

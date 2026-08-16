@@ -104,8 +104,12 @@ export const ProteinInfoButton = ({ proteinId, label = "Protein" }) => {
     <>
       <button
         type="button"
-        onClick={() => setIsOpen(true)}
-        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 text-[11px] font-bold transition-all shadow-sm group"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setIsOpen(true);
+        }}
+        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 text-[11px] font-bold transition-all shadow-sm group cursor-pointer"
         title={`View biological details for ${proteinId || label}`}
       >
         <span className="text-emerald-600 font-serif font-black text-xs group-hover:scale-110 transition-transform">ℹ️</span>

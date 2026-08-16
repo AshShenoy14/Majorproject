@@ -59,7 +59,7 @@ def main():
     bio_dim = len(next(iter(bio_mapping.values()))) if bio_mapping else 0
     print(f"Detected Dimensions: Sequence={input_dim}, Biology={bio_dim}")
 
-    seq_model = SequencePPIModel(input_dim=input_dim, bio_dim=bio_dim).to(device)
+    seq_model = SequencePPIModel(input_dim=input_dim).to(device)
     seq_model.load_state_dict(torch.load(MODELS_DIR / "sequence_model_best.pth", map_location=device))
     seq_model.eval()
 
@@ -72,7 +72,7 @@ def main():
     if is_gin:
         graph_model = GINLinkPredictor(in_channels=graph_data.x.shape[1], hidden_channels=128).to(device)
     else:
-        graph_model = GATLinkPredictor(in_channels=graph_data.x.shape[1], hidden_channels=128, heads=4).to(device)
+        graph_model = GATLinkPredictor(in_channels=graph_data.x.shape[1], hidden_channels=256).to(device)
         
     graph_model.load_state_dict(state_dict)
     graph_model.eval()

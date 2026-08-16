@@ -184,7 +184,7 @@ const IRLMVisualizer = ({
                                             Importance Score: <b>{score.toFixed(3)}</b>
                                         </Typography>
                                         <Typography variant="caption" sx={{ color: isInRegion ? '#00e5ff' : '#aaa', display: 'block', mt: 0.5 }}>
-                                            {isInRegion ? `Inside Interaction Region [${regStart}-${regEnd}]` : 'Flanking Sequence'}
+                                            {isInRegion ? `Inside Predicted Interaction Region [${regStart}-${regEnd}]` : 'Flanking Sequence'}
                                         </Typography>
                                         {mutInfo && (
                                             <Typography variant="caption" sx={{ color: mutInfo.color, fontWeight: 'bold', display: 'block', mt: 0.5 }}>
@@ -278,7 +278,7 @@ const IRLMVisualizer = ({
                 <Box>
                     <Stack direction="row" alignItems="center" spacing={1.5}>
                         <Typography variant="h5" sx={{ fontWeight: 800, background: 'linear-gradient(90deg, #00e5ff 0%, #d500f9 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-                            IRLM Interaction Region Visualizer
+                            IRLM Predicted Interaction Region Visualizer
                         </Typography>
                         <Chip
                             icon={<CheckCircleIcon sx={{ fontSize: '1rem !important' }} />}
@@ -293,7 +293,7 @@ const IRLMVisualizer = ({
                         />
                     </Stack>
                     <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                        Residue-level cross-attention heatmaps, localized interaction regions, and residue-pair contact matrices.
+                        Residue-level cross-attention heatmaps, localized predicted interaction regions, and residue-pair contact matrices.
                     </Typography>
                 </Box>
 
@@ -344,13 +344,13 @@ const IRLMVisualizer = ({
                         <Stack direction="row" alignItems="center" spacing={1}>
                             <Box sx={{ width: 14, height: 14, borderRadius: '50%', bgcolor: '#ff4b4b', border: '1px solid #fff' }} />
                             <Typography variant="body2" sx={{ fontWeight: 600, color: '#ff4b4b' }}>
-                                Red = Inside Interaction Region
+                                Red = Inside Predicted Interaction Region
                             </Typography>
                         </Stack>
                         <Stack direction="row" alignItems="center" spacing={1}>
                             <Box sx={{ width: 14, height: 14, borderRadius: '50%', bgcolor: '#9e9e9e', border: '1px solid #fff' }} />
                             <Typography variant="body2" sx={{ fontWeight: 600, color: '#9e9e9e' }}>
-                                Gray = Outside Interaction Region
+                                Gray = Outside Predicted Interaction Region
                             </Typography>
                         </Stack>
                     </Stack>

@@ -33,3 +33,7 @@ models/*
 data/9606.protein.links.v12.0.txt
 .cache/
 checkpoints/
+*.zip
+*.tar.gz
+*.7z
+*.gz

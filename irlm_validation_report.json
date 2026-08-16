@@ -1,0 +1,115 @@
+{
+  "TP53_MDM2_Validation": {
+    "reg_tp53": [
+      38,
+      73
+    ],
+    "reg_mdm2": [
+      5,
+      26
+    ],
+    "confidence": 0.5,
+    "tp53_triad_scores": {
+      "TP53_19": 0.9259,
+      "TP53_23": 0.9038,
+      "TP53_26": 0.8937
+    },
+    "tp53_window_avg": 0.9126,
+    "tp53_overall_avg": 0.9116,
+    "mdm2_pocket_avg": 0.9567,
+    "mdm2_overall_avg": 0.9026,
+    "tp53_canonical_overlap": false,
+    "mdm2_canonical_overlap": true,
+    "top_pairs": [
+      {
+        "res_a": "P58",
+        "res_b": "E23",
+        "pos_a": 58,
+        "pos_b": 23,
+        "score": 0.75
+      },
+      {
+        "res_a": "P58",
+        "res_b": "Q24",
+        "pos_a": 58,
+        "pos_b": 24,
+        "score": 0.75
+      },
+      {
+        "res_a": "G59",
+        "res_b": "S22",
+        "pos_a": 59,
+        "pos_b": 22,
+        "score": 0.75
+      },
+      {
+        "res_a": "G59",
+        "res_b": "E23",
+        "pos_a": 59,
+        "pos_b": 23,
+        "score": 0.75
+      },
+      {
+        "res_a": "G59",
+        "res_b": "Q24",
+        "pos_a": 59,
+        "pos_b": 24,
+        "score": 0.75
+      }
+    ]
+  },
+  "BCL2_BAX_Generalization": {
+    "reg_bcl2": [
+      28,
+      58
+    ],
+    "reg_bax": [
+      38,
+      52
+    ],
+    "confidence": 0.5,
+    "bax_bh3_avg": 0.9354,
+    "bax_overall_avg": 0.9184,
+    "bcl2_groove_avg": 0.9219,
+    "bcl2_overall_avg": 0.9288,
+    "bax_bh3_overlap": false,
+    "bcl2_groove_overlap": false,
+    "top_pairs": [
+      {
+        "res_a": "A32",
+        "res_b": "P43",
+        "pos_a": 32,
+        "pos_b": 43,
+        "score": 0.75
+      },
+      {
+        "res_a": "A32",
+        "res_b": "E44",
+        "pos_a": 32,
+        "pos_b": 44,
+        "score": 0.75
+      },
+      {
+        "res_a": "G33",
+        "res_b": "G40",
+        "pos_a": 33,
+        "pos_b": 40,
+        "score": 0.75
+      },
+      {
+        "res_a": "G33",
+        "res_b": "P43",
+        "pos_a": 33,
+        "pos_b": 43,
+        "score": 0.75
+      },
+      {
+        "res_a": "G33",
+        "res_b": "E44",
+        "pos_a": 33,
+        "pos_b": 44,
+        "score": 0.75
+      }
+    ]
+  }
+}
