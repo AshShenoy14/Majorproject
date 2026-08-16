@@ -20,6 +20,9 @@ from src.models.sequence_model import SequencePPIModel
 from src.models.graph_model import GATLinkPredictor, GINLinkPredictor
 from src.analysis.explainability import PPIExplainer
 from src.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT
+from src.utils.rf_feature_builder import build_rf_features_for_df
+from src.utils.bio_encoder import BioFeatureEncoder
+from src.analysis.biological_managers import BiologicalManager
 
 def find_optimal_threshold(y_true, y_prob, method="f1"):
     """
@@ -103,9 +106,9 @@ def calc_metrics(y_true, y_prob, threshold=0.5):
         average_precision_score(y_true, y_prob)
     ]
 
-def get_model_predictions(df, seq_model, graph_model, ensemble_model, embeddings, node_mapping, graph_data, device, desc="Inference"):
+def get_model_predictions(df, seq_model, graph_model, ensemble_model, rf_model, embeddings, bio_mapping, bio_manager, node_mapping, graph_data, device, desc="Inference"):
     """
-    Generates sequence, graph, and ensemble predictions for a given dataset dataframe.
+    Generates sequence, graph, ensemble, and random forest predictions for a given dataset dataframe.
     Constructs the exact 8-feature matrix for the XGBoost ensemble.
     """
     filtered_df = df[
@@ -161,6 +164,14 @@ def get_model_predictions(df, seq_model, graph_model, ensemble_model, embeddings
             graph_preds.extend(probs.cpu().numpy().flatten())
     graph_preds = np.array(graph_preds)
 
+    # Predict Random Forest Baseline (1941 features)
+    rf_preds = None
+    if rf_model is not None:
+        X_rf, _, _ = build_rf_features_for_df(
+            filtered_df, embeddings, bio_mapping, bio_manager, desc=f"{desc} (RF Baseline)"
+        )
+        rf_preds = rf_model.predict_proba(X_rf)[:, 1]
+
     # Predict Ensemble — 8 features
     ens_preds = None
     X_8feat = None
@@ -171,10 +182,8 @@ def get_model_predictions(df, seq_model, graph_model, ensemble_model, embeddings
         max_conf = np.maximum(conf_seq, conf_gat)
         consensus = seq_preds * graph_preds
         
-        from src.analysis.biological_managers import BiologicalManager
-        bio_manager = BiologicalManager()
         bio_scores = []
-        for _, row in tqdm(filtered_df.iterrows(), total=len(filtered_df), desc=f"{desc} (Bio)"):
+        for _, row in tqdm(filtered_df.iterrows(), total=len(filtered_df), desc=f"{desc} (Bio Score)"):
             p1, p2 = row["protein1"], row["protein2"]
             comp = bio_manager.check_localization_compatibility(p1, p2, fetch_missing=False)
             bio_scores.append(comp.get("score", 0.5))
@@ -195,7 +204,7 @@ def get_model_predictions(df, seq_model, graph_model, ensemble_model, embeddings
         
         ens_preds = ensemble_model.predict_proba(X_8feat)[:, 1]
 
-    return labels, seq_preds, graph_preds, ens_preds, X_8feat, filtered_df
+    return labels, seq_preds, graph_preds, ens_preds, rf_preds, X_8feat, filtered_df
 
 def evaluate_models(dry_run=False):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -220,10 +229,9 @@ def evaluate_models(dry_run=False):
     print(f"Loaded {len(val_df)} validation samples and {len(test_df)} test samples.")
 
     # Load embeddings and graph metadata
-    from src.utils.bio_encoder import BioFeatureEncoder
     bio_encoder = BioFeatureEncoder()
     bio_mapping = bio_encoder.get_feature_map()
-    bio_dim = len(next(iter(bio_mapping.values()))) if bio_mapping else 0
+    bio_manager = BiologicalManager()
 
     emb_path = PROCESSED_DATA_DIR / "embeddings.pt"
     map_path = PROCESSED_DATA_DIR / "ppi_graph_mapping.pt"
@@ -242,6 +250,7 @@ def evaluate_models(dry_run=False):
     seq_path = PROJECT_ROOT / "models" / "sequence_model_best.pth"
     graph_model_path = PROJECT_ROOT / "models" / "graph_model_best.pth"
     ensemble_path = PROJECT_ROOT / "models" / "ensemble_model.pkl"
+    rf_path = PROJECT_ROOT / "models" / "random_forest_baseline.pkl"
 
     sample_emb = next(iter(embeddings.values()))
     esm_dim = sample_emb.shape[-1]
@@ -268,12 +277,16 @@ def evaluate_models(dry_run=False):
     if ensemble_model:
         print(f"Loaded XGBoost Meta-Learner checkpoint ({ensemble_path.name}).")
 
+    rf_model = joblib.load(rf_path) if rf_path.exists() else None
+    if rf_model:
+        print(f"Loaded Random Forest Baseline checkpoint ({rf_path.name}).")
+
     # =========================================================================
     # STEP 1: VALIDATION THRESHOLD SELECTION (val.csv ONLY)
     # =========================================================================
     print("\n--- STEP 1: Selecting Decision Thresholds on Validation Set (val.csv ONLY) ---")
-    val_labels, val_seq, val_graph, val_ens, val_X_8feat, _ = get_model_predictions(
-        val_df, seq_model, graph_model, ensemble_model, embeddings, node_mapping, graph_data, device, desc="Val Inference"
+    val_labels, val_seq, val_graph, val_ens, val_rf, val_X_8feat, _ = get_model_predictions(
+        val_df, seq_model, graph_model, ensemble_model, rf_model, embeddings, bio_mapping, bio_manager, node_mapping, graph_data, device, desc="Val Inference"
     )
 
     val_thresh_seq, _ = find_optimal_threshold(val_labels, val_seq, method="f1")
@@ -281,10 +294,15 @@ def evaluate_models(dry_run=False):
     val_thresh_ens = 0.5
     if val_ens is not None:
         val_thresh_ens, _ = find_optimal_threshold(val_labels, val_ens, method="f1")
+    val_thresh_rf = 0.5
+    if val_rf is not None:
+        val_thresh_rf, _ = find_optimal_threshold(val_labels, val_rf, method="f1")
 
     print("\n[VALIDATION THRESHOLDS SELECTED]")
     print(f"  Sequence Model Optimal Threshold (val.csv): {val_thresh_seq:.4f}")
     print(f"  Graph Model Optimal Threshold    (val.csv): {val_thresh_graph:.4f}")
+    if val_rf is not None:
+        print(f"  Random Forest Optimal Threshold  (val.csv): {val_thresh_rf:.4f}")
     if val_ens is not None:
         print(f"  Ensemble Model Optimal Threshold (val.csv): {val_thresh_ens:.4f}")
 
@@ -296,14 +314,16 @@ def evaluate_models(dry_run=False):
     # STEP 2: LEAKAGE-FREE FINAL TEST EVALUATION (test.csv)
     # =========================================================================
     print("\n--- STEP 2: Evaluating on Test Set (test.csv) using Validation Thresholds ---")
-    test_labels, test_seq, test_graph, test_ens, test_X_8feat, _ = get_model_predictions(
-        test_df, seq_model, graph_model, ensemble_model, embeddings, node_mapping, graph_data, device, desc="Test Inference"
+    test_labels, test_seq, test_graph, test_ens, test_rf, test_X_8feat, _ = get_model_predictions(
+        test_df, seq_model, graph_model, ensemble_model, rf_model, embeddings, bio_mapping, bio_manager, node_mapping, graph_data, device, desc="Test Inference"
     )
 
     # 1. Baseline Evaluation (Default threshold=0.5)
     std_results = []
     std_results.append(["Sequence-Only (ESM-MLP)"] + calc_metrics(test_labels, test_seq, threshold=0.5))
     std_results.append(["Graph-Only (GAT)"] + calc_metrics(test_labels, test_graph, threshold=0.5))
+    if test_rf is not None:
+        std_results.append(["Random Forest Baseline"] + calc_metrics(test_labels, test_rf, threshold=0.5))
     if test_ens is not None:
         std_results.append(["Full Ensemble (XGBoost)"] + calc_metrics(test_labels, test_ens, threshold=0.5))
 
@@ -315,6 +335,8 @@ def evaluate_models(dry_run=False):
     final_results = []
     final_results.append(["Sequence-Only (ESM-MLP)", val_thresh_seq] + calc_metrics(test_labels, test_seq, threshold=val_thresh_seq))
     final_results.append(["Graph-Only (GAT)", val_thresh_graph] + calc_metrics(test_labels, test_graph, threshold=val_thresh_graph))
+    if test_rf is not None:
+        final_results.append(["Random Forest Baseline", val_thresh_rf] + calc_metrics(test_labels, test_rf, threshold=val_thresh_rf))
     if test_ens is not None:
         final_results.append(["Full Ensemble (XGBoost)", val_thresh_ens] + calc_metrics(test_labels, test_ens, threshold=val_thresh_ens))
 
@@ -330,6 +352,8 @@ def evaluate_models(dry_run=False):
         ("Sequence-Only", test_seq, val_thresh_seq),
         ("Graph-Only", test_graph, val_thresh_graph)
     ]
+    if test_rf is not None:
+        eval_configs.append(("Random Forest Baseline", test_rf, val_thresh_rf))
     if test_ens is not None:
         eval_configs.append(("Ensemble", test_ens, val_thresh_ens))
 
