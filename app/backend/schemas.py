@@ -83,6 +83,7 @@ class IRLMResponse(BaseModel):
     protein_A_importance_scores: Optional[List[float]] = None
     protein_B_importance_scores: Optional[List[float]] = None
     top_residue_pairs: Optional[List[Dict[str, Any]]] = None
+    region_score: Optional[float] = None
     region_confidence: Optional[float] = None
 
 class MutationAnalysisResponse(BaseModel):

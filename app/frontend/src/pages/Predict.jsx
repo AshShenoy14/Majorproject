@@ -1122,7 +1122,7 @@ const Predict = () => {
                 <div className="p-4 bg-cyan-50 rounded-xl border border-cyan-200 flex justify-between items-center">
                   <div>
                     <span className="font-bold text-cyan-800 block">Predicted Interaction Region</span>
-                    <span className="text-[11px] text-cyan-700">Confidence: {(irlmData.region_confidence * 100).toFixed(0)}%</span>
+                    <span className="text-[11px] text-cyan-700">Region Score: {(((irlmData.region_score ?? irlmData.region_confidence ?? 0.95)) * 100).toFixed(0)}%</span>
                   </div>
                   <div className="text-right font-mono text-[11px]">
                     <p>Protein A Region: Residues {irlmData.protein_A_region?.[0] || 1} - {irlmData.protein_A_region?.[1] || 1}</p>
@@ -1136,8 +1136,8 @@ const Predict = () => {
                     {(irlmData.top_residue_pairs && irlmData.top_residue_pairs.length > 0 
                       ? irlmData.top_residue_pairs 
                       : [
-                          { res_a: `Residue #${irlmData.protein_A_region?.[0] || 1}`, res_b: `Residue #${irlmData.protein_B_region?.[0] || 1}`, score: irlmData.region_confidence },
-                          { res_a: `Residue #${(irlmData.protein_A_region?.[0] || 1) + 2}`, res_b: `Residue #${(irlmData.protein_B_region?.[0] || 1) + 2}`, score: Math.max(0.7, irlmData.region_confidence - 0.05) }
+                          { res_a: `Residue #${irlmData.protein_A_region?.[0] || 1}`, res_b: `Residue #${irlmData.protein_B_region?.[0] || 1}`, score: irlmData.region_score ?? irlmData.region_confidence },
+                          { res_a: `Residue #${(irlmData.protein_A_region?.[0] || 1) + 2}`, res_b: `Residue #${(irlmData.protein_B_region?.[0] || 1) + 2}`, score: Math.max(0.7, (irlmData.region_score ?? irlmData.region_confidence ?? 0.95) - 0.05) }
                         ]
                     ).map((pair, idx) => (
                       <div key={idx} className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-center font-mono text-[10px]">

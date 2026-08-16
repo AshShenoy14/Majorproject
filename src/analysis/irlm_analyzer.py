@@ -39,18 +39,15 @@ class IRLMAnalyzer:
         graph_data = graph_data if graph_data is not None else kwargs.get("graph_data")
         mapping = mapping if mapping is not None else kwargs.get("mapping")
 
-        # 1. Extract unpooled residue-level ESM representations with synthetic fallback
+        # 1. Extract unpooled residue-level ESM representations
         if esm_extractor is not None and hasattr(esm_extractor, "get_residue_embeddings"):
             try:
                 h_a = esm_extractor.get_residue_embeddings(seq_a).to(self.device).float()
                 h_b = esm_extractor.get_residue_embeddings(seq_b).to(self.device).float()
             except Exception as e:
-                print(f"Warning: IRLM ESM extraction fallback ({e})")
-                h_a = torch.randn(max(1, len(seq_a)), 480, device=self.device)
-                h_b = torch.randn(max(1, len(seq_b)), 480, device=self.device)
+                raise RuntimeError(f"ESM residue embedding extraction failed for IRLM: {e}")
         else:
-            h_a = torch.randn(max(1, len(seq_a)), 480, device=self.device)
-            h_b = torch.randn(max(1, len(seq_b)), 480, device=self.device)
+            raise ValueError("No valid ESM extractor with 'get_residue_embeddings' method provided for IRLM analysis.")
 
         # 2. Extract Graph Embeddings if graph context is present
         z_a, z_b = None, None
@@ -72,12 +69,12 @@ class IRLMAnalyzer:
             r_a, r_b, interaction_matrix = self.irlm_module.compute_residue_importance(h_a, h_b, z_a, z_b)
             reg_a, keys_a, ratio_a = self.irlm_module.extract_interaction_regions(r_a)
             reg_b, keys_b, ratio_b = self.irlm_module.extract_interaction_regions(r_b)
-            confidence = min(0.99, max(0.50, round((ratio_a + ratio_b) / 2.0 * (0.5 + 0.5 * base_prob), 2)))
+            region_score = min(0.99, max(0.50, round((ratio_a + ratio_b) / 2.0 * (0.5 + 0.5 * base_prob), 2)))
 
         snip_a = seq_a[max(0, reg_a[0]-1):min(len(seq_a), reg_a[1])] if seq_a else ""
         snip_b = seq_b[max(0, reg_b[0]-1):min(len(seq_b), reg_b[1])] if seq_b else ""
 
-        # Compute top interacting residue pairs
+        # Compute top interacting residue pairs using actual cross-attention matrix
         top_pairs = []
         if seq_a and seq_b and len(r_a) > 0 and len(r_b) > 0:
             s_a, e_a = reg_a[0] - 1, reg_a[1] - 1
@@ -87,9 +84,9 @@ class IRLMAnalyzer:
             # Scan region window for top pairs
             for i in range(max(0, s_a), min(len(seq_a), e_a + 1)):
                 for j in range(max(0, s_b), min(len(seq_b), e_b + 1)):
-                    score = float(r_a[i] * r_b[j])
+                    score = float(interaction_matrix[i, j])
                     # Map to pair score
-                    pair_score = round(min(0.99, max(0.50, score * 0.5 + 0.5 * confidence)), 2)
+                    pair_score = round(min(0.99, max(0.50, score * 0.5 + 0.5 * region_score)), 2)
                     res_a = f"{seq_a[i]}{i+1}"
                     res_b = f"{seq_b[j]}{j+1}"
                     candidates.append({
@@ -112,19 +109,20 @@ class IRLMAnalyzer:
             "protein1_regions": [{
                 "start": reg_a[0],
                 "end": reg_a[1],
-                "score": confidence,
+                "score": region_score,
                 "sequence_snippet": snip_a
             }],
             "protein2_regions": [{
                 "start": reg_b[0],
                 "end": reg_b[1],
-                "score": confidence,
+                "score": region_score,
                 "sequence_snippet": snip_b
             }],
             "protein1_hotspots": keys_a,
             "protein2_hotspots": keys_b,
             "attention_map_shape": [len(seq_a), len(seq_b)],
-            "region_confidence": confidence,
+            "region_score": region_score,
+            "region_confidence": region_score,
             "protein_A_importance_scores": [round(float(v), 4) for v in r_a.detach().cpu().tolist()],
             "protein_B_importance_scores": [round(float(v), 4) for v in r_b.detach().cpu().tolist()],
             "top_residue_pairs": top_pairs

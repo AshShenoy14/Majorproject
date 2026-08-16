@@ -337,9 +337,9 @@ class InteractionRegionLocalizationModule(nn.Module):
         reg_a, keys_a, ratio_a = self.extract_interaction_regions(r_a)
         reg_b, keys_b, ratio_b = self.extract_interaction_regions(r_b)
 
-        # Overall Region Confidence score [0, 1]
-        # Combines energy ratio with base interaction probability confidence
-        region_confidence = min(0.99, max(0.50, round((ratio_a + ratio_b) / 2.0 * (0.5 + 0.5 * base_interaction_prob), 2)))
+        # Overall Uncalibrated Region Score [0, 1]
+        # Combines energy ratio with base interaction probability score
+        region_score = min(0.99, max(0.50, round((ratio_a + ratio_b) / 2.0 * (0.5 + 0.5 * base_interaction_prob), 2)))
 
         return {
             "interaction_probability": float(base_interaction_prob),
@@ -347,7 +347,7 @@ class InteractionRegionLocalizationModule(nn.Module):
             "protein_B_region": reg_b,
             "protein_A_key_residues": keys_a,
             "protein_B_key_residues": keys_b,
-            "region_confidence": float(region_confidence),
+            "region_score": float(region_score),
             "protein_A_importance_scores": [round(float(v), 4) for v in r_a.detach().cpu().tolist()],
             "protein_B_importance_scores": [round(float(v), 4) for v in r_b.detach().cpu().tolist()],
         }
@@ -357,32 +357,63 @@ class IRLMLoss(nn.Module):
     """
     Composite loss function for training/finetuning IRLM.
     Combines:
-    1. Binary Cross Entropy Loss on overall interaction probability
-    2. L1 Sparsity Loss to enforce localized, non-diffuse binding interface
-    3. Smoothness Loss to encourage spatially contiguous residue regions
+    1. Binary Cross Entropy Loss on overall interaction probability (L_ppi)
+    2. Weighted Binary Cross Entropy Loss on 2D residue-residue contact map (L_contact)
+    3. L1 Sparsity Loss to enforce localized, non-diffuse binding interface (L_sparsity)
+    4. Smoothness Loss to encourage spatially contiguous residue regions (L_smooth)
     """
-    def __init__(self, lambda_sparsity: float = 0.05, lambda_smooth: float = 0.05):
+    def __init__(self, 
+                 lambda_contact: float = 1.0, 
+                 lambda_sparsity: float = 0.05, 
+                 lambda_smooth: float = 0.05,
+                 max_pos_weight: float = 50.0):
         super().__init__()
         self.bce = nn.BCELoss()
+        self.lambda_contact = lambda_contact
         self.lambda_sparsity = lambda_sparsity
         self.lambda_smooth = lambda_smooth
+        self.max_pos_weight = max_pos_weight
 
     def forward(self, 
-                pred_prob: torch.Tensor, 
-                target_label: torch.Tensor, 
+                pred_prob: Optional[torch.Tensor], 
+                target_label: Optional[torch.Tensor], 
                 interaction_matrix: torch.Tensor, 
                 r_a: torch.Tensor, 
-                r_b: torch.Tensor) -> torch.Tensor:
+                r_b: torch.Tensor,
+                contact_map: Optional[torch.Tensor] = None) -> torch.Tensor:
 
-        # 1. Main task loss
-        loss_bce = self.bce(pred_prob, target_label)
+        # 1. Main PPI task loss (if labels provided)
+        if pred_prob is not None and target_label is not None:
+            loss_bce = self.bce(pred_prob, target_label)
+        else:
+            loss_bce = torch.tensor(0.0, device=interaction_matrix.device)
 
-        # 2. Sparsity Loss on 2D matrix M_ij
+        # 2. Residue-Residue Contact Map Supervision Loss
+        if contact_map is not None:
+            # Clamp interaction matrix for numerical stability
+            p_mat = torch.clamp(interaction_matrix, min=1e-7, max=1.0 - 1e-7)
+            
+            # Compute dynamic positive class weight due to high contact sparsity
+            n_pos = torch.sum(contact_map == 1.0)
+            n_neg = torch.sum(contact_map == 0.0)
+            if n_pos > 0:
+                pos_weight = torch.clamp(n_neg / n_pos, min=1.0, max=self.max_pos_weight)
+            else:
+                pos_weight = torch.tensor(1.0, device=interaction_matrix.device)
+
+            # Weighted BCE formula for probability values
+            bce_map = - (pos_weight * contact_map * torch.log(p_mat) + (1.0 - contact_map) * torch.log(1.0 - p_mat))
+            loss_contact = torch.mean(bce_map)
+        else:
+            loss_contact = torch.tensor(0.0, device=interaction_matrix.device)
+
+        # 3. Sparsity Loss on 2D matrix M_ij
         loss_sparsity = torch.mean(torch.abs(interaction_matrix))
 
-        # 3. Contiguous Smoothness Loss on 1D importance profiles
+        # 4. Contiguous Smoothness Loss on 1D importance profiles
         diff_a = r_a[1:] - r_a[:-1] if len(r_a) > 1 else torch.tensor(0.0, device=r_a.device)
         diff_b = r_b[1:] - r_b[:-1] if len(r_b) > 1 else torch.tensor(0.0, device=r_b.device)
         loss_smooth = torch.mean(diff_a ** 2) + torch.mean(diff_b ** 2)
 
-        return loss_bce + self.lambda_sparsity * loss_sparsity + self.lambda_smooth * loss_smooth
+        return loss_bce + self.lambda_contact * loss_contact + self.lambda_sparsity * loss_sparsity + self.lambda_smooth * loss_smooth
+

@@ -50,7 +50,7 @@ const IRLMVisualizer = ({
         protein_A_importance_scores = [],
         protein_B_importance_scores = [],
         top_residue_pairs = [],
-        region_confidence = 0.95
+        region_score = irlmData?.region_score ?? irlmData?.region_confidence ?? 0.95
     } = irlmData;
 
     const regA_Start = protein_A_region[0] || (protein1_regions[0]?.start) || 1;
@@ -282,12 +282,12 @@ const IRLMVisualizer = ({
                         </Typography>
                         <Chip
                             icon={<CheckCircleIcon sx={{ fontSize: '1rem !important' }} />}
-                            label={`Confidence: ${(region_confidence * 100).toFixed(0)}%`}
+                            label={`Region Score: ${(region_score * 100).toFixed(0)}%`}
                             size="small"
                             sx={{
-                                bgcolor: region_confidence >= 0.8 ? 'rgba(0, 255, 136, 0.15)' : 'rgba(255, 193, 7, 0.15)',
-                                color: region_confidence >= 0.8 ? '#00ff88' : '#ffc107',
-                                border: `1px solid ${region_confidence >= 0.8 ? 'rgba(0, 255, 136, 0.4)' : 'rgba(255, 193, 7, 0.4)'}`,
+                                bgcolor: region_score >= 0.8 ? 'rgba(0, 255, 136, 0.15)' : 'rgba(255, 193, 7, 0.15)',
+                                color: region_score >= 0.8 ? '#00ff88' : '#ffc107',
+                                border: `1px solid ${region_score >= 0.8 ? 'rgba(0, 255, 136, 0.4)' : 'rgba(255, 193, 7, 0.4)'}`,
                                 fontWeight: 800
                             }}
                         />
@@ -414,54 +414,22 @@ const IRLMVisualizer = ({
                             </Grid>
                         ))
                     ) : (
-                        // Fallback sample pairs if list empty
-                        [
-                            { res_a: `R${regA_Start}`, res_b: `Y${regB_Start}`, score: region_confidence },
-                            { res_a: `K${Math.min(seq1.length || 10, regA_Start + 4)}`, res_b: `D${Math.min(seq2.length || 10, regB_Start + 4)}`, score: Math.max(0.7, region_confidence - 0.04) },
-                            { res_a: `E${Math.min(seq1.length || 10, regA_Start + 8)}`, res_b: `R${Math.min(seq2.length || 10, regB_Start + 8)}`, score: Math.max(0.65, region_confidence - 0.08) }
-                        ].map((pair, idx) => (
-                            <Grid item xs={12} sm={6} md={4} key={idx}>
-                                <Card
-                                    elevation={0}
-                                    sx={{
-                                        p: 2,
-                                        borderRadius: 3,
-                                        bgcolor: isDark ? 'rgba(0, 0, 0, 0.3)' : 'rgba(255, 255, 255, 0.7)',
-                                        border: `1px solid ${isDark ? 'rgba(0, 229, 255, 0.25)' : 'rgba(0, 0, 0, 0.08)'}`,
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'space-between'
-                                    }}
-                                >
-                                    <Box>
-                                        <Typography variant="body2" sx={{ fontWeight: 700, fontFamily: 'monospace', color: '#00e5ff' }}>
-                                            {id1} <span style={{ color: '#fff' }}>{pair.res_a}</span>
-                                        </Typography>
-                                        <Stack direction="row" alignItems="center" spacing={0.5} my={0.3}>
-                                            <SwapHorizIcon sx={{ fontSize: '1rem', color: '#d500f9' }} />
-                                            <Typography variant="caption" color="text.secondary">Interacts with</Typography>
-                                        </Stack>
-                                        <Typography variant="body2" sx={{ fontWeight: 700, fontFamily: 'monospace', color: '#d500f9' }}>
-                                            {id2} <span style={{ color: '#fff' }}>{pair.res_b}</span>
-                                        </Typography>
-                                    </Box>
-
-                                    <Box sx={{ textAlign: 'right' }}>
-                                        <Typography variant="caption" color="text.secondary" display="block">Pair Score</Typography>
-                                        <Chip
-                                            label={pair.score.toFixed(2)}
-                                            size="small"
-                                            sx={{
-                                                bgcolor: 'rgba(0, 255, 136, 0.2)',
-                                                color: '#00ff88',
-                                                fontWeight: 800,
-                                                border: '1px solid rgba(0, 255, 136, 0.5)'
-                                            }}
-                                        />
-                                    </Box>
-                                </Card>
-                            </Grid>
-                        ))
+                        <Grid item xs={12}>
+                            <Paper
+                                elevation={0}
+                                sx={{
+                                    p: 3,
+                                    textAlign: 'center',
+                                    borderRadius: 3,
+                                    bgcolor: isDark ? 'rgba(15, 23, 42, 0.4)' : 'rgba(0, 0, 0, 0.02)',
+                                    border: `1px dashed ${isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.15)'}`
+                                }}
+                            >
+                                <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                                    No high-confidence residue pairs detected for this interaction.
+                                </Typography>
+                            </Paper>
+                        </Grid>
                     )}
                 </Grid>
             </Box>

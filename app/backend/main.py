@@ -697,7 +697,8 @@ async def localize_interaction_regions(request: IRLMRequest):
             protein_A_importance_scores=irlm_result.get("protein_A_importance_scores"),
             protein_B_importance_scores=irlm_result.get("protein_B_importance_scores"),
             top_residue_pairs=irlm_result.get("top_residue_pairs"),
-            region_confidence=irlm_result.get("region_confidence")
+            region_score=irlm_result.get("region_score", irlm_result.get("region_confidence")),
+            region_confidence=irlm_result.get("region_confidence", irlm_result.get("region_score"))
         )
     except HTTPException as he:
         raise he

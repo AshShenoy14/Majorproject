@@ -118,7 +118,8 @@ def run_validation():
 
     print(f"Predicted TP53 Region: Residues {reg_tp53[0]} - {reg_tp53[1]}")
     print(f"Predicted MDM2 Region: Residues {reg_mdm2[0]} - {reg_mdm2[1]}")
-    print(f"IRLM Region Confidence: {tp53_mdm2_res['region_confidence']*100:.1f}%")
+    score_tp53_mdm2 = tp53_mdm2_res.get('region_score', tp53_mdm2_res.get('region_confidence'))
+    print(f"IRLM Region Score: {score_tp53_mdm2*100:.1f}%")
 
     # Evaluate TP53 F19, W23, L26 score distribution & percentile
     tp53_scores_arr = np.array(scores_tp53)
