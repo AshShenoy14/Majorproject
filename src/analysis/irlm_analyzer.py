@@ -69,24 +69,32 @@ class IRLMAnalyzer:
             r_a, r_b, interaction_matrix = self.irlm_module.compute_residue_importance(h_a, h_b, z_a, z_b)
             reg_a, keys_a, ratio_a = self.irlm_module.extract_interaction_regions(r_a)
             reg_b, keys_b, ratio_b = self.irlm_module.extract_interaction_regions(r_b)
-            region_score = min(0.99, max(0.50, round((ratio_a + ratio_b) / 2.0 * (0.5 + 0.5 * base_prob), 2)))
+
+        s_a, e_a = reg_a[0] - 1, reg_a[1] - 1
+        s_b, e_b = reg_b[0] - 1, reg_b[1] - 1
+
+        mean_imp_a = float(r_a[max(0, s_a):min(len(seq_a), e_a + 1)].mean()) if e_a >= s_a and len(r_a) > 0 else (float(r_a.mean()) if len(r_a) > 0 else 0.5)
+        mean_imp_b = float(r_b[max(0, s_b):min(len(seq_b), e_b + 1)].mean()) if e_b >= s_b and len(r_b) > 0 else (float(r_b.mean()) if len(r_b) > 0 else 0.5)
+        avg_region_imp = (mean_imp_a + mean_imp_b) / 2.0
+
+        region_score = min(0.99, max(0.50, round(0.4 * base_prob + 0.6 * avg_region_imp, 2)))
 
         snip_a = seq_a[max(0, reg_a[0]-1):min(len(seq_a), reg_a[1])] if seq_a else ""
         snip_b = seq_b[max(0, reg_b[0]-1):min(len(seq_b), reg_b[1])] if seq_b else ""
 
-        # Compute top interacting residue pairs using actual cross-attention matrix
+        # Compute top interacting residue pairs using normalized cross-attention and residue importance
         top_pairs = []
         if seq_a and seq_b and len(r_a) > 0 and len(r_b) > 0:
-            s_a, e_a = reg_a[0] - 1, reg_a[1] - 1
-            s_b, e_b = reg_b[0] - 1, reg_b[1] - 1
-            
+            max_attn = float(interaction_matrix.max()) if interaction_matrix.max() > 0 else 1.0
             candidates = []
+            
             # Scan region window for top pairs
             for i in range(max(0, s_a), min(len(seq_a), e_a + 1)):
                 for j in range(max(0, s_b), min(len(seq_b), e_b + 1)):
-                    score = float(interaction_matrix[i, j])
-                    # Map to pair score
-                    pair_score = round(min(0.99, max(0.50, score * 0.5 + 0.5 * region_score)), 2)
+                    raw_attn = float(interaction_matrix[i, j])
+                    norm_attn = raw_attn / max_attn
+                    res_imp = (float(r_a[i]) + float(r_b[j])) / 2.0
+                    pair_score = round(min(0.99, max(0.50, 0.4 * norm_attn + 0.6 * res_imp)), 2)
                     res_a = f"{seq_a[i]}{i+1}"
                     res_b = f"{seq_b[j]}{j+1}"
                     candidates.append({
@@ -120,6 +128,7 @@ class IRLMAnalyzer:
             }],
             "protein1_hotspots": keys_a,
             "protein2_hotspots": keys_b,
+            "hotspot_residues": top_pairs,
             "attention_map_shape": [len(seq_a), len(seq_b)],
             "region_score": region_score,
             "region_confidence": region_score,

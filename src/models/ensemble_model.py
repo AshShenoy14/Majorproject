@@ -78,7 +78,7 @@ class PPIEnsemble:
 
     def predict(self, base_preds_1: np.ndarray, base_preds_2: np.ndarray, bio_features: np.ndarray = None, method: str = "stacking") -> np.ndarray:
         if method == "soft_voting":
-            return (base_preds_1 + base_preds_2) / 2.0
+            raise ValueError("soft_voting fallback is disabled in production safety mode. Use trained XGBoost meta-learner ('stacking').")
             
         elif method == "stacking":
             if self.meta_model is None:
@@ -88,7 +88,7 @@ class PPIEnsemble:
             return self.meta_model.predict_proba(X)[:, 1]
         
         else:
-            raise ValueError(f"Unknown prediction method '{method}'. Supported methods: 'stacking', 'soft_voting'.")
+            raise ValueError(f"Unknown prediction method '{method}'. Supported method: 'stacking'.")
 
     def save(self, path: str):
         if self.meta_model:

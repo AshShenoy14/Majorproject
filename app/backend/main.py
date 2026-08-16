@@ -112,64 +112,59 @@ async def load_system():
         
         # Sequence Model
         seq_path = PROJECT_ROOT / "models" / "sequence_model_best.pth"
-        models["seq_model"] = SequencePPIModel(input_dim=480).to(device)
-        if seq_path.exists():
+        if not seq_path.exists():
+            raise RuntimeError(f"CRITICAL SAFETY ERROR: Sequence model checkpoint missing at {seq_path}. Fallback to random weights is strictly prohibited.")
+        try:
+            models["seq_model"] = SequencePPIModel(input_dim=480).to(device)
             models["seq_model"].load_state_dict(torch.load(seq_path, map_location=device))
-            print("Sequence Model loaded.")
-        else:
-            print("Warning: Sequence Model weights not found. Using randomly initialized weights.")
-        models["seq_model"].eval()
+            models["seq_model"].eval()
+            print("Sequence Model loaded successfully from checkpoint.")
+        except Exception as e:
+            raise RuntimeError(f"CRITICAL SAFETY ERROR: Failed to load sequence model from {seq_path}: {e}")
 
         # Graph Model
         from src.models.graph_model import GATLinkPredictor, GINLinkPredictor
         graph_path = PROJECT_ROOT / "models" / "graph_model_best.pth"
         graph_data_path = PROCESSED_DATA_DIR / "ppi_graph.pt"
-        if graph_data_path.exists():
+        if not graph_path.exists() or not graph_data_path.exists():
+            raise RuntimeError(f"CRITICAL SAFETY ERROR: Graph model checkpoint ({graph_path}) or data ({graph_data_path}) missing. Fallbacks strictly prohibited.")
+        try:
             data_cache["graph"] = torch.load(graph_data_path, weights_only=False).to(device)
             in_channels = data_cache["graph"].x.shape[1]
+            state_dict = torch.load(graph_path, map_location=device)
+            is_gin = any("convs" in k for k in state_dict.keys())
             
-            if graph_path.exists():
-                try:
-                    state_dict = torch.load(graph_path, map_location=device)
-                    # Auto-detect architecture: GIN uses 'convs', SAGEConv uses 'conv1'
-                    is_gin = any("convs" in k for k in state_dict.keys())
-                    
-                    if is_gin:
-                        print("Detected GIN architecture for Graph Model.")
-                        models["graph_model"] = GINLinkPredictor(in_channels=in_channels, hidden_channels=128).to(device)
-                    else:
-                        print("Detected SAGEConv architecture for Graph Model.")
-                        models["graph_model"] = GATLinkPredictor(in_channels=in_channels, hidden_channels=256).to(device)
-                    
-                    models["graph_model"].load_state_dict(state_dict)
-                    print("Graph Model loaded.")
-                except Exception as e:
-                    print(f"Warning: Could not load Graph Model weights ({e}). Initializing default architecture.")
-                    models["graph_model"] = GATLinkPredictor(in_channels=in_channels, hidden_channels=256).to(device)
+            if is_gin:
+                print("Detected GIN architecture for Graph Model.")
+                models["graph_model"] = GINLinkPredictor(in_channels=in_channels, hidden_channels=128).to(device)
             else:
-                print("Warning: Graph Model weights not found. Defaulting to SAGEConv.")
+                print("Detected SAGEConv architecture for Graph Model.")
                 models["graph_model"] = GATLinkPredictor(in_channels=in_channels, hidden_channels=256).to(device)
             
+            models["graph_model"].load_state_dict(state_dict)
             models["graph_model"].eval()
+            print("Graph Model loaded successfully from checkpoint.")
+        except Exception as e:
+            raise RuntimeError(f"CRITICAL SAFETY ERROR: Failed to load graph model from {graph_path}: {e}")
             
-            map_path = PROCESSED_DATA_DIR / "ppi_graph_mapping.pt"
-            if map_path.exists():
-                 data_cache["mapping"] = torch.load(map_path, weights_only=False)
-        else:
-            print("Warning: PPI Graph data not found.")
+        map_path = PROCESSED_DATA_DIR / "ppi_graph_mapping.pt"
+        if map_path.exists():
+             data_cache["mapping"] = torch.load(map_path, weights_only=False)
 
         # 3. Load Ensemble model
         ensemble_path = PROJECT_ROOT / "models" / "ensemble_model.pkl"
         global explainer # Declare explainer as global to modify it
-        if ensemble_path.exists():
+        if not ensemble_path.exists():
+            raise RuntimeError(f"CRITICAL SAFETY ERROR: Ensemble meta-learner missing at {ensemble_path}. Fallbacks strictly prohibited.")
+        try:
             models["ensemble"] = PPIEnsemble(str(ensemble_path))
             print("Loaded Hybrid Ensemble meta-learner.")
             
             # Initialize Explainer
             print("Initializing SHAP explainer...")
             explainer = PPIExplainer(str(ensemble_path))
-        else:
-            print("Ensemble model not found. Using simple average fallback.")
+        except Exception as e:
+            raise RuntimeError(f"CRITICAL SAFETY ERROR: Failed to load ensemble model from {ensemble_path}: {e}")
 
         # Network Analyzer
         train_path = PROCESSED_DATA_DIR / "train.csv"
@@ -333,48 +328,53 @@ async def predict_interaction(pair: ProteinPair):
                         g_out = models["graph_model"](data_cache["graph"].x, data_cache["graph"].edge_index, edge_label_index)
                         graph_prob = torch.sigmoid(g_out).mean().item()
         
-        # 5. Final Prediction (Ensemble or Simple Average)
-        final_prob = (seq_prob + graph_prob) / 2.0
-        model_used = "Average"
-        shap_values = None
-        bio_match = 0.0 # Default
+        # 5. Final Prediction (Strict XGBoost Meta-Learner Ensemble)
+        if "ensemble" not in models or models["ensemble"] is None or explainer is None:
+            raise HTTPException(status_code=503, detail="Ensemble meta-learner or SHAP explainer unavailable.")
 
-        if "ensemble" in models and models["ensemble"] is not None and explainer is not None:
-            try:
-                # Get Biological Match Score
-                bio_comp = managers["bio"].check_localization_compatibility(p1, p2)
-                bio_score = bio_comp.get("score", 0.5)
+        try:
+            # Get Biological Match Score
+            bio_comp = managers["bio"].check_localization_compatibility(p1, p2)
+            bio_score = bio_comp.get("score", 0.5)
+            bio_match = bio_score
 
-                # Enhanced features (7 total): [seq, graph, conf_seq, conf_graph, disagreement, max_conf, bio_score]
-                conf_seq = abs(seq_prob - 0.5)
-                conf_graph = abs(graph_prob - 0.5)
-                disagreement = abs(seq_prob - graph_prob)
-                max_conf = max(conf_seq, conf_graph)
-                
-                ens_prob = models["ensemble"].predict(
-                    np.array([seq_prob]), 
-                    np.array([graph_prob]), 
-                    bio_features=np.array([[bio_score]]),
-                    method="stacking"
-                )[0]
-                
-                # --- Zero-Shot Correction (Major Project Polish) ---
-                # If both are likely missing from graph (graph_prob is neutral), 
-                # but sequence is very strong (ESM > 0.9), and bio-score is high,
-                # we should boost the probability to reflect zero-shot confidence.
-                if graph_prob == 0.5 and seq_prob > 0.9 and bio_score > 0.8:
-                    ens_prob = max(ens_prob, seq_prob * 0.9)
-                
-                final_prob = float(ens_prob)
-                model_used = "XGBoost Ensemble (Zero-Shot Adjusted)"
-                
-                # Generate SHAP explanation with updated features
-                shap_val = explainer.explain_prediction(seq_prob, graph_prob, conf_seq, conf_graph, disagreement, max_conf, bio_score)
-                shap_values = shap_val.tolist()[0] 
-            except Exception as e:
-                print(f"Ensemble prediction/SHAP failed: {e}")
-                final_prob = (seq_prob + graph_prob) / 2.0
-                model_used = "Average (Ensemble Failed)"
+            conf_seq = abs(seq_prob - 0.5)
+            conf_graph = abs(graph_prob - 0.5)
+            disagreement = abs(seq_prob - graph_prob)
+            max_conf = max(conf_seq, conf_graph)
+            
+            # Predict with XGBoost Meta-Learner
+            # PPIEnsemble._build_features constructs all 8 features:
+            # [seq, graph, conf_seq, conf_graph, disagreement, max_conf, consensus, bio_score]
+            ens_prob = models["ensemble"].predict(
+                np.array([seq_prob]), 
+                np.array([graph_prob]), 
+                bio_features=np.array([[bio_score]]),
+                method="stacking"
+            )[0]
+            
+            # Runtime defensive assertion to verify exact 8-feature alignment
+            feat_matrix = models["ensemble"]._build_features(
+                np.array([seq_prob]), 
+                np.array([graph_prob]), 
+                bio_features=np.array([[bio_score]])
+            )
+            assert feat_matrix.shape[1] == 8, f"Feature parity failure: Expected 8 features for XGBoost ensemble, got {feat_matrix.shape[1]}"
+            
+            # --- Zero-Shot Correction (Major Project Polish) ---
+            if graph_prob == 0.5 and seq_prob > 0.9 and bio_score > 0.8:
+                ens_prob = max(ens_prob, seq_prob * 0.9)
+            
+            final_prob = float(ens_prob)
+            model_used = "XGBoost Ensemble"
+            
+            # Generate SHAP explanation with 8 features
+            shap_val = explainer.explain_prediction(seq_prob, graph_prob, conf_seq, conf_graph, disagreement, max_conf, bio_score)
+            shap_values = shap_val.tolist()[0] 
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            raise HTTPException(status_code=503, detail=f"Ensemble prediction / SHAP explanation failed: {e}")
         
         # 6. Explanation
         explanation = {
@@ -697,6 +697,7 @@ async def localize_interaction_regions(request: IRLMRequest):
             protein_A_importance_scores=irlm_result.get("protein_A_importance_scores"),
             protein_B_importance_scores=irlm_result.get("protein_B_importance_scores"),
             top_residue_pairs=irlm_result.get("top_residue_pairs"),
+            hotspot_residues=irlm_result.get("hotspot_residues") or irlm_result.get("top_residue_pairs"),
             region_score=irlm_result.get("region_score", irlm_result.get("region_confidence")),
             region_confidence=irlm_result.get("region_confidence", irlm_result.get("region_score"))
         )
