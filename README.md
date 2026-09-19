@@ -12,13 +12,13 @@
 ![Tests](https://img.shields.io/badge/Tests-15%2F15%20Passing-brightgreen)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 
-**TransGraph-PPI** is a research-oriented multimodal machine learning framework designed for **Protein–Protein Interaction (PPI) prediction** and **interaction-region localization**. It integrates deep protein sequence embeddings (ESM-2), graph topological representations (GAT), an Out-Of-Fold XGBoost ensemble, and a bi-directional cross-attention Interaction Region Localization Module (IRLM).
+**TransGraph-PPI** is a research-oriented multimodal machine learning framework designed for **Protein–Protein Interaction (PPI) prediction**. It integrates deep protein sequence embeddings (ESM-2), graph topological representations (GAT), biological domain knowledge (subcellular co-localization), an Out-Of-Fold XGBoost stacking meta-ensemble, and SHAP explainability.
 
 ---
 
 ## 📌 Overview
 
-Protein–Protein Interactions govern fundamental cellular processes. TransGraph-PPI brings together sequence semantics, biological network topology, structural cross-attention, and explainable AI into a unified web application and prediction pipeline.
+Protein–Protein Interactions govern fundamental cellular processes. TransGraph-PPI brings together sequence semantics, biological network topology, domain co-localization context, and explainable AI into a unified web application and prediction pipeline.
 
 ### Core Modules
 
@@ -26,8 +26,8 @@ Protein–Protein Interactions govern fundamental cellular processes. TransGraph
 | :--- | :--- | :--- |
 | **Sequence Model** | ESM-2 (`esm2_t6_8M_UR50D`) + MLP | Deep protein sequence feature extraction & binary interaction scoring |
 | **Graph Model** | Graph Attention Network (GAT) | Topological neighborhood & interaction pattern learning in PPI network graphs |
-| **Ensemble Meta-Learner** | XGBoost (OOF Stacking) | Synergistic integration of sequence, topology, and co-localization features |
-| **Region Localization (IRLM)** | Bi-directional 1D/2D Cross-Attention | Residue-level importance & interaction-region hypothesis generation |
+| **Biological Context** | UniProt / Subcellular Localization | Domain knowledge validation & co-localization compatibility scoring |
+| **Ensemble Meta-Learner** | XGBoost (OOF Stacking) | Synergistic 8-feature integration of sequence, topology, confidence, and co-localization |
 | **Explainability (XAI)** | SHAP (SHapley Additive exPlanations) | Feature attribution explaining model consensus and base signal contributions |
 
 ---
@@ -40,21 +40,17 @@ graph TD
     B --> C[ESM-MLP Sequence Model]
 
     D[PPI Graph Network] --> E[GAT Graph Model]
+    
+    K[Biological Context / Co-localization] --> F
 
-    C --> F[XGBoost OOF Ensemble]
+    C --> F[XGBoost OOF Stacking Ensemble]
     E --> F
 
     F --> G[Interaction Probability]
     F --> H[SHAP Explanation]
 
-    B --> I[IRLM Cross-Attention Module]
-    I --> J[1D Residue Importance Profiles]
-    I --> K[Residue-Pair Contact Heatmap]
-
     G --> L[FastAPI Backend / React Dashboard]
     H --> L
-    J --> L
-    K --> L
 ```
 
 ---
@@ -73,27 +69,6 @@ All performance metrics reported below reflect evaluation on the strictly isolat
 | **Ensemble (Ours - OOF Meta-Learner)** | **0.50** | **0.9154** | **0.9181** | **0.9122** | **0.9151** | **0.9764** | **0.9773** |
 
 *Note: The XGBoost ensemble meta-learner was trained strictly on Out-Of-Fold (OOF) base model predictions to prevent target leakage and achieve optimal ROC-AUC (0.9764) and PR-AUC (0.9773).*
-
----
-
-## 🔬 Interaction Region Localization Module (IRLM)
-
-The **Interaction Region Localization Module (IRLM)** utilizes a bi-directional cross-attention mechanism over sequence embeddings to score sub-sequence regions and residue pairs likely involved in interaction.
-
-### Evaluation Statistics (74 PDB Structural Complexes)
-- **Dataset Scope**: Evaluated on 14 held-out PDB complexes (424,329 total residue pairs).
-- **Validation AUPRC**: **0.0393** vs. **0.00166** random baseline (**23.70x enrichment factor** over random chance).
-- **Validation ROC-AUC**: **0.7287**.
-
-### Canonical Case Study: TP53–MDM2 (PDB: 1YCR)
-Evaluated on the held-out TP53–MDM2 complex:
-- **Binding Triad Recovery**: IRLM 1D importance profile highlights the key TP53 transactivation triad:
-  - `Phe19` ($F19$): **0.9268**
-  - `Trp23` ($W23$): **0.8505**
-  - `Leu26` ($L26$): **0.6196**
-- **Domain Windows**: Successfully localizes the TP53 transactivation region (residues 15–29, mean score **0.9126**) and the MDM2 binding pocket (residues 25–109, mean score **0.9567**).
-
-> ⚠️ **Scientific Scope & Limitation**: IRLM cross-attention scores represent data-driven sequence attention weights for candidate region hypothesis generation. They do **not** constitute calibrated physical binding-site probabilities, nor have they been experimentally validated across full-proteome 3D structural interfaces.
 
 ---
 
@@ -197,7 +172,7 @@ pytest tests/
 ```
 TransGraph-PPI
 ├── app
-│   ├── backend               # FastAPI REST API (inference, IRLM, SHAP endpoints)
+│   ├── backend               # FastAPI REST API (inference, SHAP, network endpoints)
 │   └── frontend              # React + Vite web dashboard
 ├── data
 │   ├── processed             # Dataset CSVs, embeddings, graph representations
@@ -206,8 +181,8 @@ TransGraph-PPI
 ├── models                    # Trained PyTorch & XGBoost model checkpoints
 ├── src
 │   ├── data                  # Collection, preprocessing, ESM-2 extraction scripts
-│   ├── models                # MLP, GAT, and IRLM neural network definitions
-│   ├── training              # Sequence, GAT, ensemble, and IRLM training scripts
+│   ├── models                # MLP and GAT neural network definitions
+│   ├── training              # Sequence, GAT, and ensemble training scripts
 │   └── evaluation            # Metric calculation and validation scripts
 ├── tests                     # Unit & end-to-end integration safety tests
 └── README.md
@@ -220,7 +195,6 @@ TransGraph-PPI
 1. **Embedding Scale**: Trained using ESM-2 8M parameter embeddings (`esm2_t6_8M_UR50D`) due to VRAM limits. Larger ESM variants (e.g., 650M or 3B) may yield richer sequence representations.
 2. **Graph Cold-Start**: Novel proteins lacking edges in the pre-constructed training GAT graph will have fallback graph signals, shifting reliance entirely to the sequence model.
 3. **Negative Sampling**: Random non-interaction sampling may occasionally sample unannotated true interactions ("hard negatives").
-4. **Attention Localization Scope**: IRLM attention maps serve as hypothesis generation tools rather than atomistic 3D contact predictions.
 
 ---
 
@@ -228,7 +202,6 @@ TransGraph-PPI
 
 - **Orthogonal Dataset Benchmarking**: Evaluation on external datasets (such as HuRI or BioGRID reference sets) to assess cross-dataset generalization.
 - **Model Scaling**: Upgrading sequence feature extractors to higher-capacity ESM-2/ESM-Fold models.
-- **Contact Calibration**: Incorporating length-normalized physical contact calibration for structural region localization.
 
 ---
 
@@ -238,7 +211,7 @@ If you reference or build upon this research framework in your work:
 
 ```bibtex
 @misc{transgraph_ppi_2026,
-  title={TransGraph-PPI: Research Framework for Multimodal Protein-Protein Interaction Prediction and Interaction-Region Localization},
+  title={TransGraph-PPI: Research Framework for Multimodal Protein-Protein Interaction Prediction},
   author={Ashwini Shenoy B and Basil S},
   year={2026},
   publisher={GitHub},

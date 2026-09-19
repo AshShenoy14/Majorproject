@@ -16,7 +16,6 @@ import html2pdf from 'html2pdf.js';
 import { ppiService } from '../services/api';
 import Protein3DView from '../components/Protein3DView';
 import ProteinInfoButton from '../components/ProteinInfoModal';
-import IRLMVisualizer from '../components/IRLMVisualizer';
 
 const CASE_STUDIES = [
   { label: "🎯 Oncology (TP53 & MDM2)", p1: "ENSP00000269305", p2: "ENSP00000258149", desc: "Tumor suppressor binding regulating cell cycle & apoptosis." },
@@ -34,7 +33,6 @@ const Predict = () => {
   const [selectedCase, setSelectedCase] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
-  const [irlmData, setIrlmData] = useState(null);
   const [selectedResidueP1, setSelectedResidueP1] = useState(null);
   const [selectedResidueP2, setSelectedResidueP2] = useState(null);
   const [error, setError] = useState(null);
@@ -43,7 +41,7 @@ const Predict = () => {
   const logEndRef = useRef(null);
   
   // ── UI PAGE & EXPORT STATE ──────────────────────────────────
-  const [activeResultPage, setActiveResultPage] = useState('probability'); // 'probability' | 'evidence' | 'irlm'
+  const [activeResultPage, setActiveResultPage] = useState('probability'); // 'probability' | 'evidence'
   const [exportingPdf, setExportingPdf] = useState(false);
   const [expertMode, setExpertMode] = useState(false);  // false = Beginner, true = Research
   const [batchResults, setBatchResults] = useState([]);   // batch CSV results
@@ -83,7 +81,6 @@ const Predict = () => {
     if (e) e.preventDefault();
     setLoading(true);
     setError(null);
-    setIrlmData(null);
     setLogs([]);
     const startTime = performance.now();
     
@@ -115,15 +112,6 @@ const Predict = () => {
           conf: response.data.confidence_score
         }));
       } catch (_) {}
-
-      try {
-        addLog("Localizing Predicted Interaction Regions (IRLM)...", "process");
-        const locRes = await ppiService.localizeInteractionRegions(p1, p2, s1, s2, response.data.interaction_probability);
-        setIrlmData(locRes.data);
-        addLog("IRLM Region Localization Complete.", "success");
-      } catch (locErr) {
-        console.warn("IRLM localization failed:", locErr);
-      }
     } catch (err) {
       addLog("Execution Fault: " + (err.response?.data?.detail || "Unknown"), "error");
       setError(err.response?.data?.detail || "Prediction failed.");
@@ -197,7 +185,6 @@ const Predict = () => {
     setBatchLoading(true);
     setBatchResults([]);
     setResult(null);
-    setIrlmData(null);
     addLog(`Batch CSV loaded: ${file.name}`, 'info');
     const reader = new FileReader();
     reader.onload = async (ev) => {
@@ -585,18 +572,6 @@ const Predict = () => {
                       <BarChart3 size={15} />
                       <span>Page 2: Evidence Weightage</span>
                     </button>
-
-                    <button
-                      onClick={() => setActiveResultPage('irlm')}
-                      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                        activeResultPage === 'irlm'
-                          ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-lg shadow-cyan-500/20'
-                          : 'text-slate-400 hover:text-white hover:bg-slate-900'
-                      }`}
-                    >
-                      <Layers size={15} />
-                      <span>Page 3: IRLM Visualization</span>
-                    </button>
                   </div>
 
                   {/* Main Scientific PDF Download Button */}
@@ -725,7 +700,6 @@ const Predict = () => {
                                   fallbackPdbId="1tnr" 
                                   label={`Protein A: ${protein1}`} 
                                   selectedResidue={selectedResidueP1}
-                                  interactionRegion={irlmData?.protein_A_region}
                                 />
                               </div>
                               <div className="w-full max-w-full min-w-0 bg-slate-50/70 border border-slate-100 p-4 md:p-5 rounded-3xl flex flex-col justify-between">
@@ -734,7 +708,6 @@ const Predict = () => {
                                   fallbackPdbId="1a2y" 
                                   label={`Protein B: ${protein2}`} 
                                   selectedResidue={selectedResidueP2}
-                                  interactionRegion={irlmData?.protein_B_region}
                                 />
                               </div>
                             </div>
@@ -865,17 +838,6 @@ const Predict = () => {
                                   Graph Attention Network (GAT) scored cellular pathway proximity at <strong className="text-indigo-400">{(result.gat_probability * 100).toFixed(1)}%</strong>, indicating shared functional sub-graphs in STRING DB topology.
                                 </p>
                               </div>
-
-                              {irlmData && irlmData.hotspot_residues && (
-                                <div className="p-3.5 bg-white/5 rounded-2xl border border-white/5 space-y-1">
-                                  <p className="text-white font-bold flex items-center gap-2">
-                                    <Info size={14} className="text-cyan-400" /> IRLM Binding Hotspots
-                                  </p>
-                                  <p className="text-slate-300 opacity-90 text-[11px]">
-                                    Localization identified <strong className="text-cyan-300">{irlmData.hotspot_residues.length} key binding residue pairs</strong> driving overall interaction potential.
-                                  </p>
-                                </div>
-                              )}
                             </div>
 
                             <div className="flex items-center gap-4 text-[10px] text-slate-400 border-t border-white/10 pt-4 mt-4 font-mono">
@@ -888,62 +850,7 @@ const Predict = () => {
                       </motion.div>
                     )}
 
-                    {/* PAGE 3: IRLM VISUALIZATION */}
-                    {activeResultPage === 'irlm' && (
-                      <motion.div
-                        key="page-3"
-                        initial={{ opacity: 0, y: 15 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -15 }}
-                        className="space-y-6"
-                      >
-                        <div className="flex justify-between items-center bg-white p-5 px-7 rounded-[2rem] border border-slate-100 shadow-sm">
-                          <div>
-                            <span className="text-[10px] font-black uppercase tracking-widest text-cyan-500">Page 3 of 3</span>
-                            <h3 className="text-xl font-black text-slate-800 tracking-tight">IRLM Region Visualization & Contact Mapping</h3>
-                            <p className="text-xs text-slate-400 font-mono mt-0.5">Residue Cross-Attention Heatmaps & Contact Pairs</p>
-                          </div>
-                          <button
-                            onClick={() => handleExportCardFigure('page-3-container', 'IRLM_Visualization')}
-                            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs flex items-center gap-2 transition-all cursor-pointer"
-                          >
-                            <Camera size={14} className="text-cyan-600" /> Export Figure
-                          </button>
-                        </div>
-
-                        <div id="page-3-container">
-                          {irlmData ? (
-                            <IRLMVisualizer 
-                              irlmData={irlmData} 
-                              id1={protein1} 
-                              id2={protein2} 
-                              seq1={seq1} 
-                              seq2={seq2} 
-                              isDark={true}
-                              onSelectResidue={handleResidueSelect}
-                            />
-                          ) : (
-                            <div className="bg-white p-12 rounded-[2.5rem] border border-slate-100 text-center flex flex-col items-center justify-center space-y-4">
-                              <Loader2 size={40} className="text-cyan-500 animate-spin" />
-                              <h4 className="text-sm font-black text-slate-700 uppercase tracking-widest">Computing IRLM Residue Localization...</h4>
-                              <p className="text-xs text-slate-400 max-w-md">Scanning cross-attention weights and amino acid sequence profiles.</p>
-                            </div>
-                          )}
-
-                          {!expertMode && irlmData && (
-                            <div className="bg-teal-50 border border-teal-200 rounded-2xl p-6 mt-4">
-                              <h4 className="text-sm font-black text-teal-700 mb-2 flex items-center gap-2">
-                                <GraduationCap size={16} /> Beginner Summary
-                              </h4>
-                              <p className="text-xs text-teal-800 leading-relaxed">
-                                The AI detected <strong>{irlmData.hotspot_residues?.length ?? '?'}</strong> binding hotspot residue pairs
-                                between these two proteins. Click any residue above to highlight and focus its 3D position in the structural viewer.
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      </motion.div>
-                    )}
+                    {/* End of Page Tabs */}
 
                   </AnimatePresence>
                 </div>
@@ -1002,7 +909,6 @@ const Predict = () => {
                       setProtein1(r.protein1_id || protein1);
                       setProtein2(r.protein2_id || protein2);
                       setResult(r);
-                      setIrlmData(null);
                       setActiveResultPage('probability');
                     }}
                     className="border-t border-slate-50 hover:bg-slate-50/80 transition-colors cursor-pointer group"
@@ -1117,49 +1023,9 @@ const Predict = () => {
             </div>
           </div>
 
-          {/* PAGE 3 PDF SECTION */}
-          <div className="space-y-4 pt-4" style={{ pageBreakBefore: 'always' }}>
-            <h2 className="text-sm font-black uppercase tracking-wider text-cyan-700 border-b pb-1">3. IRLM Predicted Interaction Region Localization</h2>
-            
-            {irlmData ? (
-              <div className="space-y-4 text-xs">
-                <div className="p-4 bg-cyan-50 rounded-xl border border-cyan-200 flex justify-between items-center">
-                  <div>
-                    <span className="font-bold text-cyan-800 block">Predicted Interaction Region</span>
-                    <span className="text-[11px] text-cyan-700">Region Score: {(((irlmData.region_score ?? irlmData.region_confidence ?? 0.95)) * 100).toFixed(0)}%</span>
-                  </div>
-                  <div className="text-right font-mono text-[11px]">
-                    <p>Protein A Region: Residues {irlmData.protein_A_region?.[0] || 1} - {irlmData.protein_A_region?.[1] || 1}</p>
-                    <p>Protein B Region: Residues {irlmData.protein_B_region?.[0] || 1} - {irlmData.protein_B_region?.[1] || 1}</p>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <h3 className="font-bold text-slate-800 text-[11px] uppercase tracking-wider">Top Interacting Residue Pairs</h3>
-                  <div className="grid grid-cols-3 gap-2">
-                    {(irlmData.top_residue_pairs && irlmData.top_residue_pairs.length > 0 
-                      ? irlmData.top_residue_pairs 
-                      : [
-                          { res_a: `Residue #${irlmData.protein_A_region?.[0] || 1}`, res_b: `Residue #${irlmData.protein_B_region?.[0] || 1}`, score: irlmData.region_score ?? irlmData.region_confidence },
-                          { res_a: `Residue #${(irlmData.protein_A_region?.[0] || 1) + 2}`, res_b: `Residue #${(irlmData.protein_B_region?.[0] || 1) + 2}`, score: Math.max(0.7, (irlmData.region_score ?? irlmData.region_confidence ?? 0.95) - 0.05) }
-                        ]
-                    ).map((pair, idx) => (
-                      <div key={idx} className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-center font-mono text-[10px]">
-                        <span className="text-emerald-700 font-bold block">{pair.res_a} ↔ {pair.res_b}</span>
-                        <span className="text-slate-500">Score: {pair.score?.toFixed(2) || '0.90'}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <p className="text-xs text-slate-500 italic">IRLM localization data pending or unavailable.</p>
-            )}
-
             <div className="pt-8 border-t border-slate-200 text-center text-[10px] text-slate-400 font-mono">
               End of Scientific Report — Generated by TransGraph-PPI Analytical Engine
             </div>
-          </div>
         </div>
       )}
 

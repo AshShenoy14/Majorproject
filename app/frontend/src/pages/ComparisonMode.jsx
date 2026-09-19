@@ -9,14 +9,12 @@ import {
   CartesianGrid, Tooltip, Cell, PieChart, Pie
 } from 'recharts';
 import { ppiService } from '../services/api';
-import IRLMVisualizer from '../components/IRLMVisualizer';
 
 // ────── Comparison Mode Page ──────────────────────────────────────────────────
 // Shows wild-type vs single-point mutant side-by-side with:
 //   - Interaction probability diff
-//   - Binding region changes
-//   - Hotspot residue diff
-//   - IRLM visualizer for both
+//   - Probability delta visualization
+//   - Mutation impact interpretation
 
 const ComparisonMode = () => {
   const [protein1, setProtein1] = useState('');
@@ -32,8 +30,6 @@ const ComparisonMode = () => {
   // Results for WT and mutant
   const [wtResult, setWtResult] = useState(null);
   const [mutResult, setMutResult] = useState(null);
-  const [wtIrlm, setWtIrlm] = useState(null);
-  const [mutIrlm, setMutIrlm] = useState(null);
 
   const handleCompare = async () => {
     if (!protein1 || !protein2 || !mutPos || !mutOrig || !mutAlt) {
@@ -47,30 +43,18 @@ const ComparisonMode = () => {
 
     try {
       // 1. Wild-type prediction
-      const [wtPred, wtIrlmRes] = await Promise.all([
-        ppiService.predict({ protein1_id: protein1, protein2_id: protein2 }),
-        ppiService.analyzeIRLM({ protein1_id: protein1, protein2_id: protein2,
-                                 base_probability: 0.5 }),
-      ]);
+      const wtPred = await ppiService.predict(protein1, protein2);
       setWtResult(wtPred.data);
-      setWtIrlm(wtIrlmRes.data);
 
       // 2. Mutant prediction via mutation endpoint
-      const mutRes = await ppiService.analyzeMutations({
-        protein1_id: protein1,
-        protein2_id: protein2,
-        mutations: [{
-          protein: parseInt(mutProtein),
-          pos: parseInt(mutPos),
-          orig: mutOrig.toUpperCase(),
-          mut: mutAlt.toUpperCase(),
-        }],
-      });
+      const mutRes = await ppiService.mutate(protein1, null, protein2, null, [{
+        protein: parseInt(mutProtein),
+        pos: parseInt(mutPos),
+        orig: mutOrig.toUpperCase(),
+        mut: mutAlt.toUpperCase(),
+      }]);
       const mutEntry = mutRes.data.mutation_results[0];
       setMutResult(mutEntry);
-
-      // 3. IRLM for mutant - reuse WT irlm (mutation doesn't drastically shift regions)
-      setMutIrlm(wtIrlmRes.data);
     } catch (err) {
       setError(err?.response?.data?.detail || 'Comparison failed. Check backend.');
     } finally {
@@ -227,43 +211,19 @@ const ComparisonMode = () => {
               </div>
             </div>
 
-            {/* IRLM Side-by-Side */}
-            {wtIrlm && (
-              <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-                <h3 className="text-sm font-black text-slate-700 uppercase tracking-widest mb-2 flex items-center gap-2">
-                  <Map size={14} /> Interaction Region Comparison
-                </h3>
-                <p className="text-xs text-slate-400 mb-4">
-                  Red residues on sequence highlight the mutation position {mutOrig}{mutPos}{mutAlt}.
-                  IRLM regions are based on the wild-type sequence — mutations inside these regions have higher impact.
-                </p>
-                <IRLMVisualizer
-                  data={wtIrlm}
-                  proteinAId={protein1}
-                  proteinBId={protein2}
-                  mutations={[{
-                    protein: parseInt(mutProtein),
-                    pos: parseInt(mutPos),
-                    orig: mutOrig.toUpperCase(),
-                    mut: mutAlt.toUpperCase(),
-                  }]}
-                />
-              </div>
-            )}
-
-            {/* Hotspot text summary */}
+            {/* Mutation impact summary */}
             {mutResult && (
-              <div className={`rounded-2xl p-6 border ${mutResult.is_in_interaction_region ? 'bg-rose-50 border-rose-100' : 'bg-slate-50 border-slate-200'}`}>
+              <div className={`rounded-2xl p-6 border ${Math.abs(delta) >= 0.05 ? 'bg-amber-50 border-amber-200' : 'bg-slate-50 border-slate-200'}`}>
                 <h3 className="text-sm font-black uppercase tracking-widest mb-2 flex items-center gap-2 text-slate-700">
-                  <Zap size={14} /> Hotspot Analysis
+                  <Zap size={14} /> Mutation Impact Analysis
                 </h3>
                 <p className="text-sm text-slate-600">
-                  {mutResult.is_in_interaction_region
-                    ? `⚠️ Position ${mutPos} falls inside a predicted interaction region (${mutResult.interaction_region || 'IRLM region'}). This mutation is likely to have a significant impact on binding.`
-                    : `ℹ️ Position ${mutPos} is outside the primary interaction region. The mutation has limited effect on the core binding interface.`}
+                  {Math.abs(delta) >= 0.05
+                    ? `⚠️ Position ${mutPos} mutation (${mutOrig}→${mutAlt}) shows a significant impact on interaction probability (${delta > 0 ? '+' : ''}${(delta * 100).toFixed(1)}% Δ).`
+                    : `ℹ️ Position ${mutPos} mutation (${mutOrig}→${mutAlt}) shows minimal effect on overall binding affinity (${delta > 0 ? '+' : ''}${(delta * 100).toFixed(1)}% Δ).`}
                 </p>
                 {mutResult.interpretation && (
-                  <p className="text-xs text-slate-500 mt-2 italic">AI Interpretation: {mutResult.interpretation}</p>
+                  <p className="text-xs text-slate-500 mt-2 italic">Model Interpretation: {mutResult.interpretation}</p>
                 )}
               </div>
             )}

@@ -39,42 +39,6 @@ The table below summarizes performance on the held-out benchmark set across mode
 
 ---
 
-## 3. Interaction Region Localization Module (IRLM) Audit
-
-### Dataset & Evaluation Statistics
-- **Total Structural Complexes**: 74 PDB complexes
-- **Training Complexes**: 60 complexes
-- **Validation Complexes**: 14 complexes (424,329 total residue pairs)
-- **1YCR Complex Status**: Strictly held-out in the validation set with zero training exposure.
-
-### Validation Performance
-| Metric | IRLM Performance | Random Baseline | Enrichment Factor |
-| :--- | :--- | :--- | :--- |
-| **ROC-AUC** | **0.728708** | 0.500000 | 1.46x |
-| **AUPRC** | **0.039323** | 0.001659 | **23.70x Enrichment** |
-
----
-
-## 4. TP53–MDM2 (PDB: 1YCR) Case Study Evaluation
-
-Forensic evaluation of the canonical TP53–MDM2 interface (1YCR):
-
-### Quantitative Metrics
-- **Total Residue Pairs**: 1,105 ($L_{MDM2} = 85$, $L_{TP53} = 13$)
-- **Ground-Truth Contact Density**: 2.53% (28 contacts out of 1,105 pairs) vs. Validation Mean Density of 0.39%
-- **1YCR ROC-AUC**: 0.640204
-- **1YCR AUPRC**: 0.037325 (Random baseline: 0.025339 $\rightarrow$ 1.47x enrichment)
-
-### Residue Importance Profile (1D Normalized $r_b$)
-- **TP53 Key Hydrophobic Binding Triad**:
-  - `Phe19` ($F19$): **0.9268**
-  - `Trp23` ($W23$): **0.8505**
-  - `Leu26` ($L26$): **0.6196**
-  - **TP53 Transactivation Domain Window (Residues 15–29)**: Average Importance **0.9126**
-- **MDM2 Hydrophobic Pocket (Residues 25–109)**: Average Importance **0.9567** (elevated over global background 0.9026). Key recovered pocket residues include $L54$, $L57$, $Y67$, and $V93$.
-
----
-
 ## 5. SHAP Feature Explanation Audit
 
 SHAP (SHapley Additive exPlanations) values for the XGBoost meta-learner demonstrate the feature contribution hierarchy:
@@ -103,22 +67,13 @@ Tested on live FastAPI server (`http://127.0.0.1:8000`) using Ensembl Protein ID
 - **SHAP Explanation**: Includes sequence contribution, graph contribution, biological match, and consensus signals.
 - **Finite Check**: `True` (0 NaNs, 0 Infs).
 
-#### 2. `POST /analysis/localize`
-- **HTTP Status**: `200 OK`
-- **Protein A Predicted Region**: `[341, 353]`
-- **Protein B Predicted Region**: `[398, 416]`
-- **Region Score**: `0.76`
-- **Region Confidence**: `0.76`
-- **Top Residue Pair Sample**: `A342` $\leftrightarrow$ `S400` (Pair Score: `0.95`)
-- **Finite Check**: `True` (0 NaNs, 0 Infs).
-
 ---
 
 ## 7. Test Suite Status
 
 Executed `pytest tests/`:
-- **Total Tests**: 15
-- **Passed**: **15 / 15**
+- **Total Tests**: 13
+- **Passed**: **13 / 13**
 - **Failed**: 0
 - **Test Modules**:
   - `tests/test_alphafold_features.py` (Passed)
@@ -127,15 +82,14 @@ Executed `pytest tests/`:
   - `tests/test_containerization.py` (Passed)
   - `tests/test_explainability.py` (Passed)
   - `tests/test_inference_safety.py` (5 tests Passed)
-  - `tests/test_irlm.py` (3 tests Passed)
   - `tests/test_localization_sampling.py` (Passed)
   - `tests/test_quantized_inference.py` (Passed)
+  - `tests/test_therapeutic_target.py` (Passed)
 
 ---
 
 ## 8. Summary of Verification Status
 
-- **Model Checkpoints**: Frozen (`models/sequence_model_best.pth`, `models/graph_model_best.pth`, `models/ensemble_model.pkl`, `models/irlm_best.pth`).
+- **Model Checkpoints**: Frozen (`models/sequence_model_best.pth`, `models/graph_model_best.pth`, `models/ensemble_model.pkl`, `models/random_forest_baseline.pkl`).
 - **Numerical Stability**: Hardened; 100% finite outputs across all API endpoints.
-- **Residue Indexing**: Verified 1-indexed alignment with amino acid sequences.
 - **Release Ready**: Yes (`v1.0-research`).

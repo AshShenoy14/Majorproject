@@ -25,7 +25,6 @@ import {
   Area
 } from 'recharts';
 import { ppiService } from '../services/api';
-import IRLMVisualizer from '../components/IRLMVisualizer';
 
 const MutationAnalysis = () => {
   const [protein1, setProtein1] = useState('ENSP00000327694');
@@ -33,7 +32,6 @@ const MutationAnalysis = () => {
   const [mutations, setMutations] = useState([{ protein: 1, pos: 45, orig: 'A', mut: 'T' }]);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
-  const [irlmData, setIrlmData] = useState(null);
   const [error, setError] = useState(null);
 
   const addMutation = () => {
@@ -69,19 +67,6 @@ const MutationAnalysis = () => {
 
       const response = await ppiService.mutate(protein1, null, protein2, null, formattedMutations);
       setResult(response.data);
-
-      try {
-        const locRes = await ppiService.localizeInteractionRegions(
-          protein1, 
-          protein2, 
-          null, 
-          null, 
-          response.data.mutation_results[0]?.base_score || 0.5
-        );
-        setIrlmData(locRes.data);
-      } catch (locErr) {
-        console.warn("IRLM region localization in mutation scan failed:", locErr);
-      }
     } catch (err) {
       setError(err.response?.data?.detail || "Mutation scan failed. Ensure correct IDs and residue positions.");
     } finally {
@@ -97,25 +82,6 @@ const MutationAnalysis = () => {
       orig: res.orig,
       mut: res.mut
     }));
-  };
-
-  const getMutationHotspotClassification = (pos, proteinNum = 1) => {
-    if (!irlmData) return null;
-    const regions = proteinNum === 1 ? irlmData.p1_regions : irlmData.p2_regions;
-    if (!regions) return null;
-    const inRegion = regions.some(r => pos >= r.start && pos <= r.end);
-    if (inRegion) {
-      return {
-        isHotspot: true,
-        label: 'Interface Hotspot Overlap',
-        color: 'bg-rose-50 text-rose-600 border-rose-200'
-      };
-    }
-    return {
-      isHotspot: false,
-      label: 'Peripheral / Non-interface Zone',
-      color: 'bg-slate-100 text-slate-500 border-slate-200'
-    };
   };
 
   return (
@@ -238,7 +204,6 @@ const MutationAnalysis = () => {
           <div className="lg:col-span-1 space-y-6">
             <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest text-center">Batch Mutation Results</h3>
             {result.mutation_results.map((res, idx) => {
-              const hotspotClass = getMutationHotspotClassification(res.pos, res.protein || 1);
               const isIncrease = res.impact_delta > 0;
               const isDecrease = res.impact_delta < 0;
               return (
@@ -247,11 +212,6 @@ const MutationAnalysis = () => {
                     <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">
                       Protein {res.protein === 2 ? 'B' : 'A'} (P{res.pos} {res.orig}→{res.mut})
                     </span>
-                    {hotspotClass && (
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${hotspotClass.color}`}>
-                        {hotspotClass.label}
-                      </span>
-                    )}
                   </div>
 
                   <div className="p-4 bg-slate-50 rounded-2xl w-full text-center space-y-3 border border-slate-100">
@@ -378,19 +338,6 @@ const MutationAnalysis = () => {
                </div>
             </div>
           </div>
-
-          {/* IRLM VISUALIZER WITH MUTATION OVERLAYS */}
-          {irlmData && (
-            <div className="lg:col-span-3">
-              <IRLMVisualizer 
-                irlmData={irlmData} 
-                id1={protein1} 
-                id2={protein2} 
-                mutations={mutations} 
-                isDark={false} 
-              />
-            </div>
-          )}
         </motion.div>
       )}
     </div>
