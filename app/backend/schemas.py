@@ -130,3 +130,19 @@ class HeteroPredictionResponse(BaseModel):
     protein1_context_connections: Dict[str, List[str]] = Field(..., description="Connections for protein 1 to context nodes")
     protein2_context_connections: Dict[str, List[str]] = Field(..., description="Connections for protein 2 to context nodes")
     shared_context: List[str] = Field(..., description="Shared context nodes connected to both proteins")
+
+class TherapeuticTargetResponse(BaseModel):
+    rank: int = Field(..., description="Target rank order")
+    protein_id: str = Field(..., description="Protein identifier (ENSP)")
+    uniprot_id: Optional[str] = Field("N/A", description="Mapped UniProt ID")
+    ttps_score: float = Field(..., description="Computational Therapeutic Target Priority Score [0.0 - 1.0]")
+    norm_degree: float = Field(..., description="Normalized Degree Centrality [0.0 - 1.0]")
+    norm_betweenness: float = Field(..., description="Normalized Betweenness Centrality [0.0 - 1.0]")
+    is_chembl_target: bool = Field(..., description="Whether protein has verified ChEMBL drug target evidence")
+    chembl_id: Optional[str] = Field(None, description="ChEMBL target identifier")
+    target_name: Optional[str] = Field(None, description="ChEMBL target preferred name")
+    target_type: Optional[str] = Field(None, description="ChEMBL target classification type")
+    degree_centrality: float = Field(..., description="Raw degree centrality in PPI network")
+    betweenness_centrality: float = Field(..., description="Raw betweenness centrality in PPI network")
+    eigenvector_centrality: float = Field(..., description="Raw eigenvector centrality in PPI network")
+

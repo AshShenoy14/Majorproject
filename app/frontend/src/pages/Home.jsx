@@ -29,10 +29,10 @@ const StatCard = ({ icon: Icon, label, value, subtext, color }) => (
 
 const Home = () => {
   const [stats, setStats] = useState({
-    proteins: '14,208',
-    interactions: '42,519',
-    accuracy: '94.2%',
-    predictions: '1,204'
+    proteins: '12,238',
+    interactions: '96,829',
+    accuracy: '91.5%',
+    predictions: '363,081'
   });
 
   useEffect(() => {
@@ -130,7 +130,7 @@ const Home = () => {
           icon={CheckCircle}
           label="Model Accuracy"
           value={stats.accuracy}
-          subtext="Validated on Yeast subset"
+          subtext="Held-out Human test set (40.3k pairs)"
           color="bg-gradient-to-br from-purple-400 to-purple-600"
         />
         <StatCard

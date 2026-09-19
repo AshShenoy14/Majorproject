@@ -148,10 +148,10 @@ const About = () => {
            <div className="flex items-center justify-between px-6 p-4 glass-card bg-white">
               <div className="flex items-center gap-3">
                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Model: v3.1_LATEST</span>
+                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Model: v1.0-research</span>
               </div>
               <div className="flex items-center gap-4">
-                <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Accuracy Target: 95.0%</span>
+                <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Verified ROC-AUC: 97.6% (Acc: 91.5%)</span>
                 <div className="w-px h-4 bg-slate-100" />
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">Academic Build</span>
               </div>

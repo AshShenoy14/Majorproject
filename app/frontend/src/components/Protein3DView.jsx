@@ -113,18 +113,18 @@ const Protein3DView = ({ pdbId, label, selectedResidue, interactionRegion, fallb
   }, [selectedResidue, interactionRegion, activePdbId]);
 
   return (
-    <div className="flex flex-col items-center group w-full">
-      <div className="text-[10px] font-black text-cyan-400/80 mb-2 uppercase tracking-[0.2em] group-hover:text-cyan-400 transition-colors flex items-center justify-between w-full">
-        <span className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-          {label || 'Structure'} (PDB: {activePdbId.toUpperCase()})
+    <div className="flex flex-col items-center group w-full max-w-full min-w-0 box-border">
+      <div className="flex items-center justify-between gap-2 w-full mb-2.5 min-w-0 max-w-full flex-wrap">
+        <span className="flex items-center gap-2 font-black text-xs text-slate-800 uppercase tracking-wider truncate min-w-0">
+          <span className="w-2.5 h-2.5 rounded-full bg-cyan-500 animate-pulse shrink-0" />
+          <span className="truncate">{label || 'Structure'} (PDB: {activePdbId.toUpperCase()})</span>
         </span>
         {selectedResidue?.residue_number ? (
-          <span className="text-rose-400 font-mono text-[9px] lowercase bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/20">
+          <span className="text-rose-600 font-mono text-[10px] bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200 font-bold shrink-0">
             focused: res #{selectedResidue.residue_number}
           </span>
         ) : interactionRegion ? (
-          <span className="text-emerald-400 font-mono text-[9px] lowercase bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+          <span className="text-emerald-700 font-mono text-[10px] bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 font-bold shrink-0">
             interface: #{interactionRegion[0]}-#{interactionRegion[1]}
           </span>
         ) : null}
@@ -132,22 +132,22 @@ const Protein3DView = ({ pdbId, label, selectedResidue, interactionRegion, fallb
 
       <div 
         ref={viewerContainerRef} 
-        className="w-full h-[280px] rounded-2xl overflow-hidden border border-white/10 bg-slate-950 shadow-2xl relative"
-        style={{ position: 'relative' }}
+        className="w-full max-w-full h-[360px] md:h-[400px] rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 shadow-md relative"
+        style={{ position: 'relative', width: '100%', maxWidth: '100%', boxSizing: 'border-box' }}
       >
         {/* Interface Region Indicator Badge */}
         {interactionRegion && Array.isArray(interactionRegion) && interactionRegion.length === 2 && (
-          <div className="absolute top-2 left-2 z-10 bg-emerald-500/90 text-white text-[9px] font-black px-2 py-1 rounded-md shadow-md border border-emerald-400 backdrop-blur-md flex items-center gap-1 pointer-events-none">
-            <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
-            Binding Interface Highlighted (#{interactionRegion[0]}-#{interactionRegion[1]})
+          <div className="absolute top-3 left-3 z-10 bg-emerald-950/85 text-emerald-300 text-[10px] font-bold px-3 py-1.5 rounded-lg shadow-lg border border-emerald-500/40 backdrop-blur-md flex items-center gap-2 pointer-events-none max-w-[calc(100%-1.5rem)] truncate">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0" />
+            <span className="truncate">Binding Interface (#{interactionRegion[0]}-#{interactionRegion[1]})</span>
           </div>
         )}
 
         {/* Selected Residue Badge */}
         {selectedResidue?.residue_number && (
-          <div className="absolute top-2 right-2 z-10 bg-rose-500/90 text-white text-[9px] font-black px-2.5 py-1 rounded-md shadow-lg border border-rose-400 backdrop-blur-md flex items-center gap-1.5 animate-pulse pointer-events-none">
-            <span className="w-1.5 h-1.5 rounded-full bg-white" />
-            Residue #{selectedResidue.residue_number} ({selectedResidue.residue_name || 'AA'})
+          <div className="absolute top-3 right-3 z-10 bg-rose-950/85 text-rose-300 text-[10px] font-bold px-3 py-1.5 rounded-lg shadow-lg border border-rose-500/40 backdrop-blur-md flex items-center gap-2 animate-pulse pointer-events-none max-w-[calc(100%-1.5rem)] truncate">
+            <span className="w-2 h-2 rounded-full bg-rose-400 shrink-0" />
+            <span className="truncate">Residue #{selectedResidue.residue_number} ({selectedResidue.residue_name || 'AA'})</span>
           </div>
         )}
       </div>

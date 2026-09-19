@@ -32,7 +32,8 @@ from src.utils.bio_encoder import BioFeatureEncoder
 from app.backend.schemas import (
     ProteinPair, PredictionResponse, NetworkResponse, BatchPredictionRequest,
     MutationRequest, MutationAnalysisResponse, BioMetaResponse, FeasibilityResponse,
-    ResidueGraphRequest, ChatRequest, ChatResponse, IRLMRequest, IRLMResponse, InteractionRegion
+    ResidueGraphRequest, ChatRequest, ChatResponse, IRLMRequest, IRLMResponse, InteractionRegion,
+    TherapeuticTargetResponse
 )
 
 import torch.nn.functional as F
@@ -552,6 +553,62 @@ async def get_centrality(top_k: int = 10):
         raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/analysis/therapeutic-targets",
+         response_model=List[TherapeuticTargetResponse],
+         summary="Get Prioritized Therapeutic Targets",
+         description="Calculates Computational Therapeutic Target Priority Scores (TTPS) combining topological centrality and drug evidence.",
+         tags=["Analysis"])
+async def get_therapeutic_targets(
+    limit: int = 50,
+    w_degree: float = 0.40,
+    w_betweenness: float = 0.35,
+    w_chembl: float = 0.25
+):
+    """
+    Returns therapeutic target priorities ranked by TTPS score:
+    TTPS = w_degree * NormDegree + w_betweenness * NormBetweenness + w_chembl * Indicator(ChEMBL Target)
+    """
+    if "network" not in analyzers:
+        raise HTTPException(status_code=503, detail="Network Analysis not running (Check train.csv)")
+
+    try:
+        target_mgr = managers.get("target")
+        df = analyzers["network"].calculate_therapeutic_priority_score(
+            target_manager=target_mgr,
+            top_k=limit,
+            w_degree=w_degree,
+            w_betweenness=w_betweenness,
+            w_chembl=w_chembl
+        )
+        if df.empty:
+            return []
+
+        records = df.to_dict(orient="records")
+        results = []
+        for r in records:
+            results.append({
+                "rank": int(r.get("rank", 0)),
+                "protein_id": str(r.get("protein_id", "")),
+                "uniprot_id": str(r.get("uniprot_id") or "N/A"),
+                "ttps_score": float(r.get("ttps_score", 0.0)),
+                "norm_degree": float(r.get("norm_degree", 0.0)),
+                "norm_betweenness": float(r.get("norm_betweenness", 0.0)),
+                "is_chembl_target": bool(r.get("is_chembl_target", False)),
+                "chembl_id": r.get("chembl_id") if pd.notna(r.get("chembl_id")) else None,
+                "target_name": r.get("target_name") if pd.notna(r.get("target_name")) else None,
+                "target_type": r.get("target_type") if pd.notna(r.get("target_type")) else None,
+                "degree_centrality": float(r.get("degree_centrality", 0.0)),
+                "betweenness_centrality": float(r.get("betweenness_centrality", 0.0)),
+                "eigenvector_centrality": float(r.get("eigenvector_centrality", 0.0)),
+            })
+        return results
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 
 @app.get("/analysis/stats",

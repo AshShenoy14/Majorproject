@@ -23,6 +23,10 @@ export const ppiService = {
   getDrugTargets: (proteins = null) => 
     api.get(`/drug_targets${proteins ? `?proteins=${proteins}` : ''}`),
 
+  getTherapeuticTargets: (limit = 50, wDegree = 0.40, wBetweenness = 0.35, wChembl = 0.25) =>
+    api.get(`/analysis/therapeutic-targets?limit=${limit}&w_degree=${wDegree}&w_betweenness=${wBetweenness}&w_chembl=${wChembl}`),
+
+
   getCentrality: (topK = 10) => api.get(`/analysis/centrality?top_k=${topK}`),
 
   getNetworkStats: () => api.get('/analysis/stats'),

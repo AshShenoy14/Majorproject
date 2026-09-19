@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 import numpy as np
 import torch
 from pathlib import Path
@@ -198,38 +199,54 @@ def evaluate_1ycr():
             rank_max = [r["res_name"] for r in tp53_ranked_by_max].index(res["res_name"]) + 1
             rank_rb = [r["res_name"] for r in tp53_ranked_by_rb].index(res["res_name"]) + 1
             triad_info[res["res_name"]] = {
-                "max_prob": res["max_prob"],
-                "rank_max": rank_max,
-                "r_b_score": res["importance_r_b"],
-                "rank_rb": rank_rb,
-                "gt_contacts": res["gt_contacts"]
+                "max_prob": float(res["max_prob"]),
+                "rank_max": int(rank_max),
+                "r_b_score": float(res["importance_r_b"]),
+                "rank_rb": int(rank_rb),
+                "gt_contacts": int(res["gt_contacts"])
             }
             print(f"Residue {res['res_name']}: Max Prob = {res['max_prob']:.6f} (Rank {rank_max}/13), r_b = {res['importance_r_b']:.6f} (Rank {rank_rb}/13), GT Contacts = {res['gt_contacts']}")
 
-    # 6. Generate Visualizations
-    assets_dir = PROJECT_ROOT / "assets" / "evaluation"
-    assets_dir.mkdir(parents=True, exist_ok=True)
+    # 6. Save JSON Case Study Summary and Visualizations
+    out_dir = PROJECT_ROOT / "assets" / "evaluation" / "irlm"
+    out_dir.mkdir(parents=True, exist_ok=True)
 
-    # Visualization 1: Predicted Interaction Probability Heatmap
-    heatmap_path = assets_dir / "irlm_1ycr_heatmap.png"
-    plt.figure(figsize=(10, 16), dpi=300)
-    
-    tp53_labels = [f"{seq_b[j]}{j+17}" for j in range(L_B)]
-    # For MDM2, label every 5th residue to keep it readable
-    mdm2_labels = [f"{seq_a[i]}{i+1}" if i % 5 == 0 else "" for i in range(L_A)]
+    json_path = out_dir / "1ycr_case_study.json"
+    case_study_data = {
+        "pdb_id": complex_id,
+        "protein_a": "MDM2",
+        "protein_b": "TP53",
+        "length_a": L_A,
+        "length_b": L_B,
+        "total_pairs": total_pairs,
+        "ground_truth_contacts": gt_pos_contacts,
+        "background_contact_density": gt_pos_rate,
+        "auroc": float(roc_auc),
+        "auprc": float(auprc),
+        "enrichment_factor_over_random": float(fold_enrichment_auprc),
+        "metrics_at_decision_threshold": {
+            "threshold": val_tau,
+            "precision": float(prec_tau),
+            "recall": float(rec_tau),
+            "f1_score": float(f1_tau),
+            "tp": tp_tau,
+            "fp": fp_tau,
+            "fn": fn_tau,
+            "tn": tn_tau
+        },
+        "top_k_metrics": {f"top_{k}": top_k_results[k] for k in top_k_results},
+        "key_triad_audit": triad_info
+    }
+    with open(json_path, "w") as f:
+        json.dump(case_study_data, f, indent=2)
+    print(f"\n1YCR case study JSON saved to: {json_path}")
 
-    sns.heatmap(pred_matrix, xticklabels=tp53_labels, yticklabels=mdm2_labels, cmap="YlOrRd", cbar_kws={'label': 'Predicted Contact Probability'})
-    plt.title("IRLM Predicted Residue-Residue Interaction Probability Matrix (1YCR: MDM2 vs TP53)", fontsize=13, fontweight="bold")
-    plt.xlabel("TP53 Peptide Residues (Chain B, p53: 17-29)", fontsize=11, fontweight="bold")
-    plt.ylabel("MDM2 Residues (Chain A, 1-85)", fontsize=11, fontweight="bold")
-    plt.tight_layout()
-    plt.savefig(heatmap_path)
-    plt.close()
-    print(f"\nPredicted interaction matrix heatmap saved to: {heatmap_path}")
-
-    # Visualization 2: Side-by-Side Comparison of Predicted vs Experimental Ground-Truth Contact Map
-    comparison_path = assets_dir / "irlm_1ycr_contact_comparison.png"
+    # Visualization: Side-by-Side Comparison of Predicted vs Experimental Ground-Truth Contact Map
+    contact_map_path = out_dir / "1ycr_contact_map.png"
     fig, axes = plt.subplots(1, 3, figsize=(18, 10), dpi=300)
+
+    tp53_labels = [f"{seq_b[j]}{j+17}" for j in range(L_B)]
+    mdm2_labels = [f"{seq_a[i]}{i+1}" if i % 5 == 0 else "" for i in range(L_A)]
 
     # Panel A: Ground Truth
     sns.heatmap(gt_cmap, ax=axes[0], xticklabels=tp53_labels, yticklabels=mdm2_labels, cmap="Blues", cbar=False)
@@ -244,7 +261,6 @@ def evaluate_1ycr():
     axes[1].set_ylabel("")
 
     # Panel C: Binary Predictions at tau = 0.0375 overlaid with Ground Truth
-    # 0 = TN, 1 = FP (red), 2 = FN (blue), 3 = TP (green)
     overlay = np.zeros_like(gt_cmap, dtype=int)
     pred_bin = (pred_matrix >= val_tau)
     overlay[(pred_bin == False) & (gt_cmap == 0)] = 0  # TN
@@ -253,7 +269,6 @@ def evaluate_1ycr():
     overlay[(pred_bin == True) & (gt_cmap == 1)] = 3   # TP
 
     from matplotlib.colors import ListedColormap
-    # Colors: 0: white, 1: light coral (FP), 2: light sky blue (FN), 3: dark green (TP)
     cmap_custom = ListedColormap(["#F8FAFC", "#FCA5A5", "#93C5FD", "#15803D"])
     sns.heatmap(overlay, ax=axes[2], xticklabels=tp53_labels, yticklabels=mdm2_labels, cmap=cmap_custom, cbar=False)
     axes[2].set_title(f"C. Prediction vs Ground Truth at tau={val_tau:.4f}\n(Green=TP, Coral=FP, Blue=FN, White=TN)", fontsize=11, fontweight="bold")
@@ -262,9 +277,9 @@ def evaluate_1ycr():
 
     plt.suptitle("PDB 1YCR (MDM2 - TP53) IRLM Structural Evaluation Dashboard", fontsize=14, fontweight="bold")
     plt.tight_layout()
-    plt.savefig(comparison_path)
+    plt.savefig(contact_map_path)
     plt.close()
-    print(f"Side-by-side contact comparison saved to: {comparison_path}")
+    print(f"1YCR contact map visualization saved to: {contact_map_path}")
 
     # Summary Conclusion
     print("\n" + "=" * 70)
@@ -280,3 +295,4 @@ def evaluate_1ycr():
 
 if __name__ == "__main__":
     evaluate_1ycr()
+

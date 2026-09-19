@@ -13,37 +13,36 @@ import { ppiService } from '../services/api';
 
 // ── Real project metrics from evaluation report ──────────────────────────────
 const STATIC_METRICS = {
-  roc_auc:       0.9312,
-  precision:     0.8741,
-  recall:        0.8893,
-  f1_score:      0.8816,
-  accuracy:      0.8950,
-  mcc:           0.7864,
+  roc_auc:       0.9764,
+  precision:     0.9181,
+  recall:        0.9122,
+  f1_score:      0.9151,
+  accuracy:      0.9154,
+  pr_auc:        0.9773,
   avg_latency_ms: 312,
-  dataset:       'STRING v12 + BioGRID (Human, 9606)',
-  model_version: 'TransGraph-PPI v2.0',
+  dataset:       'STRING v12 (Human, Taxon 9606)',
+  model_version: 'TransGraph-PPI v1.0-research',
   esm_model:     'facebook/esm2_t6_8M_UR50D',
   gat_layers:    3,
-  ensemble:      'ESM-MLP + GAT + IRLM',
-  train_pairs:   14200,
-  test_pairs:    3550,
+  ensemble:      'ESM-MLP + GAT (XGBoost Meta-Learner)',
+  train_pairs:   322739,
+  test_pairs:    40342,
 };
 
 const radarData = [
   { metric: 'ROC-AUC',   value: STATIC_METRICS.roc_auc * 100 },
+  { metric: 'PR-AUC',    value: STATIC_METRICS.pr_auc * 100 },
   { metric: 'Precision', value: STATIC_METRICS.precision * 100 },
   { metric: 'Recall',    value: STATIC_METRICS.recall * 100 },
   { metric: 'F1',        value: STATIC_METRICS.f1_score * 100 },
   { metric: 'Accuracy',  value: STATIC_METRICS.accuracy * 100 },
-  { metric: 'MCC',       value: STATIC_METRICS.mcc * 100 },
 ];
 
 const modelCompare = [
-  { name: 'TransGraph-PPI\n(Ours)', auc: 93.1, f1: 88.2 },
-  { name: 'DeepPPI',               auc: 88.4, f1: 83.1 },
-  { name: 'ProteinBERT',           auc: 85.7, f1: 80.6 },
-  { name: 'PIPR',                  auc: 82.3, f1: 77.9 },
-  { name: 'DPPI',                  auc: 79.8, f1: 74.2 },
+  { name: 'Ensemble (Ours)',      auc: 97.6, f1: 91.5 },
+  { name: 'ESM-MLP (Seq Only)',   auc: 97.4, f1: 91.9 },
+  { name: 'Random Forest',        auc: 91.2, f1: 84.4 },
+  { name: 'GAT (Graph Only)',     auc: 88.6, f1: 81.6 },
 ];
 
 const latencyHistory = [
@@ -134,9 +133,9 @@ const Benchmark = () => {
           </ResponsiveContainer>
         </div>
 
-        {/* SOTA Bar Comparison */}
+        {/* Ablation & Model Comparison */}
         <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
-          <h3 className="text-sm font-black text-slate-700 uppercase tracking-widest mb-6">SOTA Comparison (ROC-AUC %)</h3>
+          <h3 className="text-sm font-black text-slate-700 uppercase tracking-widest mb-6">Ablation & Model Comparison (ROC-AUC %)</h3>
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={modelCompare} layout="vertical" margin={{ left: 16, right: 16 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
@@ -180,10 +179,10 @@ const Benchmark = () => {
             ['Model',    STATIC_METRICS.model_version],
             ['ESM',      STATIC_METRICS.esm_model],
             ['GAT Layers', STATIC_METRICS.gat_layers],
-            ['Dataset',  'STRING v12 + BioGRID'],
+            ['Dataset',  STATIC_METRICS.dataset],
             ['Train',    `${STATIC_METRICS.train_pairs.toLocaleString()} pairs`],
             ['Test',     `${STATIC_METRICS.test_pairs.toLocaleString()} pairs`],
-            ['MCC',      STATIC_METRICS.mcc.toFixed(4)],
+            ['PR-AUC',   STATIC_METRICS.pr_auc.toFixed(4)],
           ].map(([k, v]) => (
             <div key={k} className="flex items-center justify-between text-xs">
               <span className="font-bold text-slate-400 uppercase tracking-wider">{k}</span>

@@ -114,3 +114,107 @@ class NetworkAnalyzer:
             "density": nx.density(self.graph),
             "is_connected": nx.is_connected(self.graph) if self.graph.number_of_nodes() < 2000 else "Skipped (Large Graph)"
         }
+
+    def calculate_therapeutic_priority_score(
+        self,
+        target_manager = None,
+        top_k: int = 50,
+        w_degree: float = 0.40,
+        w_betweenness: float = 0.35,
+        w_chembl: float = 0.25
+    ) -> pd.DataFrame:
+        """
+        Calculates the Computational Therapeutic Target Priority Score (TTPS) for proteins in the graph:
+        TTPS = w_degree * NormDegree + w_betweenness * NormBetweenness + w_chembl * Indicator(ChEMBL Target)
+
+        Weights default to 0.40, 0.35, 0.25 (sum = 1.0).
+        NormDegree and NormBetweenness are min-max normalized floats in [0, 1].
+        Indicator(ChEMBL Target) is 1.0 if known drug target / ChEMBL record exists, else 0.0.
+        """
+        df = self.calculate_centralities()
+        if df.empty:
+            return pd.DataFrame()
+
+        # Min-max normalization for degree centrality
+        deg_min = df['degree_centrality'].min()
+        deg_max = df['degree_centrality'].max()
+        deg_range = deg_max - deg_min
+        if deg_range > 0:
+            df['norm_degree'] = (df['degree_centrality'] - deg_min) / deg_range
+        else:
+            df['norm_degree'] = 0.0
+
+        # Min-max normalization for betweenness centrality
+        bet_min = df['betweenness_centrality'].min()
+        bet_max = df['betweenness_centrality'].max()
+        bet_range = bet_max - bet_min
+        if bet_range > 0:
+            df['norm_betweenness'] = (df['betweenness_centrality'] - bet_min) / bet_range
+        else:
+            df['norm_betweenness'] = 0.0
+
+        # Ensure no NaNs / Infs
+        df['norm_degree'] = df['norm_degree'].fillna(0.0).clip(0.0, 1.0)
+        df['norm_betweenness'] = df['norm_betweenness'].fillna(0.0).clip(0.0, 1.0)
+
+        # ChEMBL drug target lookup if target_manager is provided
+        df['is_chembl_target'] = False
+        df['chembl_id'] = None
+        df['uniprot_id'] = "N/A"
+        df['target_name'] = None
+        df['target_type'] = None
+
+        tm = target_manager if target_manager is not None else getattr(self, 'target_manager', None)
+        if tm is not None:
+            try:
+                proteins_to_query = df['protein_id'].tolist()
+                drug_targets_df = tm.get_targets(proteins_to_query)
+                if not drug_targets_df.empty:
+                    # Create lookup map
+                    target_map = {}
+                    for _, row in drug_targets_df.iterrows():
+                        pid = row.get('protein_id')
+                        if pid and pid not in target_map:
+                            target_map[pid] = {
+                                'chembl_id': row.get('chembl_id'),
+                                'uniprot_id': row.get('uniprot_id', 'N/A'),
+                                'target_name': row.get('target_name'),
+                                'target_type': row.get('target_type'),
+                            }
+
+                    # Populate columns
+                    for idx, row in df.iterrows():
+                        pid = row['protein_id']
+                        if pid in target_map:
+                            df.at[idx, 'is_chembl_target'] = True
+                            df.at[idx, 'chembl_id'] = target_map[pid]['chembl_id']
+                            df.at[idx, 'uniprot_id'] = target_map[pid]['uniprot_id']
+                            df.at[idx, 'target_name'] = target_map[pid]['target_name']
+                            df.at[idx, 'target_type'] = target_map[pid]['target_type']
+            except Exception as e:
+                print(f"Warning: Drug target lookup failed during TTPS computation: {e}")
+
+        # Compute TTPS
+        chembl_val = df['is_chembl_target'].astype(float)
+        df['ttps_score'] = (
+            w_degree * df['norm_degree'] +
+            w_betweenness * df['norm_betweenness'] +
+            w_chembl * chembl_val
+        )
+
+        # NaN / Inf protection
+        df['ttps_score'] = df['ttps_score'].fillna(0.0).clip(0.0, 1.0)
+
+        # Deterministic sorting: desc(ttps_score), desc(degree_centrality), asc(protein_id)
+        df = df.sort_values(
+            by=['ttps_score', 'degree_centrality', 'protein_id'],
+            ascending=[False, False, True]
+        ).reset_index(drop=True)
+
+        df['rank'] = df.index + 1
+
+        if top_k is not None:
+            df = df.head(top_k)
+
+        return df
+

@@ -266,7 +266,7 @@ const Predict = () => {
           </div>
           <div className="flex items-center gap-1.5">
             <Gauge size={14} className="text-indigo-400" />
-            <span>ROC-AUC: <strong className="text-white">0.942</strong></span>
+            <span>ROC-AUC: <strong className="text-white">0.976</strong></span>
           </div>
           <div className="flex items-center gap-1.5">
             <Server size={14} className="text-amber-400" />
@@ -603,10 +603,10 @@ const Predict = () => {
                   <button
                     onClick={handleDownloadPDF}
                     disabled={exportingPdf}
-                    className="px-5 py-3 bg-gradient-to-r from-emerald-500 via-teal-500 to-indigo-500 hover:from-emerald-400 hover:to-indigo-400 text-white rounded-xl font-black text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition-all cursor-pointer active:scale-95 disabled:opacity-50 tracking-wider uppercase"
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs flex items-center gap-2 shadow-sm hover:shadow transition-all cursor-pointer active:scale-95 disabled:opacity-50"
                   >
-                    {exportingPdf ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-                    {exportingPdf ? 'Generating Report...' : 'Download Scientific PDF'}
+                    {exportingPdf ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+                    <span>{exportingPdf ? 'Exporting...' : 'Download PDF'}</span>
                   </button>
                 </div>
 
@@ -642,7 +642,7 @@ const Predict = () => {
                             <Sparkles size={18} className="text-emerald-500 shrink-0 mt-0.5" />
                             <div>
                               <span className="font-bold text-emerald-900 block mb-0.5">Explorer Summary (General Audience):</span>
-                              Our AI predicted a <strong className="text-emerald-700">{(result.consensus_probability * 100).toFixed(1)}% chance</strong> that <span className="font-semibold">{protein1}</span> and <span className="font-semibold">{protein2}</span> interact in the cell. Below, you can inspect their individual 3D shapes. The <strong className="text-emerald-700">highlighted amber/emerald region</strong> marks where the two proteins dock together.
+                              Our AI predicted a <strong className="text-emerald-700">{((result.interaction_probability ?? result.consensus_probability ?? 0) * 100).toFixed(1)}% chance</strong> that <span className="font-semibold">{protein1}</span> and <span className="font-semibold">{protein2}</span> interact in the cell. Below, you can inspect their individual 3D shapes. The <strong className="text-emerald-700">highlighted amber/emerald region</strong> marks where the two proteins dock together.
                             </div>
                           </div>
                         )}
@@ -702,19 +702,24 @@ const Predict = () => {
                           </div>
 
                           {/* 3D Structural Projection Card */}
-                          <div id="card-3d-structure" className="md:col-span-2 bg-white p-8 rounded-[2.5rem] border border-slate-100 flex flex-col justify-between shadow-sm relative overflow-hidden min-h-[420px]">
-                            <div className="flex items-center justify-between mb-4">
-                              <span className="px-3 py-1 bg-indigo-50 text-indigo-600 text-[9px] font-black rounded-lg uppercase tracking-widest">3D Structural Projection Workbench</span>
+                          <div id="card-3d-structure" className="md:col-span-2 bg-white p-6 md:p-8 rounded-[2.5rem] border border-slate-100 flex flex-col justify-between shadow-sm relative overflow-hidden w-full max-w-full text-slate-800 min-h-[500px]">
+                            <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100 w-full max-w-full">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="w-2.5 h-2.5 rounded-full bg-cyan-500 animate-pulse shrink-0" />
+                                <span className="px-3 py-1 bg-cyan-50 text-cyan-600 border border-cyan-100 text-[10px] font-black rounded-lg uppercase tracking-widest truncate">
+                                  3D Structural Projection Workbench
+                                </span>
+                              </div>
                               <button
                                 onClick={() => handleExportCardFigure('card-3d-structure', '3D_Structural_Projection')}
-                                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all"
+                                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
                               >
-                                <Camera size={13} className="text-indigo-600" /> Export Figure
+                                <Camera size={13} className="text-cyan-600" /> Export Figure
                               </button>
                             </div>
 
-                            <div className="flex-1 flex flex-col md:flex-row items-center justify-center gap-6">
-                              <div className="flex-1 w-full h-full min-h-[280px]">
+                            <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 w-full max-w-full min-w-0 items-stretch my-2">
+                              <div className="w-full max-w-full min-w-0 bg-slate-50/70 border border-slate-100 p-4 md:p-5 rounded-3xl flex flex-col justify-between">
                                 <Protein3DView 
                                   pdbId={protein1} 
                                   fallbackPdbId="1tnr" 
@@ -723,8 +728,7 @@ const Predict = () => {
                                   interactionRegion={irlmData?.protein_A_region}
                                 />
                               </div>
-                              <div className="hidden md:block w-px h-48 bg-slate-100" />
-                              <div className="flex-1 w-full h-full min-h-[280px]">
+                              <div className="w-full max-w-full min-w-0 bg-slate-50/70 border border-slate-100 p-4 md:p-5 rounded-3xl flex flex-col justify-between">
                                 <Protein3DView 
                                   pdbId={protein2} 
                                   fallbackPdbId="1a2y" 

@@ -1,0 +1,83 @@
+{
+  "pdb_id": "1YCR_A_B",
+  "protein_a": "MDM2",
+  "protein_b": "TP53",
+  "length_a": 85,
+  "length_b": 13,
+  "total_pairs": 1105,
+  "ground_truth_contacts": 28,
+  "background_contact_density": 0.025339366515837104,
+  "auroc": 0.6402042711234912,
+  "auprc": 0.03732490954347269,
+  "enrichment_factor_over_random": 1.4730008944253448,
+  "metrics_at_decision_threshold": {
+    "threshold": 0.0375,
+    "precision": 0.040650406500760135,
+    "recall": 0.17857142850765306,
+    "f1_score": 0.06622516253322237,
+    "tp": 5,
+    "fp": 118,
+    "fn": 23,
+    "tn": 959
+  },
+  "top_k_metrics": {
+    "top_5": {
+      "pos_in_k": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "enrichment": 0.0
+    },
+    "top_10": {
+      "pos_in_k": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "enrichment": 0.0
+    },
+    "top_20": {
+      "pos_in_k": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "enrichment": 0.0
+    },
+    "top_28": {
+      "pos_in_k": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "enrichment": 0.0
+    },
+    "top_50": {
+      "pos_in_k": 0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "enrichment": 0.0
+    }
+  },
+  "key_triad_audit": {
+    "F19": {
+      "max_prob": 0.050069257616996765,
+      "rank_max": 3,
+      "r_b_score": 0.9268460869789124,
+      "rank_rb": 2,
+      "gt_contacts": 4
+    },
+    "W23": {
+      "max_prob": 0.04641037806868553,
+      "rank_max": 9,
+      "r_b_score": 0.8504630923271179,
+      "rank_rb": 3,
+      "gt_contacts": 2
+    },
+    "L26": {
+      "max_prob": 0.03893299400806427,
+      "rank_max": 11,
+      "r_b_score": 0.6195641160011292,
+      "rank_rb": 10,
+      "gt_contacts": 2
+    }
+  }
+}
