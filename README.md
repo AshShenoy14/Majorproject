@@ -24,7 +24,7 @@ Protein–Protein Interactions govern fundamental cellular processes. TransGraph
 
 | Component | Architecture / Method | Role |
 | :--- | :--- | :--- |
-| **Sequence Model** | ESM-2 (`esm2_t6_8M_UR50D`) + MLP | Deep protein sequence feature extraction & binary interaction scoring |
+| **Sequence Model** | ESM-2 (`esm2_t12_35M_UR50D`, 35M parameters, 480 dims) + MLP | Deep protein sequence feature extraction & binary interaction scoring |
 | **Graph Model** | Graph Attention Network (GAT) | Topological neighborhood & interaction pattern learning in PPI network graphs |
 | **Biological Context** | UniProt / Subcellular Localization | Domain knowledge validation & co-localization compatibility scoring |
 | **Ensemble Meta-Learner** | XGBoost (OOF Stacking) | Synergistic 8-feature integration of sequence, topology, confidence, and co-localization |
@@ -192,7 +192,7 @@ TransGraph-PPI
 
 ## ⚠️ Explicit Limitations
 
-1. **Embedding Scale**: Trained using ESM-2 8M parameter embeddings (`esm2_t6_8M_UR50D`) due to VRAM limits. Larger ESM variants (e.g., 650M or 3B) may yield richer sequence representations.
+1. **Embedding Scale**: Trained using ESM-2 35M parameter embeddings (`esm2_t12_35M_UR50D`, 480 dimensions). Larger ESM variants (e.g., 150M, 650M or 3B) may yield richer sequence representations in future work.
 2. **Graph Cold-Start**: Novel proteins lacking edges in the pre-constructed training GAT graph will have fallback graph signals, shifting reliance entirely to the sequence model.
 3. **Negative Sampling**: Random non-interaction sampling may occasionally sample unannotated true interactions ("hard negatives").
 

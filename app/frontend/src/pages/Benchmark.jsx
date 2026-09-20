@@ -22,7 +22,7 @@ const STATIC_METRICS = {
   avg_latency_ms: 312,
   dataset:       'STRING v12 (Human, Taxon 9606)',
   model_version: 'TransGraph-PPI v1.0-research',
-  esm_model:     'facebook/esm2_t6_8M_UR50D',
+  esm_model:     'facebook/esm2_t12_35M_UR50D',
   gat_layers:    3,
   ensemble:      'ESM-MLP + GAT (XGBoost Meta-Learner)',
   train_pairs:   322739,

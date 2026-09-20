@@ -38,7 +38,7 @@ def configure_runtime(force_cpu: bool = False, cpu_threads: int = None) -> str:
 
 _quantized_model_cache = {}
 
-def get_quantized_esm_embedding(sequence: str, model_name: str = "facebook/esm2_t30_150M_UR50D") -> torch.Tensor:
+def get_quantized_esm_embedding(sequence: str, model_name: str = "facebook/esm2_t12_35M_UR50D") -> torch.Tensor:
     """
     Retrieves the mean-pooled ESM embedding for a single sequence using dynamic INT8 quantization on CPU.
     """

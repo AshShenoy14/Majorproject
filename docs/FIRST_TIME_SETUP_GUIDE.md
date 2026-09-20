@@ -97,8 +97,8 @@ python src/data/feature_extraction.py
 ```
 
 **What this does:**
-- Downloads the ESM-2 protein language model (`facebook/esm2_t6_8M_UR50D`) from HuggingFace (~33 MB, automatic)
-- Generates 320-dimensional embeddings for every unique protein
+- Downloads the ESM-2 protein language model (`facebook/esm2_t12_35M_UR50D`) from HuggingFace (~135 MB, automatic)
+- Generates 480-dimensional embeddings for every unique protein
 - Saves `embeddings.pt` to `data/processed/`
 
 > [!CAUTION]

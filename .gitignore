@@ -38,4 +38,6 @@ scratch*.py
 *.zip
 *.tar.gz
 *.7z
-*.gz
+*.gz
+CLAUDE.md
+.claudesignore

@@ -39,14 +39,14 @@ To quantify the individual contributions of sequence semantics and graph topolog
 
 | Configuration | Description | Accuracy | F1 Score | ROC-AUC |
 | :--- | :--- | :---: | :---: | :---: |
-| **ESM-2 Alone** | Sequence Model using ESM-2 (8M) Embeddings | 0.8645 | 0.8684 | 0.9403 |
+| **ESM-2 Alone** | Sequence Model using ESM-2 (35M) Embeddings | 0.8645 | 0.8684 | 0.9403 |
 | **GAT Alone** | Graph Attention Network on PPI Network | 0.7266 | 0.7404 | 0.8330 |
 | **Ensemble (Ours)** | **Hybrid ESM-2 + GAT Synergy** | **0.8846** | **0.8848** | **0.9523** |
 
 ### 2.2 Key Findings
 - **Synergistic Gain:** The Ensemble model provides a significant boost (approx. +2% Accuracy/F1) over the best individual component (ESM-2), demonstrating that graph topology provides complementary information to sequence features.
 - **Robustness:** The GAT model, while lower in isolation, acts as a vital structural regularizer for the ensemble, especially in cases where sequence similarity might be misleading.
-- **Efficiency:** The use of the `esm2_t6_8M` variant allows high performance even on consumer-grade hardware, whereas larger models would typically require industrial-scale GPUs.
+- **Efficiency:** The use of the `esm2_t12_35M_UR50D` (35M parameters, 480 dimensions) variant allows high performance while remaining computationally practical for training and real-time inference.
 
 ---
 
