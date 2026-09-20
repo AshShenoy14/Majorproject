@@ -75,7 +75,7 @@ def run_p_test(n_iterations=10):
     ].copy()
     
     print(f"[P Test] {len(filtered_df)} valid samples after filtering.")
-    print("GAT config loaded: hidden=64, heads=4")
+    print("GraphSAGE config loaded: hidden=256")
 
     # Load Models
     seq_path = PROJECT_ROOT / "models" / "sequence_model_best.pth"
@@ -147,14 +147,14 @@ def run_p_test(n_iterations=10):
     ens_probs = (seq_probs + graph_probs) / 2
 
     # Bootstrapping for Stability Check
-    all_results = {"ESM-MLP": [], "GAT": [], "Ensemble": []}
+    all_results = {"ESM-MLP": [], "GraphSAGE": [], "Ensemble": []}
     
     for i in tqdm(range(n_iterations), desc="Bootstrapping"):
         indices = np.random.choice(len(labels), len(labels), replace=True)
         y_true = labels[indices]
         
         all_results["ESM-MLP"].append(get_metrics(y_true, seq_probs[indices]))
-        all_results["GAT"].append(get_metrics(y_true, graph_probs[indices]))
+        all_results["GraphSAGE"].append(get_metrics(y_true, graph_probs[indices]))
         all_results["Ensemble"].append(get_metrics(y_true, ens_probs[indices]))
 
     # Print Summary Tables
@@ -167,7 +167,7 @@ def run_p_test(n_iterations=10):
 
     print("\n=== P Test Results (Bootstrapped Mean ± Std) ===")
     table_data = []
-    for model in ["ESM-MLP", "GAT", "Ensemble"]:
+    for model in ["ESM-MLP", "GraphSAGE", "Ensemble"]:
         m = format_results(all_results[model])
         table_data.append([model, m["Accuracy"], m["Precision"], m["Recall"], m["F1"], m["ROC-AUC"], m["PR-AUC"]])
     print(tabulate(table_data, headers=["Model", "Accuracy", "Precision", "Recall", "F1", "ROC-AUC", "PR-AUC"], tablefmt="grid"))
@@ -175,7 +175,7 @@ def run_p_test(n_iterations=10):
     # Optimal Threshold Tuning
     print("\n=== P Test Optimal Threshold Tuning (F1-maximizing) ===")
     table_opt = []
-    for model_name, probs in [("ESM-MLP", seq_probs), ("GAT", graph_probs), ("Ensemble", ens_probs)]:
+    for model_name, probs in [("ESM-MLP", seq_probs), ("GraphSAGE", graph_probs), ("Ensemble", ens_probs)]:
         best_t = find_optimal_threshold(labels, probs, metric='f1')
         m = get_metrics(labels, probs > best_t) # Accuracy at optimal threshold
         # Specifically get metrics at this threshold

@@ -45,11 +45,6 @@ const DrugInsights = () => {
       } catch (err) {
         console.error("Drug insights error:", err);
         setError("Failed to load computational therapeutic target priority scores.");
-        ppiService.logTelemetry('DrugInsights.jsx:fetchData', 'Error fetching therapeutic targets', {
-          endpoint: '/analysis/therapeutic-targets',
-          errorMessage: err?.message || null,
-          errorCode: err?.code || null
-        });
       } finally {
         setLoading(false);
       }

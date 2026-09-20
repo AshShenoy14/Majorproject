@@ -10,7 +10,7 @@ networkx
 matplotlib
 seaborn
 tqdm
-requests
+requests>=2.31,<2.34  # requests>=2.34 breaks requests-cache (used by chembl_webresource_client): NameError 'RequestsCookieJar'
 biopython
 evaluate
 datasets

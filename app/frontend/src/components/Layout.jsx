@@ -28,7 +28,7 @@ const PAGE_META = {
   '/drug-targets':{ title: 'Drug Insights',            subtitle: 'Drug Target Discovery & ChEMBL Data' },
   '/assistant':   { title: 'Protein Assistant',        subtitle: 'AI-Powered Biological Query Engine' },
   '/about':       { title: 'About',                    subtitle: 'Project Overview & Model Details' },
-  '/zero-shot':   { title: 'Cross-Species Testing',    subtitle: 'Zero-Shot Generalization Evaluation' },
+  '/zero-shot':   { title: 'Cross-Species Exploration',    subtitle: 'Exploratory, Non-Validated Inference' },
 };
 
 const NAV_LINKS = [

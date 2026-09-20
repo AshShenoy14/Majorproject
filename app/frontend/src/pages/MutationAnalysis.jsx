@@ -333,7 +333,7 @@ const MutationAnalysis = () => {
                   <p className="text-xs font-bold text-orange-700 uppercase tracking-widest mb-1">Biological Context</p>
                   <p className="text-xs text-orange-600 leading-relaxed">
                     Mutations in high-affinity regions (hotspots) often lead to significant disruption of binding interfaces. 
-                    Monitor the GAT Topography metrics if the delta is significant.
+                    Monitor the graph-model (GraphSAGE) signal if the delta is significant.
                   </p>
                </div>
             </div>

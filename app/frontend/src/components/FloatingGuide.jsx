@@ -74,7 +74,7 @@ const FloatingGuide = () => {
               {/* Body */}
               <div className="p-6 sm:p-8 space-y-6 max-h-[70vh] overflow-y-auto">
                 <p className="text-slate-600 text-xs sm:text-sm font-medium leading-relaxed">
-                  Welcome to <strong>TransGraph-PPI</strong>. Our platform harnesses ESM-2 protein language representations and Graph Attention Networks to predict and analyze biological interactions.
+                  Welcome to <strong>TransGraph-PPI</strong>. Our platform harnesses ESM-2 protein language representations and a GraphSAGE graph neural network to predict and analyze biological interactions.
                 </p>
 
                 {/* Modules Grid */}
@@ -136,7 +136,7 @@ const FloatingGuide = () => {
                       <Globe size={16} /> 4. Cross-Species & Drugs
                     </div>
                     <p className="text-xs text-slate-500 leading-normal">
-                      Test zero-shot generalization across model organisms and screen ChEMBL drug target candidates.
+                      Explore the model on non-human protein pairs (exploratory, not validated) and screen ChEMBL drug target candidates.
                     </p>
                     <Link
                       to="/zero-shot"

@@ -1,31 +1,58 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import ForceGraph3D from 'react-force-graph-3d';
 import { motion } from 'framer-motion';
-import { Globe, ZoomIn, ZoomOut, Maximize, Loader2 } from 'lucide-react';
+import { Globe, ZoomIn, ZoomOut, Maximize, Loader2, AlertTriangle } from 'lucide-react';
+import { ppiService } from '../services/api';
+
+// Number of real training-set positive interactions requested from GET /network
+const EDGE_LIMIT = 300;
 
 const NetworkExplorer3D = () => {
-  const [graphData, setGraphData] = useState({ nodes: [], links: [] });
+  const [network, setNetwork] = useState({ nodes: [], edges: [] });
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const fgRef = useRef();
 
   useEffect(() => {
-    // Generate a beautiful sample interactome for demonstration
-    // In a real scenario, this would come from the ppi_graph.pt exported as JSON
-    const nodes = [...Array(100).keys()].map(i => ({ 
-      id: i, 
-      name: `Protein-${i}`,
-      val: Math.random() * 20 + 5,
-      color: i % 5 === 0 ? '#22D3EE' : '#6366F1'
-    }));
-    
-    const links = [...Array(100).keys()].map(() => ({
-      source: Math.floor(Math.random() * 100),
-      target: Math.floor(Math.random() * 100)
-    }));
-
-    setGraphData({ nodes, links });
-    setLoading(false);
+    let cancelled = false;
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await ppiService.getNetwork(EDGE_LIMIT);
+        if (!cancelled) setNetwork({ nodes: res.data?.nodes || [], edges: res.data?.edges || [] });
+      } catch (err) {
+        console.error('Failed to load interaction network:', err);
+        if (!cancelled) setError(err?.response?.data?.detail || 'Could not load the interaction network from the backend.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
   }, []);
+
+  // Node size/colour derive only from the real edges returned by the backend (degree within the displayed subgraph).
+  const graphData = useMemo(() => {
+    const degree = {};
+    network.edges.forEach(e => {
+      degree[e.source] = (degree[e.source] || 0) + 1;
+      degree[e.target] = (degree[e.target] || 0) + 1;
+    });
+    const sorted = Object.values(degree).sort((a, b) => a - b);
+    const cutoff = sorted.length ? sorted[Math.floor(sorted.length * 0.9)] : Infinity;
+    return {
+      nodes: network.nodes.map(n => ({
+        id: n.id,
+        name: `${n.label} (degree ${degree[n.id] || 0})`,
+        val: 2 + (degree[n.id] || 0),
+        color: (degree[n.id] || 0) >= cutoff ? '#22D3EE' : '#6366F1'
+      })),
+      links: network.edges.map(e => ({ source: e.source, target: e.target }))
+    };
+  }, [network]);
+
+  const isEmpty = !loading && !error && graphData.nodes.length === 0;
 
   return (
     <div className="h-[calc(100vh-120px)] w-full relative bg-slate-950 rounded-xl overflow-hidden border border-slate-800 shadow-2xl">
@@ -35,8 +62,26 @@ const NetworkExplorer3D = () => {
         </div>
       )}
 
+      {error && (
+        <div className="absolute inset-0 flex items-center justify-center z-40">
+          <div className="max-w-md p-6 bg-rose-50 border border-rose-200 rounded-2xl flex items-start gap-3">
+            <AlertTriangle className="text-rose-500 flex-shrink-0" size={20} />
+            <div>
+              <p className="text-sm font-black text-rose-700">Interaction network unavailable</p>
+              <p className="text-sm text-rose-600 mt-1">{error}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isEmpty && (
+        <div className="absolute inset-0 flex items-center justify-center z-40">
+          <p className="text-sm font-semibold text-slate-300">The backend returned no interactions to display.</p>
+        </div>
+      )}
+
       {/* 3D Graph */}
-      {!loading && (
+      {!loading && !error && !isEmpty && (
         <ForceGraph3D
           ref={fgRef}
           graphData={graphData}
@@ -64,16 +109,16 @@ const NetworkExplorer3D = () => {
             </div>
             <h2 className="text-xl font-black text-slate-800 tracking-tight">Interactome 3D</h2>
           </div>
-          <p className="text-[9px] text-slate-400 font-black uppercase tracking-[0.2em] mb-6">Structural Topography</p>
+          <p className="text-[9px] text-slate-400 font-black uppercase tracking-[0.2em] mb-6">Training-set positive interactions</p>
           
           <div className="space-y-3">
             <div className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-xl transition-colors">
               <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.5)]" />
-              <span className="text-[10px] text-slate-600 font-black uppercase tracking-wider">Hub Proteins</span>
+              <span className="text-[10px] text-slate-600 font-black uppercase tracking-wider">Top 10% by degree (in this subgraph)</span>
             </div>
             <div className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-xl transition-colors">
               <div className="w-2.5 h-2.5 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]" />
-              <span className="text-[10px] text-slate-600 font-black uppercase tracking-wider">Signal Transducers</span>
+              <span className="text-[10px] text-slate-600 font-black uppercase tracking-wider">Other proteins</span>
             </div>
           </div>
         </motion.div>
@@ -105,7 +150,7 @@ const NetworkExplorer3D = () => {
       <div className="absolute bottom-8 right-8 z-10 pointer-events-none">
         <div className="px-5 py-2.5 bg-emerald-500/90 backdrop-blur-xl border border-emerald-400 rounded-full shadow-2xl flex items-center gap-3">
           <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
-          <span className="text-[10px] font-black text-white uppercase tracking-[0.2em]">Real-Time WebGL Core</span>
+          <span className="text-[10px] font-black text-white uppercase tracking-[0.2em]">WebGL Renderer</span>
         </div>
       </div>
     </div>

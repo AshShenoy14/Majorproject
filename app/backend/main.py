@@ -1,5 +1,6 @@
 import sys
 import os
+import json
 from pathlib import Path
 
 # Add project root and configure environments BEFORE importing heavy ML libraries
@@ -26,7 +27,7 @@ from src.analysis.explainability import PPIExplainer
 from src.analysis.explain_model import explain_prediction as explain_gnn
 from src.analysis.network_analysis import NetworkAnalyzer
 from src.analysis.mutation_analyzer import MutationAnalyzer
-from src.analysis.biological_managers import BiologicalManager
+from src.analysis.biological_managers import BiologicalManager, ensemble_bio_score
 from src.analysis.protein_assistant import ProteinAssistant
 from src.utils.bio_encoder import BioFeatureEncoder
 from app.backend.schemas import (
@@ -151,6 +152,10 @@ async def load_system():
         map_path = PROCESSED_DATA_DIR / "ppi_graph_mapping.pt"
         if map_path.exists():
              data_cache["mapping"] = torch.load(map_path, weights_only=False)
+             # PageRank is the last of the 3 topological node features appended to the ESM embeddings in
+             # src/data/graph_construction.py ([degree_centrality, clustering, pagerank]); expose it as computed there.
+             pr_col = data_cache["graph"].x[:, -1].cpu().tolist()
+             data_cache["pagerank"] = {pid: pr_col[idx] for pid, idx in data_cache["mapping"].items()}
 
         # 3. Load Ensemble model
         ensemble_path = PROJECT_ROOT / "models" / "ensemble_model.pkl"
@@ -209,7 +214,7 @@ async def load_system():
 @app.post("/predict", 
           response_model=PredictionResponse,
           summary="Predict Interaction probability",
-          description="Predicts the interaction probability between two proteins using a hybrid ESM-MLP and GAT ensemble model.",
+          description="Predicts the interaction probability between two proteins using a hybrid ESM-MLP and GraphSAGE ensemble model.",
           tags=["Prediction"])
 async def predict_interaction(pair: ProteinPair):
     """
@@ -255,8 +260,8 @@ async def predict_interaction(pair: ProteinPair):
         # 3. Sequence Prediction
         with torch.no_grad():
             # Add Biological Features to Sequence Input if available
-            bio_meta = managers["bio"].get_bio_metadata([p1, p2])
-            
+            bio_meta = managers["bio"].get_bio_metadata([p1, p2], fetch_missing=False)
+
             # Helper to get encoded vector for an ID from the fetched metadata
             def get_encoded(pid):
                 row = bio_meta[bio_meta["protein_id"] == pid]
@@ -313,7 +318,7 @@ async def predict_interaction(pair: ProteinPair):
                     nb_p2 = insert_novel_node_knn(embs[p2], data_cache["existing_embeddings"], k=k)
                     nb_indices2 = [data_cache["mapping"][n] for n in nb_p2]
                 
-                # Form edge pairs for GAT prediction across all neighbor combinations
+                # Form edge pairs for GraphSAGE prediction across all neighbor combinations
                 src_indices = []
                 dst_indices = []
                 for idx1 in nb_indices1:
@@ -332,10 +337,11 @@ async def predict_interaction(pair: ProteinPair):
             raise HTTPException(status_code=503, detail="Ensemble meta-learner or SHAP explainer unavailable.")
 
         try:
-            # Get Biological Match Score
-            bio_comp = managers["bio"].check_localization_compatibility(p1, p2)
-            bio_score = bio_comp.get("score", 0.5)
-            bio_match = bio_score
+            # Ensemble bio feature: cache-only, identical to training/evaluation (never live-fetched)
+            bio_score = ensemble_bio_score(managers["bio"], p1, p2)
+            # Display-only: live UniProt-backed compatibility, NOT fed to the ensemble
+            bio_comp = managers["bio"].check_localization_compatibility(p1, p2, persist=False)
+            bio_match = bio_comp.get("score", 0.5)
 
             conf_seq = abs(seq_prob - 0.5)
             conf_graph = abs(graph_prob - 0.5)
@@ -359,10 +365,6 @@ async def predict_interaction(pair: ProteinPair):
                 bio_features=np.array([[bio_score]])
             )
             assert feat_matrix.shape[1] == 8, f"Feature parity failure: Expected 8 features for XGBoost ensemble, got {feat_matrix.shape[1]}"
-            
-            # --- Zero-Shot Correction (Major Project Polish) ---
-            if graph_prob == 0.5 and seq_prob > 0.9 and bio_score > 0.8:
-                ens_prob = max(ens_prob, seq_prob * 0.9)
             
             final_prob = float(ens_prob)
             model_used = "XGBoost Ensemble"
@@ -545,8 +547,12 @@ async def get_centrality(top_k: int = 10):
         df = analyzers["network"].calculate_centralities()
         if df.empty:
             return []
-        # Return top K nodes by Degree
-        return df.head(top_k).to_dict(orient="records")
+        # Return top K nodes by Degree, with the PageRank stored in the graph node features
+        records = df.head(top_k).to_dict(orient="records")
+        pagerank = data_cache.get("pagerank", {})
+        for rec in records:
+            rec["pagerank"] = pagerank.get(rec["protein"])
+        return records
     except HTTPException as he:
         raise he
     except Exception as e:
@@ -607,6 +613,28 @@ async def get_therapeutic_targets(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+
+FINAL_EVALUATION_PATH = PROJECT_ROOT / "assets" / "evaluation" / "final_test_metrics.json"
+
+@app.get("/evaluation/final",
+         summary="Get Final Test Evaluation",
+         description="Read-only. Returns the final held-out test evaluation written by src/analysis/compare_models.py.",
+         tags=["Analysis"])
+async def get_final_evaluation():
+    """
+    Serves assets/evaluation/final_test_metrics.json unchanged. No metrics are computed or stored here.
+    """
+    if not FINAL_EVALUATION_PATH.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="Final evaluation results not found. Run `python src/analysis/compare_models.py` to generate them."
+        )
+    try:
+        with open(FINAL_EVALUATION_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError) as e:
+        raise HTTPException(status_code=500, detail=f"Could not read final evaluation results: {e}")
 
 
 @app.get("/analysis/stats",

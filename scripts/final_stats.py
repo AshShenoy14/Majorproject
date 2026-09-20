@@ -55,7 +55,7 @@ def main():
 
     # No extra features added here to maintain compatibility with trained models
 
-    # Graph Model — updated to support auto-detection (GAT/GIN)
+    # Graph Model — updated to support auto-detection (GraphSAGE/GIN)
     from src.models.graph_model import GATLinkPredictor, GINLinkPredictor
     in_channels = graph_data.x.shape[1]
     
@@ -68,12 +68,12 @@ def main():
             print("Detected GIN architecture for Graph Model.")
             graph_model = GINLinkPredictor(in_channels=in_channels, hidden_channels=128).to(device)
         else:
-            print("Detected GAT/SAGE architecture for Graph Model.")
+            print("Detected GraphSAGE architecture for Graph Model.")
             graph_model = GATLinkPredictor(in_channels=in_channels, hidden_channels=256).to(device)
             
         graph_model.load_state_dict(state_dict)
     else:
-        print(f"Graph model not found at {graph_model_path}. Defaulting to GAT/SAGE.")
+        print(f"Graph model not found at {graph_model_path}. Defaulting to GraphSAGE.")
         graph_model = GATLinkPredictor(in_channels=in_channels, hidden_channels=256).to(device)
     
     graph_model.eval()

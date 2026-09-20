@@ -88,7 +88,7 @@ const Predict = () => {
     await new Promise(r => setTimeout(r, 400));
     addLog("Extracting ESM-2 Language Embeddings...", "process");
     await new Promise(r => setTimeout(r, 300));
-    addLog("Analyzing Topological Centrality via GAT...", "process");
+    addLog("Analyzing graph neighborhood via GraphSAGE...", "process");
 
     try {
       const p1 = protein1.trim() || "Protein_1";
@@ -244,7 +244,7 @@ const Predict = () => {
           <div className="w-3 h-3 rounded-full bg-emerald-400 animate-ping" />
           <span className="text-xs font-black uppercase tracking-widest text-emerald-400">Live Model Telemetry</span>
           <span className="text-slate-500">|</span>
-          <span className="text-xs font-semibold text-slate-300">ESM-2 + GAT Ensemble</span>
+          <span className="text-xs font-semibold text-slate-300">ESM-2 + GraphSAGE Ensemble</span>
         </div>
         <div className="flex items-center gap-6 text-xs font-mono text-slate-300">
           <div className="flex items-center gap-1.5">
@@ -277,7 +277,7 @@ const Predict = () => {
               </div>
               <div>
                 <h2 className="text-lg font-black text-slate-800 tracking-tight">Analysis Portal</h2>
-                <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Model: ESM2-GAT-FUSION-V2</p>
+                <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Model: ESM2-GraphSAGE-XGBoost</p>
               </div>
             </div>
 
@@ -479,7 +479,7 @@ const Predict = () => {
               </div>
               <p className="text-[9px] text-slate-400 mt-1.5 leading-relaxed">
                 {expertMode
-                  ? 'Research Mode: Deep SHAP matrices, GAT graph topology, & raw metrics.'
+                  ? 'Research Mode: Deep SHAP matrices, GraphSAGE graph signal, & raw metrics.'
                   : 'Explorer Mode: Simple plain-language explanations & key visual insights.'}
               </p>
             </div>
@@ -665,7 +665,7 @@ const Predict = () => {
                                 { label: 'Interaction Strength', value: result.interaction_probability > 0.7 ? 'Strong' : result.interaction_probability > 0.5 ? 'Moderate' : 'Weak', color: result.interaction_probability > 0.7 ? 'text-emerald-600 bg-emerald-50 border-emerald-200' : result.interaction_probability > 0.5 ? 'text-amber-600 bg-amber-50 border-amber-200' : 'text-rose-600 bg-rose-50 border-rose-200' },
                                 { label: 'Prediction Confidence', value: `${(result.confidence_score * 100).toFixed(1)}%`, color: 'text-indigo-600 bg-indigo-50 border-indigo-200' },
                                 { label: 'ESM Sequence Signal', value: `${(result.esm_probability * 100).toFixed(1)}%`, color: 'text-teal-600 bg-teal-50 border-teal-200' },
-                                { label: 'GAT Graph Signal', value: `${(result.gat_probability * 100).toFixed(1)}%`, color: 'text-violet-600 bg-violet-50 border-violet-200' },
+                                { label: 'GraphSAGE Graph Signal', value: `${(result.gat_probability * 100).toFixed(1)}%`, color: 'text-violet-600 bg-violet-50 border-violet-200' },
                                 { label: 'Biological Importance', value: result.interaction_probability > 0.75 ? 'High' : result.interaction_probability > 0.5 ? 'Moderate' : 'Low', color: 'text-slate-600 bg-slate-50 border-slate-200' },
                               ].map((m, i) => (
                                 <div key={i} className={`flex items-center justify-between px-3 py-1.5 rounded-xl border text-[10px] font-bold ${m.color}`}>
@@ -772,7 +772,7 @@ const Predict = () => {
                             <div className="space-y-8 flex-1 flex flex-col justify-center">
                               {[
                                 { label: 'Protein Language Model (ESM-2)', val: result.esm_probability*100, color: 'bg-emerald-500', desc: 'Sequence embedding compatibility score' },
-                                { label: 'Social Network Topology (GAT)', val: result.gat_probability*100, color: 'bg-indigo-500', desc: 'Graph centrality & neighborhood interaction score' },
+                                { label: 'Network Topology (GraphSAGE)', val: result.gat_probability*100, color: 'bg-indigo-500', desc: 'Graph centrality & neighborhood interaction score' },
                                 { label: 'Jury Consensus Agreement', val: result.confidence_score*100, color: 'bg-amber-500', desc: 'Model variance & prediction stability factor' }
                               ].map((sig, i) => (
                                 <div key={i} className="space-y-2">
@@ -835,7 +835,7 @@ const Predict = () => {
                                   <Database size={14} className="text-indigo-400" /> Graph Network Topology
                                 </p>
                                 <p className="text-slate-300 opacity-90 text-[11px]">
-                                  Graph Attention Network (GAT) scored cellular pathway proximity at <strong className="text-indigo-400">{(result.gat_probability * 100).toFixed(1)}%</strong>, indicating shared functional sub-graphs in STRING DB topology.
+                                  The GraphSAGE graph model scored interaction-graph neighborhood proximity at <strong className="text-indigo-400">{(result.gat_probability * 100).toFixed(1)}%</strong>, indicating shared functional sub-graphs in STRING DB topology.
                                 </p>
                               </div>
                             </div>
@@ -892,7 +892,7 @@ const Predict = () => {
                   <th className="text-left px-4 py-3 font-black uppercase tracking-wider">Protein B</th>
                   <th className="text-center px-4 py-3 font-black uppercase tracking-wider">Probability</th>
                   <th className="text-center px-4 py-3 font-black uppercase tracking-wider">ESM</th>
-                  <th className="text-center px-4 py-3 font-black uppercase tracking-wider">GAT</th>
+                  <th className="text-center px-4 py-3 font-black uppercase tracking-wider">GraphSAGE</th>
                   <th className="text-center px-4 py-3 font-black uppercase tracking-wider">Confidence</th>
                   <th className="text-center px-4 py-3 font-black uppercase tracking-wider">Interacts?</th>
                   <th className="text-center px-4 py-3 font-black uppercase tracking-wider">Action</th>
@@ -963,7 +963,7 @@ const Predict = () => {
             </div>
             <div className="text-right text-[10px] font-mono text-slate-500">
               <p>Timestamp: {new Date().toLocaleString()}</p>
-              <p>Model: ESM2-GAT-FUSION-V2</p>
+              <p>Model: ESM2-GraphSAGE-XGBoost</p>
             </div>
           </div>
 
@@ -989,7 +989,7 @@ const Predict = () => {
               </div>
               <div className="text-right space-y-1 text-xs font-medium">
                 <p>ESM-2 Language Signal: <strong>{(result.esm_probability * 100).toFixed(1)}%</strong></p>
-                <p>GAT Network Signal: <strong>{(result.gat_probability * 100).toFixed(1)}%</strong></p>
+                <p>GraphSAGE Graph Signal: <strong>{(result.gat_probability * 100).toFixed(1)}%</strong></p>
                 <p>Ensemble Confidence: <strong>{(result.confidence_score * 100).toFixed(1)}%</strong></p>
               </div>
             </div>
@@ -1008,9 +1008,9 @@ const Predict = () => {
               </div>
 
               <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
-                <h3 className="font-bold text-slate-800">Graph Attention Network (GAT)</h3>
+                <h3 className="font-bold text-slate-800">GraphSAGE Graph Model</h3>
                 <p className="text-slate-600 text-[11px] leading-relaxed">
-                  Calculates network centrality and shared sub-graph neighborhood proximity.
+                  Scores the pair from neighborhood aggregation over the STRING-derived training interaction graph.
                 </p>
               </div>
             </div>

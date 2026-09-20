@@ -92,7 +92,7 @@ def analyze_case(p1, p2):
     print(f"Ensemble Prob: {ens.predict(np.array([s_prob]), np.array([g_prob]), np.array([[bio_score]]))[0]:.4f}")
     
     print("\nSHAP Contributions (Positive means pushing towards Interaction):")
-    features = ["ESM-MLP", "GAT", "Conf-Seq", "Conf-GAT", "Disagreement", "MaxConf", "Bio-Loc"]
+    features = ["ESM-MLP", "GraphSAGE", "Conf-Seq", "Conf-GraphSAGE", "Disagreement", "MaxConf", "Bio-Loc"]
     for name, val in zip(features, shap_vals[0]):
         print(f"{name:12}: {val:+.4f}")
 

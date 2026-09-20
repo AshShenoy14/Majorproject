@@ -10,7 +10,7 @@ class ProteinPair(BaseModel):
 class PredictionResponse(BaseModel):
     interaction_probability: float = Field(..., description="Final ensemble prediction probability", json_schema_extra={"example": 0.88})
     esm_probability: float = Field(..., description="Probability from the ESM-MLP sequence model", json_schema_extra={"example": 0.92})
-    gat_probability: float = Field(..., description="Probability from the GAT graph model", json_schema_extra={"example": 0.75})
+    gat_probability: float = Field(..., description="Probability from the GraphSAGE graph model (field name kept as gat_probability for API compatibility)", json_schema_extra={"example": 0.75})
     confidence_score: float = Field(..., description="Normalized confidence score [0, 1]", json_schema_extra={"example": 0.76})
     explanation: Dict[str, Any] = Field(..., description="Feature importance scores (e.g., SHAP values)")
     gnn_explanation: Optional[Dict[str, Any]] = Field(None, description="Detailed GNN-specific neighbor importance")
@@ -55,8 +55,6 @@ class MutationResult(BaseModel):
     mutated_score: float = Field(..., description="Interaction probability after mutation")
     impact_delta: float = Field(..., description="Change in probability (mutated - base)")
     interpretation: str = Field(..., description="Qualitative impact of the mutation")
-    is_in_interaction_region: Optional[bool] = Field(None, description="Optional interaction region indicator")
-    interaction_region: Optional[str] = Field(None, description="Optional region label")
     error: Optional[str] = None
 
 class MutationAnalysisResponse(BaseModel):

@@ -31,6 +31,8 @@ export const ppiService = {
 
   getNetworkStats: () => api.get('/analysis/stats'),
 
+  getFinalEvaluation: () => api.get('/evaluation/final'),
+
   getBioMetadata: (proteins) => api.get(`/bio/metadata?proteins=${proteins}`),
 
   mutate: (p1_id, p1_seq, p2_id, p2_seq, mutations) => 
@@ -71,28 +73,6 @@ export const ppiService = {
   // AI Assistant
   getChatGreeting: () => api.get('/chat/greeting'),
   sendChatMessage: (message) => api.post('/chat', { message }),
-
-  // Telemetry/Logging
-  logTelemetry: (location, message, data = {}) => {
-    const TELEMETRY_URL = import.meta.env.VITE_TELEMETRY_URL || 'http://127.0.0.1:7656/ingest/a2c6930f-0198-499d-9920-7d735f885f13';
-    return axios.post(TELEMETRY_URL, {
-      sessionId: 'e579db',
-      runId: 'pre-fix',
-      hypothesisId: 'H1',
-      location,
-      message,
-      data: {
-        baseURL: API_BASE_URL,
-        ...data
-      },
-      timestamp: Date.now()
-    }, {
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Debug-Session-Id': 'e579db'
-      }
-    }).catch(() => {});
-  }
 };
 
 export default api;

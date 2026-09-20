@@ -133,5 +133,6 @@ class GINLinkPredictor(nn.Module):
         return self.decode(z, src, dst)
 
 
-# Backward compatibility alias
+# Legacy name kept only so existing scripts/checkpoints keep loading. The implemented graph model is
+# GraphSAGE (SAGEConv) and has no attention mechanism; it is not a Graph Attention Network.
 GATLinkPredictor = GNNLinkPredictor

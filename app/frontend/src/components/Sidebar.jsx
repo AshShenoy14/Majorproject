@@ -15,7 +15,7 @@ const Sidebar = ({ onClose }) => {
     { name: 'Interactome 3D', icon: <Share2 size={16} />, path: '/network-3d' },
     { name: 'Drug Insights', icon: <ShieldAlert size={16} />, path: '/drug-targets' },
     { name: 'Bio-Assistant', icon: <Bot size={16} />, path: '/assistant' },
-    { name: 'Zero-Shot Eval', icon: <Globe size={16} />, path: '/zero-shot' },
+    { name: 'Cross-Species (Exploratory)', icon: <Globe size={16} />, path: '/zero-shot' },
   ];
 
   return (

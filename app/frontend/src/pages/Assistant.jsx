@@ -186,7 +186,7 @@ const Assistant = () => {
     let contextualMessage = message;
     if (predictionContext) {
       const { p1, p2, prob, esm, gat, conf } = predictionContext;
-      contextualMessage = `[Context: The user just ran TransGraph-PPI prediction for ${p1} ↔ ${p2}. Results: interaction_probability=${(prob*100).toFixed(1)}%, ESM=${(esm*100).toFixed(1)}%, GAT=${(gat*100).toFixed(1)}%, confidence=${(conf*100).toFixed(1)}%. Please use this context to answer the following question.]\n\n${message}`;
+      contextualMessage = `[Context: The user just ran TransGraph-PPI prediction for ${p1} ↔ ${p2}. Results: interaction_probability=${(prob*100).toFixed(1)}%, ESM=${(esm*100).toFixed(1)}%, GraphSAGE=${(gat*100).toFixed(1)}%, confidence=${(conf*100).toFixed(1)}%. Please use this context to answer the following question.]\n\n${message}`;
     }
 
     // Add user message (show without system prefix)

@@ -410,7 +410,7 @@ const NetworkExplorer = () => {
                       ['Degree', m.degree],
                       ['Betweenness', m.betweenness?.toFixed(3)],
                       ['Closeness', m.closeness?.toFixed(3)],
-                      ['PageRank', m.pagerank?.toFixed(4)],
+                      ['PageRank', m.pagerank?.toFixed(5)],
                     ].map(([k, v]) => v != null && (
                       <div key={k} className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
                         <p className="text-[9px] font-black text-slate-400 uppercase mb-0.5">{k}</p>

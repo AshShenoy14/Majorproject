@@ -29,26 +29,41 @@ const StatCard = ({ icon: Icon, label, value, subtext, color }) => (
 
 const Home = () => {
   const [stats, setStats] = useState({
-    proteins: '12,238',
-    interactions: '96,829',
-    accuracy: '91.5%',
-    predictions: '363,081'
+    proteins: '—',
+    interactions: '—',
+    accuracy: '—',
+    rocAuc: '—',
+    testPairs: null
   });
 
   useEffect(() => {
-    // Fetch real stats if available
+    // All figures come from the backend; nothing is pre-filled with placeholder values.
     const fetchStats = async () => {
       try {
         const response = await ppiService.getNetworkStats();
-        if (response.data) {
+        if (response.data?.num_nodes != null) {
           setStats(prev => ({
             ...prev,
-            proteins: response.data.num_nodes || prev.proteins,
-            interactions: response.data.num_edges || prev.interactions
+            proteins: response.data.num_nodes.toLocaleString(),
+            interactions: response.data.num_edges.toLocaleString()
           }));
         }
       } catch (error) {
-        console.error("Error fetching stats:", error);
+        console.error("Error fetching network stats:", error);
+      }
+      try {
+        const evalRes = await ppiService.getFinalEvaluation();
+        const ensemble = Object.entries(evalRes.data?.models || {}).find(([name]) => name.includes('Ensemble'));
+        if (ensemble) {
+          setStats(prev => ({
+            ...prev,
+            accuracy: `${(ensemble[1].accuracy * 100).toFixed(2)}%`,
+            rocAuc: `${(ensemble[1].roc_auc * 100).toFixed(2)}%`,
+            testPairs: evalRes.data?.dataset_rows?.test_evaluated ?? null
+          }));
+        }
+      } catch (error) {
+        console.error("Error fetching final evaluation:", error);
       }
     };
     fetchStats();
@@ -88,7 +103,7 @@ const Home = () => {
             className="text-xl text-slate-500 mb-10 leading-relaxed font-medium"
           >
             <span className="font-cursive text-emerald-600 text-2xl">TransGraph PPI</span> is a state-of-the-art hybrid AI framework combining protein language models (ESM-2)
-            and graph neural networks (GAT) to analyze complex biological interactomes.
+            and graph neural networks (GraphSAGE) to analyze complex biological interactomes.
           </motion.p>
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -114,30 +129,30 @@ const Home = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard
           icon={Users}
-          label="Proteins Catalogued"
+          label="Proteins in Interaction Graph"
           value={stats.proteins}
-          subtext="+124 added this week"
+          subtext="Training-set positive interactions"
           color="bg-gradient-to-br from-teal-400 to-teal-600"
         />
         <StatCard
           icon={Share2}
-          label="Interactions Analyzed"
+          label="Positive Interactions"
           value={stats.interactions}
-          subtext="Verified by STRING DB"
+          subtext="STRING-derived training pairs"
           color="bg-gradient-to-br from-blue-400 to-blue-600"
         />
         <StatCard
           icon={CheckCircle}
-          label="Model Accuracy"
+          label="Ensemble Accuracy"
           value={stats.accuracy}
-          subtext="Held-out Human test set (40.3k pairs)"
+          subtext={stats.testPairs ? `Held-out test set (${stats.testPairs.toLocaleString()} pairs)` : "Held-out test set"}
           color="bg-gradient-to-br from-purple-400 to-purple-600"
         />
         <StatCard
           icon={Activity}
-          label="Predictions Logged"
-          value={stats.predictions}
-          subtext="System-wide activity"
+          label="Ensemble ROC-AUC"
+          value={stats.rocAuc}
+          subtext="Held-out test set"
           color="bg-gradient-to-br from-orange-400 to-orange-600"
         />
       </div>
@@ -155,7 +170,7 @@ const Home = () => {
           </div>
           <p className="text-slate-500 text-sm max-w-xl font-medium leading-relaxed">
             Proteins are biological machines in cells. When they bind, they drive life processes—or trigger diseases like cancer.
-            <strong> TransGraph-PPI</strong> uses Transformer AI (ESM-2) + Graph Neural Networks (GAT) to predict protein binding, scan mutation impacts, and discover drug target nodes.
+            <strong> TransGraph-PPI</strong> uses Transformer AI (ESM-2) + Graph Neural Networks (GraphSAGE) to predict protein binding, scan mutation impacts, and discover drug target nodes.
           </p>
         </div>
 
@@ -346,7 +361,7 @@ const Home = () => {
                 <Search size={120} />
               </div>
               <h4 className="text-2xl font-black mb-2 text-slate-800 relative z-10">Predict Interaction</h4>
-              <p className="text-slate-500 text-sm font-medium mb-6 relative z-10">Run hybrid ESM+GAT model to predict binding probability.</p>
+              <p className="text-slate-500 text-sm font-medium mb-6 relative z-10">Run hybrid ESM+GraphSAGE model to predict binding probability.</p>
               <div className="flex items-center text-xs font-black uppercase tracking-widest text-emerald-600 gap-2 relative z-10 group-hover:gap-4 transition-all">
                 Launch System <ArrowRight size={16} />
               </div>

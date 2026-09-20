@@ -1,0 +1,79 @@
+{
+  "timestamp_utc": "2026-09-20T08:31:14.182265+00:00",
+  "protocol": "thresholds (F1-max, sweep 0.1-0.9) selected on val.csv; metrics computed on test.csv only",
+  "split_design": "pair-level stratified 80/10/10 split (random_state=42); pair-disjoint, NOT node-disjoint - evaluation is transductive pair prediction",
+  "dataset_rows": {
+    "total": 201712,
+    "train": 161369,
+    "validation": 20171,
+    "test": 20172,
+    "validation_evaluated": 20171,
+    "test_evaluated": 20172,
+    "test_rows_filtered": 0,
+    "validation_rows_filtered": 0
+  },
+  "models": {
+    "Sequence-Only (ESM-MLP)": {
+      "val_selected_threshold": 0.46999999999999986,
+      "accuracy": 0.8708110251834226,
+      "precision": 0.8540996023480402,
+      "recall": 0.8944080904223677,
+      "f1": 0.8737892289810151,
+      "roc_auc": 0.9442120734123578,
+      "pr_auc": 0.9467481985227696
+    },
+    "Graph-Only (GraphSAGE)": {
+      "val_selected_threshold": 0.7899999999999996,
+      "accuracy": 0.9010013880626612,
+      "precision": 0.9082466942565862,
+      "recall": 0.8921277017648225,
+      "f1": 0.9001150402640924,
+      "roc_auc": 0.9473869654542224,
+      "pr_auc": 0.9616595496536556
+    },
+    "Random Forest Baseline": {
+      "val_selected_threshold": 0.47999999999999976,
+      "accuracy": 0.8422565932976402,
+      "precision": 0.830019120458891,
+      "recall": 0.8607971445568114,
+      "f1": 0.8451280054511827,
+      "roc_auc": 0.9209018089876201,
+      "pr_auc": 0.9245065704583466
+    },
+    "Full Ensemble (XGBoost)": {
+      "val_selected_threshold": 0.5099999999999998,
+      "accuracy": 0.917509418996629,
+      "precision": 0.9380982105701207,
+      "recall": 0.8940115010906207,
+      "f1": 0.915524418722713,
+      "roc_auc": 0.9626265868439217,
+      "pr_auc": 0.9696104163812087
+    }
+  },
+  "checkpoints": {
+    "sequence_model": {
+      "file": "sequence_model_best.pth",
+      "size_bytes": 23162131,
+      "modified": "2026-08-16T11:37:12.909351+00:00",
+      "sha256_16": "fae81e2844d06411"
+    },
+    "graph_model": {
+      "file": "graph_model_best.pth",
+      "size_bytes": 4436243,
+      "modified": "2026-08-16T12:48:47.313317+00:00",
+      "sha256_16": "cdbb21ae1825b632"
+    },
+    "ensemble": {
+      "file": "ensemble_model.pkl",
+      "size_bytes": 3193288,
+      "modified": "2026-08-16T13:59:11.469932+00:00",
+      "sha256_16": "9a06a06885f7fc1b"
+    },
+    "random_forest": {
+      "file": "random_forest_baseline.pkl",
+      "size_bytes": 216202857,
+      "modified": "2026-08-16T15:39:08.261186+00:00",
+      "sha256_16": "ac06c428acc1a1c0"
+    }
+  }
+}

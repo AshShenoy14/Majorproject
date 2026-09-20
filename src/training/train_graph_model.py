@@ -81,7 +81,7 @@ def train(
 ):
     """
     Train the GNN Link Predictor using full-batch training (Stable Version).
-    model_type: 'GAT' or 'GIN'
+    model_type: 'GAT' (legacy CLI name: selects the GraphSAGE/SAGEConv model, no attention) or 'GIN'
     structural_penalty: Multiplier for loss on 'hard' negative samples (if identified).
     """
     device = configure_runtime(force_cpu=force_cpu, cpu_threads=cpu_threads)

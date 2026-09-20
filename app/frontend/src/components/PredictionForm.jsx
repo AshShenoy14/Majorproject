@@ -485,7 +485,7 @@ const PredictionForm = () => {
                       }}
                     />
                     <Typography variant="h6" color="primary" sx={{ fontWeight: 600 }}>Analyzing Sequences...</Typography>
-                    <Typography variant="caption">Calculating embeddings and graph attention</Typography>
+                    <Typography variant="caption">Calculating embeddings and graph neighborhood features</Typography>
                   </Box>
                 </motion.div>
               )}
@@ -592,7 +592,7 @@ const PredictionForm = () => {
                           </Typography>
                         </Box>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', bgcolor: isDark ? 'rgba(213, 0, 249, 0.05)' : 'rgba(21, 101, 192, 0.05)', border: `1px solid ${isDark ? 'rgba(213, 0, 249, 0.1)' : 'rgba(21, 101, 192, 0.1)'}`, p: 1.5, borderRadius: 2 }}>
-                          <Typography variant="body2">Graph Attention (GAT)</Typography>
+                          <Typography variant="body2">Graph Model (GraphSAGE)</Typography>
                           <Typography variant="body2" fontWeight="bold" color="secondary">
                             {(result.gat_probability * 100).toFixed(1)}%
                           </Typography>

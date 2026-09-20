@@ -13,44 +13,35 @@ import {
   Alert
 } from '@mui/material';
 import { motion, AnimatePresence } from 'framer-motion';
-import { AutoGraph as GraphIcon, Biotech as BioIcon, CheckCircle as CheckIcon } from '@mui/icons-material';
+import { AutoGraph as GraphIcon, Biotech as BioIcon } from '@mui/icons-material';
 import axios from 'axios';
 import { ppiService } from '../services/api';
 import InteractionVisualizer from './InteractionVisualizer';
 
-// Known Non-Human Interactions for Evaluation
+// Exploratory non-human protein pairs (accessions verified against UniProt). No ground-truth label is used or shown.
 const SPECIES_TESTS = [
   {
     species: "Mus musculus (Mouse)",
-    title: "p53-MDM2 Coregulator",
-    description: "A highly conserved cancer-regulating interaction tested zero-shot from human data.",
-    p1: "P04637", // Mouse p53
-    p2: "P23804", // Mouse MDM2
-    seq1Fallback: "MTAMEESQSDISLELPLSQETFSGLWKLLPPEDILPSPHCMDDLLLPQDVEEFFEGPSEALRVSGAPAAQDPVTETPGPVAPAPATPWPLSSFVPSQKTYQGNYGFHLGFLQSGTAKSVMCTYSPCLNKLFCQLAKTCPVQLWVSATPPAGSRVRAMAIYKKSQHMTEVVRRCPHHERCSDGDGLAPPQHLIRVEGNLRAEYLDDRNTFRHSVVVPYEPPEVGSDCTTIHYNFMCNSSCMGGMNRRPIITIITLEDSNGKLLGRNSFEVRVCACPGRDRRTEEENF",
-    seq2Fallback: "MCNTNMSVPTDGAVTTSQIPASEQETLVRPKPLLLKLLKSVGAQKDTYTMINLLQNVLRCNDRKKKFPSQSEKSKEKSSQSNERISLFLKHKNSNEKEKQPKDKKKSKGSSQSQKEPISFLRHRNSSENEEKSKSDKKKSKSSSQSQKEPISFLRHRNSS",
-    expected: "High Confidence Binding",
+    title: "p53 / MDM2",
+    description: "Mouse p53 (P53_MOUSE) and mouse MDM2 (MDM2_MOUSE).",
+    p1: "P02340", // P53_MOUSE
+    p2: "P23804", // MDM2_MOUSE
     icon: "🐁"
   },
   {
     species: "Saccharomyces cerevisiae (Yeast)",
-    title: "Actin-Profilin Cytoskeleton",
-    description: "Fundamental eukaryotic structural interaction separated by 1 billion years of evolution.",
-    p1: "P60010", // Yeast Actin
-    p2: "P07733", // Yeast Profilin
-    seq1Fallback: "MDSEVAALVIDNGSGMCKAGFAGDDAPRAVFPSIVGRPRHQGVMVGMGOKDSYVGDEAQSKRGILTLKYPIEHGIITNWDDMEKIWHHTFYNELRVAPEEHPTLLTEAPLNPKANREKMTQIMFETFNVPAMYVAIQAVLSLYASGRTTGIVLDSGDGVTHVVPIYAGFSLPHAILRIDLAGRDLTDYLMKILTERGYSFVTTAEREIVRDIKEKLCYVALDFEQEMQTAAQSSSIEKSYELPDGQVITIGNERFRCPEALFQPSFLGMESCGIHETTYNSIMKCDVDIRKDLYGNIVMSGGTTMFPGIAERMQKEITALAPSSMKVKIIAPPERKYSVWIGGSILASLSTFQQMWISKQEYDESGPSIVHHKCF",
-    seq2Fallback: "MSWQAYTDNLIGTGKVDKAVIYFRAGDGHVWAQSADFPAVKAEEISGHVTKMFTGPAPDQVTVTTAKGGIFASIKQKPEWVALGGDDKLVVETSDGVYTFAGVGSGGSVKVGKVLAKTLVG",
-    expected: "Structural Binding",
+    title: "Actin / Profilin",
+    description: "Yeast actin (ACT_YEAST) and yeast profilin (PROF_YEAST).",
+    p1: "P60010", // ACT_YEAST
+    p2: "P07274", // PROF_YEAST
     icon: "🍞"
   },
   {
     species: "Escherichia coli (Bacteria)",
-    title: "DNA Replisome (DnaA-DnaN)",
-    description: "Testing cross-kingdom predictive topology on prokaryotic DNA replication machinery.",
-    p1: "P03004", // E coli DnaA
-    p2: "P0A9T0", // E coli DnaN
-    seq1Fallback: "MSLSLWQQCLARLQDELPATEFSMWIRPLQAELSDNTLALYAPNRFVLDWVRDKYLNNINPLLKFDGAPNVLSFSHLRSVKPLRLLAGSVSVEAGLPEVARLYALGGAVMQDKITAPVGEV",
-    seq2Fallback: "MKFTVEREHLLKPLQQVSGPLGGRPTLPILGNLLLQVADGTLSLTGTDLEMEMVADVTLIPATASGTGLPEVALWGDAALVAGLSRLEMGISVTRNDLEQAYVLGREFLVRVTGEKVKPVA",
-    expected: "Functional Interaction",
+    title: "DnaA / DnaN",
+    description: "E. coli chromosomal replication initiator DnaA (DNAA_ECOLI) and beta sliding clamp DnaN (DPO3B_ECOLI).",
+    p1: "P03004", // DNAA_ECOLI
+    p2: "P0A988", // DPO3B_ECOLI
     icon: "🦠"
   }
 ];
@@ -63,35 +54,31 @@ const CrossSpeciesTesting = () => {
     const [resultMap, setResultMap] = useState({});
     const [errorMap, setErrorMap] = useState({});
 
-    // Fetch sequence from UniProt directly in the frontend with fallback
-    const fetchFasta = async (uniprotId, fallbackSeq) => {
-        try {
-            const res = await axios.get(`https://rest.uniprot.org/uniprotkb/${uniprotId}.fasta`, { timeout: 3500 });
-            const lines = res.data.split('\n');
-            const seq = lines.slice(1).map(l => l.trim()).join('').replace(/[^A-Z]/gi, '');
-            return seq || fallbackSeq;
-        } catch (e) {
-            console.warn(`UniProt fetch failed for ${uniprotId}, using fallback sequence.`, e);
-            return fallbackSeq;
-        }
+    // Fetch the sequence from UniProt; no bundled fallback sequences are used
+    const fetchFasta = async (uniprotId) => {
+        const res = await axios.get(`https://rest.uniprot.org/uniprotkb/${uniprotId}.fasta`, { timeout: 8000 });
+        const lines = res.data.split('\n');
+        const seq = lines.slice(1).map(l => l.trim()).join('').replace(/[^A-Z]/gi, '');
+        if (!seq) throw new Error(`Empty sequence returned by UniProt for ${uniprotId}`);
+        return seq;
     };
 
-    const handleRunZeroShot = async (index, testCase) => {
+    const handleRunInference = async (index, testCase) => {
         setLoadingMap(prev => ({...prev, [index]: true}));
         setErrorMap(prev => ({...prev, [index]: null}));
         
         try {
-            // 1. Fetch sequence or use fallback
-            const seq1 = await fetchFasta(testCase.p1, testCase.seq1Fallback);
-            const seq2 = await fetchFasta(testCase.p2, testCase.seq2Fallback);
+            // 1. Fetch both sequences from UniProt
+            const seq1 = await fetchFasta(testCase.p1);
+            const seq2 = await fetchFasta(testCase.p2);
             
             // 2. Feed exclusively sequences to the human-trained model
             const response = await ppiService.predict(testCase.p1, testCase.p2, seq1, seq2);
             setResultMap(prev => ({...prev, [index]: response.data}));
             
         } catch (err) {
-            console.error("Zero-shot failed:", err);
-            setErrorMap(prev => ({...prev, [index]: "Failed to execute zero-shot inference. Ensure backend server (http://127.0.0.1:8000) is running."}));
+            console.error("Exploratory inference failed:", err);
+            setErrorMap(prev => ({...prev, [index]: "Inference failed: could not fetch sequences from UniProt or reach the backend (http://127.0.0.1:8000)."}));
         } finally {
              setLoadingMap(prev => ({...prev, [index]: false}));
         }
@@ -109,11 +96,16 @@ const CrossSpeciesTesting = () => {
                     color: '#1e293b',
                     letterSpacing: '-0.02em'
                 }}>
-                    Cross-Species <span className="font-cursive text-emerald-500">Zero-Shot</span> Generalization
+                    Cross-Species <span className="font-cursive text-emerald-500">Exploratory</span> Inference
                 </Typography>
                 <Typography variant="body1" sx={{ color: '#64748b', maxWidth: 800, margin: '0 auto', fontWeight: 500, lineHeight: 1.8 }}>
-                    Evaluator Showcase: Prove that the TransGraph-PPI architecture learned fundamental <strong className="text-slate-800">biological physics</strong> instead of simply memorizing human datasets. Run live inference on unobserved evolutionary kingdoms.
+                    Run the trained human-PPI model on a few non-human protein pairs, using sequences fetched live from UniProt.
                 </Typography>
+                <Alert severity="warning" variant="outlined" sx={{ mt: 3, maxWidth: 800, mx: 'auto', textAlign: 'left', borderRadius: '1rem' }}>
+                    Exploratory only. The model was trained and evaluated on human STRING pairs with a pair-disjoint split in which the same proteins
+                    appear in both train and test, so the reported metrics do not measure performance on unseen proteins or other species.
+                    The scores below are uncalibrated model outputs with no ground-truth labels and are not evidence of cross-species generalization.
+                </Alert>
             </Box>
 
             <Grid container spacing={4}>
@@ -161,7 +153,7 @@ const CrossSpeciesTesting = () => {
                                             <Button 
                                                 variant="contained" 
                                                 size="large"
-                                                onClick={() => handleRunZeroShot(idx, testCase)}
+                                                onClick={() => handleRunInference(idx, testCase)}
                                                 disabled={loadingMap[idx]}
                                                 startIcon={loadingMap[idx] ? <CircularProgress size={16} color="inherit" /> : <GraphIcon />}
                                                 sx={{ 
@@ -179,7 +171,7 @@ const CrossSpeciesTesting = () => {
                                                     }
                                                 }}
                                             >
-                                                {loadingMap[idx] ? "Computing Topology..." : "Run Zero-Shot Evaluator"}
+                                                {loadingMap[idx] ? "Running inference..." : "Run Exploratory Inference"}
                                             </Button>
 
                                             {errorMap[idx] && (
@@ -213,8 +205,8 @@ const CrossSpeciesTesting = () => {
                                                 >
                                                     <Box sx={{ textAlign: 'center', p: 4, bgcolor: '#f8fafc', borderRadius: '2rem', width: '100%' }}>
                                                         <CircularProgress size={40} thickness={4} sx={{ mb: 3, color: '#059669' }} />
-                                                        <Typography variant="h6" sx={{ color: '#059669', fontWeight: 900, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.2em' }}>Processing Foreign Proteome...</Typography>
-                                                        <Typography variant="body2" sx={{ color: '#64748b', mt: 1, fontWeight: 500 }}>Running ESM-2 embeddings and Graph Attention on purely non-human topologies.</Typography>
+                                                        <Typography variant="h6" sx={{ color: '#059669', fontWeight: 900, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.2em' }}>Running inference...</Typography>
+                                                        <Typography variant="body2" sx={{ color: '#64748b', mt: 1, fontWeight: 500 }}>Running ESM-2 embeddings and the GraphSAGE graph model on non-human proteins (outside the human training graph).</Typography>
                                                     </Box>
                                                 </motion.div>
                                             ) : (
@@ -225,7 +217,7 @@ const CrossSpeciesTesting = () => {
                                                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4, p: 3, bgcolor: '#f8fafc', borderRadius: '2rem' }}>
                                                         <Box>
                                                             <Typography variant="h6" sx={{ color: '#059669', fontWeight: 900, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.1em', mb: 1 }}>
-                                                                Zero-Shot Interaction Probability
+                                                                Model Interaction Score (unvalidated)
                                                             </Typography>
                                                             <Typography variant="h3" fontWeight="900" sx={{ color: resultMap[idx].interaction_probability > 0.5 ? '#10b981' : '#ef4444', letterSpacing: '-0.05em' }}>
                                                                 {(resultMap[idx].interaction_probability * 100).toFixed(1)}%
@@ -233,17 +225,16 @@ const CrossSpeciesTesting = () => {
                                                         </Box>
                                                         <Box align="right">
                                                             <Chip 
-                                                                icon={<CheckIcon />} 
-                                                                label={testCase.expected} 
-                                                                sx={{ mb: 1, bgcolor: '#ecfdf5', color: '#059669', fontWeight: 900, borderRadius: '8px', border: '1px solid #d1fae5' }} 
+                                                                label="Exploratory - not validated" 
+                                                                sx={{ mb: 1, bgcolor: '#fffbeb', color: '#b45309', fontWeight: 900, borderRadius: '8px', border: '1px solid #fde68a' }} 
                                                             />
                                                             <Typography variant="caption" display="block" sx={{ color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                                                                ESM: {(resultMap[idx].esm_probability * 100).toFixed(1)}% | GAT: {(resultMap[idx].gat_probability * 100).toFixed(1)}%
+                                                                ESM: {(resultMap[idx].esm_probability * 100).toFixed(1)}% | GraphSAGE: {(resultMap[idx].gat_probability * 100).toFixed(1)}%
                                                             </Typography>
                                                         </Box>
                                                     </Box>
                                                     
-                                                    {/* Embed the standard visualizer to prove SHAP explainability works on non-human data too! */}
+                                                    {/* Standard visualizer showing the model's SHAP breakdown for this pair */}
                                                     <InteractionVisualizer result={resultMap[idx]} id1={testCase.p1} id2={testCase.p2} />
                                                     
                                                 </motion.div>

@@ -9,10 +9,10 @@
 ![PyTorch](https://img.shields.io/badge/PyTorch-DeepLearning-red)
 ![React](https://img.shields.io/badge/Frontend-ReactJS-blue)
 ![FastAPI](https://img.shields.io/badge/Backend-FastAPI-green)
-![Tests](https://img.shields.io/badge/Tests-15%2F15%20Passing-brightgreen)
+![Tests](https://img.shields.io/badge/Tests-13%2F13%20Passing-brightgreen)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 
-**TransGraph-PPI** is a research-oriented multimodal machine learning framework designed for **Protein–Protein Interaction (PPI) prediction**. It integrates deep protein sequence embeddings (ESM-2), graph topological representations (GAT), biological domain knowledge (subcellular co-localization), an Out-Of-Fold XGBoost stacking meta-ensemble, and SHAP explainability.
+**TransGraph-PPI** is a research-oriented multimodal machine learning framework designed for **Protein–Protein Interaction (PPI) prediction**. It integrates deep protein sequence embeddings (ESM-2), graph topological representations (GraphSAGE), an Out-Of-Fold XGBoost stacking meta-ensemble, SHAP explainability, and ChEMBL-based downstream therapeutic-target analysis.
 
 ---
 
@@ -25,10 +25,11 @@ Protein–Protein Interactions govern fundamental cellular processes. TransGraph
 | Component | Architecture / Method | Role |
 | :--- | :--- | :--- |
 | **Sequence Model** | ESM-2 (`esm2_t12_35M_UR50D`, 35M parameters, 480 dims) + MLP | Deep protein sequence feature extraction & binary interaction scoring |
-| **Graph Model** | Graph Attention Network (GAT) | Topological neighborhood & interaction pattern learning in PPI network graphs |
-| **Biological Context** | UniProt / Subcellular Localization | Domain knowledge validation & co-localization compatibility scoring |
-| **Ensemble Meta-Learner** | XGBoost (OOF Stacking) | Synergistic 8-feature integration of sequence, topology, confidence, and co-localization |
-| **Explainability (XAI)** | SHAP (SHapley Additive exPlanations) | Feature attribution explaining model consensus and base signal contributions |
+| **Graph Model** | GraphSAGE (`SAGEConv`) over the training PPI graph | Neighborhood aggregation for link prediction. It has no attention mechanism; the original proposal specified a GAT, but the implemented and evaluated model is GraphSAGE |
+| **Biological Context** | UniProt subcellular localization (cache-only score) | One of the 8 ensemble input features; the trained XGBoost model never splits on it, so it has no measurable effect on the reported metrics |
+| **Ensemble Meta-Learner** | XGBoost (OOF Stacking) | Stacks the two base-model probabilities plus derived confidence/disagreement features (8 features in total) |
+| **Explainability (XAI)** | SHAP (SHapley Additive exPlanations) | Feature attribution on the ensemble's 8 input features |
+| **Downstream Analysis** | Degree / betweenness / PageRank centrality + ChEMBL target lookup | Therapeutic-target prioritization (a heuristic score, not a validated ranking) |
 
 ---
 
@@ -39,9 +40,9 @@ graph TD
     A[Protein Pair: A & B] --> B[ESM-2 Embeddings]
     B --> C[ESM-MLP Sequence Model]
 
-    D[PPI Graph Network] --> E[GAT Graph Model]
-    
-    K[Biological Context / Co-localization] --> F
+    D[PPI Graph - training positives only] --> E[GraphSAGE Graph Model]
+
+    K[UniProt co-localization score] -.-> F
 
     C --> F[XGBoost OOF Stacking Ensemble]
     E --> F
@@ -51,47 +52,54 @@ graph TD
 
     G --> L[FastAPI Backend / React Dashboard]
     H --> L
+    L --> M[ChEMBL therapeutic-target analysis]
 ```
 
 ---
 
-## 📊 Validated Model Performance
+## 📊 Final Test Performance
 
-All performance metrics reported below reflect evaluation on the strictly isolated test set containing **40,342 protein pairs** with zero training pair overlap.
+Metrics come from a single evaluation of the held-out **test set (20,172 pairs)**, produced by `python src/analysis/compare_models.py`
+and stored in `assets/evaluation/final_test_metrics.json` (also served by `GET /evaluation/final` and shown on the Benchmark page).
+Decision thresholds were selected on the validation set (F1-maximizing sweep over 0.10-0.89); the test set was not used for any selection.
+All 20,172 test rows were evaluated (none filtered).
 
-### 1. Model Component & Ablation Metrics
-
-| Model / Baseline | Optimal Threshold | Accuracy | Precision | Recall | F1 Score | ROC-AUC | PR-AUC (AUPRC) |
+| Model | Val-selected threshold | Accuracy | Precision | Recall | F1 | ROC-AUC | PR-AUC |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Random Forest Baseline** | 0.50 | 0.8430 | 0.8350 | 0.8540 | 0.8444 | 0.9120 | 0.9105 |
-| **GAT (Graph Alone)** | 0.62 | 0.8017 | 0.7599 | 0.8821 | 0.8164 | 0.8860 | 0.8848 |
-| **ESM-MLP (Sequence Alone)** | 0.49 | 0.9180 | 0.9061 | 0.9326 | 0.9191 | 0.9739 | 0.9736 |
-| **Ensemble (Ours - OOF Meta-Learner)** | **0.50** | **0.9154** | **0.9181** | **0.9122** | **0.9151** | **0.9764** | **0.9773** |
+| **Random Forest baseline** | 0.48 | 0.8423 | 0.8300 | 0.8608 | 0.8451 | 0.9209 | 0.9245 |
+| **ESM-MLP (sequence only)** | 0.47 | 0.8708 | 0.8541 | 0.8944 | 0.8738 | 0.9442 | 0.9467 |
+| **GraphSAGE (graph only)** | 0.79 | 0.9010 | 0.9082 | 0.8921 | 0.9001 | 0.9474 | 0.9617 |
+| **XGBoost Ensemble (OOF stacking)** | 0.51 | **0.9175** | **0.9381** | 0.8940 | **0.9155** | **0.9626** | **0.9696** |
 
-*Note: The XGBoost ensemble meta-learner was trained strictly on Out-Of-Fold (OOF) base model predictions to prevent target leakage and achieve optimal ROC-AUC (0.9764) and PR-AUC (0.9773).*
-
----
-
-## 📁 Dataset & Isolation Safeguards
-
-| Property | Full Dataset | Training Set | Validation / Test Set |
-| :--- | :--- | :--- | :--- |
-| **Total Protein Pairs** | 363,081 | 322,739 (88.9%) | 40,342 (11.1%) |
-| **Class Balance** | 1:1 (Balanced) | 1:1 (Balanced) | 1:1 (Balanced) |
-| **Node Isolation** | Unseen Split | Training Nodes | Held-out Nodes |
-| **Pair Overlap** | N/A | **0 Pairs Overlapping** | **0 Pairs Overlapping** |
-
-- **Data Sources**: Curated from UniProt, STRING database interactions, and ChEMBL.
-- **Negative Sampling**: Positive interactions ($1$) are ground-truth STRING pairs. Negative pairs ($0$) are sampled uniformly at random across non-interacting protein pairs, strictly filtering out any known STRING interaction.
+Notes:
+- 5-fold pair-level stratified OOF predictions are used to train the XGBoost meta-learner (`src/training/train_ensemble.py`).
+- The ensemble achieves the highest accuracy, precision, F1, ROC-AUC and PR-AUC among the evaluated configurations on this test split; ESM-MLP has marginally higher recall (0.8944 vs 0.8940). No controlled ablation was run, so no causal claim is made about why the ensemble is higher.
+- These are single-run results on one split (`random_state=42`); no confidence intervals or significance tests are reported.
+- The evaluation is **transductive pair prediction** (see below). It does not establish performance on unseen proteins, and no comparison with published methods is made.
 
 ---
 
-## ⚙️ Computational Requirements & Efficiency
+## 📁 Dataset & Evaluation Protocol
 
-TransGraph-PPI was trained and validated on accessible standard hardware:
-- **Hardware Profile**: NVIDIA GeForce RTX 3050 (4 GB VRAM) & Multithreaded CPU.
-- **Training Latency**: ESM-MLP (~3-5 min/epoch), GAT (~1-2 min/epoch).
-- **Inference Latency**: < 50ms per protein pair for the full prediction pipeline.
+| Property | Full Dataset | Train | Validation | Test |
+| :--- | :---: | :---: | :---: | :---: |
+| **Protein pairs** | 201,712 | 161,369 | 20,171 | 20,172 |
+| **Positive / negative** | 100,856 / 100,856 | 80,685 / 80,684 | 10,085 / 10,086 | 10,086 / 10,086 |
+| **Class balance** | 1:1 | 1:1 | 1:1 | 1:1 |
+
+- **Unique human proteins**: 12,323.
+- **Split**: stratified 80/10/10 at the *pair* level (`random_state=42`, `src/data/preprocess_data.py`). The splits are **pair-disjoint but not node-disjoint**: every protein in the test set also occurs in the training set. Pair overlap between splits is zero (`scripts/verify_splits.py`).
+- **Graph**: built from the 80,685 positive training pairs only; no validation or test positive appears among its edges. Node features are the 480-d ESM-2 embedding plus degree centrality, clustering coefficient and PageRank.
+- **Positives**: STRING v12 human interactions filtered by `combined_score` (script default `--min_score 900`).
+- **Negatives**: a mix of random pairs (subject to a UniProt co-localization constraint) and common-neighbor "hard" negatives (`--hard_ratio`, default 0.5), never known STRING positives.
+- **Thresholds**: chosen on the validation set only.
+
+---
+
+## ⚙️ Model Notes
+
+- Sequence embeddings use ESM-2 `esm2_t12_35M_UR50D` (35M parameters, 480 dimensions); larger ESM-2 variants are untested.
+- `config.yaml` holds device and training defaults. No latency or hardware benchmarks are reported here.
 
 ---
 
@@ -163,7 +171,7 @@ python src/training/train_ensemble.py
 ```bash
 pytest tests/
 ```
-*(15/15 unit and integration tests passing)*
+*(13 tests collected; 13 passing at the time of the final cleanup)*
 
 ---
 
@@ -181,8 +189,8 @@ TransGraph-PPI
 ├── models                    # Trained PyTorch & XGBoost model checkpoints
 ├── src
 │   ├── data                  # Collection, preprocessing, ESM-2 extraction scripts
-│   ├── models                # MLP and GAT neural network definitions
-│   ├── training              # Sequence, GAT, and ensemble training scripts
+│   ├── models                # MLP and GraphSAGE neural network definitions
+│   ├── training              # Sequence, graph (GraphSAGE), and ensemble training scripts
 │   └── evaluation            # Metric calculation and validation scripts
 ├── tests                     # Unit & end-to-end integration safety tests
 └── README.md
@@ -192,16 +200,20 @@ TransGraph-PPI
 
 ## ⚠️ Explicit Limitations
 
-1. **Embedding Scale**: Trained using ESM-2 35M parameter embeddings (`esm2_t12_35M_UR50D`, 480 dimensions). Larger ESM variants (e.g., 150M, 650M or 3B) may yield richer sequence representations in future work.
-2. **Graph Cold-Start**: Novel proteins lacking edges in the pre-constructed training GAT graph will have fallback graph signals, shifting reliance entirely to the sequence model.
-3. **Negative Sampling**: Random non-interaction sampling may occasionally sample unannotated true interactions ("hard negatives").
+1. **Transductive evaluation**: the split is pair-disjoint, not node-disjoint, so the reported metrics do not measure generalization to unseen proteins or other species. The cold-start path (nearest-neighbour node insertion in `/predict`) and the Cross-Species page are exploratory and have not been evaluated.
+2. **Single split, single run**: results come from one seed/split with no confidence intervals or significance testing.
+3. **Biological feature**: the co-localization score is part of the ensemble input, but the trained XGBoost trees never split on it (it is 0.5 for almost every pair, since the UniProt cache covers few proteins), so it contributes nothing measurable.
+4. **Synthetic negatives**: negatives are sampled, not experimentally validated, and may include unannotated true interactions.
+5. **No external benchmark**: no evaluation on other datasets (e.g. SHS27k, SHS148k, HuRI, BioGRID) has been run, so no comparison with published methods is made.
+6. **Embedding scale**: only the 35M-parameter ESM-2 model was used.
+7. **Therapeutic targets**: the TTPS score (0.40 degree + 0.35 betweenness + 0.25 ChEMBL indicator) is a heuristic with user-chosen weights, not a validated ranking.
 
 ---
 
 ## 🔮 Future Research Directions
 
-- **Orthogonal Dataset Benchmarking**: Evaluation on external datasets (such as HuRI or BioGRID reference sets) to assess cross-dataset generalization.
-- **Model Scaling**: Upgrading sequence feature extractors to higher-capacity ESM-2/ESM-Fold models.
+- **Node-disjoint / cold-start evaluation**: protein-disjoint splits and external datasets (such as HuRI or BioGRID) to measure generalization to unseen proteins.
+- **Model scaling**: higher-capacity ESM-2 variants for the sequence model.
 
 ---
 

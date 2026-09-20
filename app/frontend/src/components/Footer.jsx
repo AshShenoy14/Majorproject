@@ -53,7 +53,7 @@ const Footer = () => {
                         letterSpacing: '0.04em',
                     }}
                 >
-                    Powered by ESM-2, GAT & XGBoost
+                    Powered by ESM-2, GraphSAGE & XGBoost
                 </Typography>
             </Container>
         </Box>

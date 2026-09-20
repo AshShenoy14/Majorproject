@@ -57,7 +57,7 @@ class PPIExplainer:
              
         return shap_values
 
-    def save_summary_plot(self, X: np.ndarray, feature_names=["ESM-MLP", "GAT", "|ESM-0.5|", "|GAT-0.5|", "Disagreement", "Max Conf", "Consensus", "Bio Localization"], title="SHAP Summary Plot", output_path="shap_summary.png"):
+    def save_summary_plot(self, X: np.ndarray, feature_names=["ESM-MLP", "GraphSAGE", "|ESM-0.5|", "|GraphSAGE-0.5|", "Disagreement", "Max Conf", "Consensus", "Bio Localization"], title="SHAP Summary Plot", output_path="shap_summary.png"):
         """
         Generates and saves a SHAP summary plot for a batch of predictions.
         """
@@ -74,10 +74,3 @@ class PPIExplainer:
         plt.savefig(output_path, bbox_inches='tight')
         plt.close()
         print(f"SHAP summary plot saved to {output_path}")
-
-def plot_gat_attention(attention_weights, edge_index):
-    """
-    Placeholder for plotting GAT attention weights on the graph.
-    Requires extraction of attention weights from GAT model.
-    """
-    pass

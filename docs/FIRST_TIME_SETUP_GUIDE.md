@@ -139,14 +139,14 @@ python src/training/train_sequence_model.py --embedding_path data/processed/embe
 
 **Output:** `models/sequence_model_best.pth`
 
-### 3b. Train Graph Model (GAT)
+### 3b. Train Graph Model (GraphSAGE)
 
 ```bash
 python src/training/train_graph_model.py --graph_path data/processed/ppi_graph.pt
 ```
 
 **Optional flags:**
-- `--epochs 100` (default: 100, GAT usually needs more epochs)
+- `--epochs 100` (default: 100)
 - `--lr 0.005` (default: 0.005)
 
 **Output:** `models/graph_model_best.pth`

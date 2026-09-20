@@ -5,6 +5,9 @@ import joblib
 import os
 import sys
 import argparse
+import json
+import hashlib
+from datetime import datetime, timezone
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.metrics import (
@@ -22,7 +25,7 @@ from src.analysis.explainability import PPIExplainer
 from src.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT
 from src.utils.rf_feature_builder import build_rf_features_for_df
 from src.utils.bio_encoder import BioFeatureEncoder
-from src.analysis.biological_managers import BiologicalManager
+from src.analysis.biological_managers import BiologicalManager, ensemble_bio_score
 
 def find_optimal_threshold(y_true, y_prob, method="f1"):
     """
@@ -185,8 +188,7 @@ def get_model_predictions(df, seq_model, graph_model, ensemble_model, rf_model, 
         bio_scores = []
         for _, row in tqdm(filtered_df.iterrows(), total=len(filtered_df), desc=f"{desc} (Bio Score)"):
             p1, p2 = row["protein1"], row["protein2"]
-            comp = bio_manager.check_localization_compatibility(p1, p2, fetch_missing=False)
-            bio_scores.append(comp.get("score", 0.5))
+            bio_scores.append(ensemble_bio_score(bio_manager, p1, p2))
         
         bio_scores_np = np.array(bio_scores)
         
@@ -205,6 +207,22 @@ def get_model_predictions(df, seq_model, graph_model, ensemble_model, rf_model, 
         ens_preds = ensemble_model.predict_proba(X_8feat)[:, 1]
 
     return labels, seq_preds, graph_preds, ens_preds, rf_preds, X_8feat, filtered_df
+
+def _checkpoint_info(path):
+    """Identifier for a checkpoint file: name, size, mtime and SHA-256 prefix (None if missing)."""
+    if not path.exists():
+        return None
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    st = path.stat()
+    return {
+        "file": path.name,
+        "size_bytes": st.st_size,
+        "modified": datetime.fromtimestamp(st.st_mtime, timezone.utc).isoformat(),
+        "sha256_16": h.hexdigest()[:16],
+    }
 
 def evaluate_models(dry_run=False):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -321,7 +339,7 @@ def evaluate_models(dry_run=False):
     # 1. Baseline Evaluation (Default threshold=0.5)
     std_results = []
     std_results.append(["Sequence-Only (ESM-MLP)"] + calc_metrics(test_labels, test_seq, threshold=0.5))
-    std_results.append(["Graph-Only (GAT)"] + calc_metrics(test_labels, test_graph, threshold=0.5))
+    std_results.append(["Graph-Only (GraphSAGE)"] + calc_metrics(test_labels, test_graph, threshold=0.5))
     if test_rf is not None:
         std_results.append(["Random Forest Baseline"] + calc_metrics(test_labels, test_rf, threshold=0.5))
     if test_ens is not None:
@@ -334,11 +352,47 @@ def evaluate_models(dry_run=False):
     # 2. Final Leakage-Free Test Evaluation (using Validation-Selected Thresholds)
     final_results = []
     final_results.append(["Sequence-Only (ESM-MLP)", val_thresh_seq] + calc_metrics(test_labels, test_seq, threshold=val_thresh_seq))
-    final_results.append(["Graph-Only (GAT)", val_thresh_graph] + calc_metrics(test_labels, test_graph, threshold=val_thresh_graph))
+    final_results.append(["Graph-Only (GraphSAGE)", val_thresh_graph] + calc_metrics(test_labels, test_graph, threshold=val_thresh_graph))
     if test_rf is not None:
         final_results.append(["Random Forest Baseline", val_thresh_rf] + calc_metrics(test_labels, test_rf, threshold=val_thresh_rf))
     if test_ens is not None:
         final_results.append(["Full Ensemble (XGBoost)", val_thresh_ens] + calc_metrics(test_labels, test_ens, threshold=val_thresh_ens))
+
+    # 2b. Reproducible JSON log of the final test evaluation
+    if not dry_run:
+        train_rows = len(pd.read_csv(PROCESSED_DATA_DIR / "train.csv"))
+        metric_keys = ["accuracy", "precision", "recall", "f1", "roc_auc", "pr_auc"]
+        models_log = {}
+        for row in final_results:
+            models_log[row[0]] = {"val_selected_threshold": float(row[1]),
+                                  **{k: float(v) for k, v in zip(metric_keys, row[2:])}}
+        log_doc = {
+            "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+            "protocol": "thresholds (F1-max, sweep 0.1-0.9) selected on val.csv; metrics computed on test.csv only",
+            "split_design": "pair-level stratified 80/10/10 split (random_state=42); pair-disjoint, NOT node-disjoint - evaluation is transductive pair prediction",
+            "dataset_rows": {
+                "total": train_rows + len(val_df) + len(test_df),
+                "train": train_rows,
+                "validation": len(val_df),
+                "test": len(test_df),
+                "validation_evaluated": int(len(val_labels)),
+                "test_evaluated": int(len(test_labels)),
+                "test_rows_filtered": int(len(test_df) - len(test_labels)),
+                "validation_rows_filtered": int(len(val_df) - len(val_labels)),
+            },
+            "models": models_log,
+            "checkpoints": {
+                "sequence_model": _checkpoint_info(seq_path),
+                "graph_model": _checkpoint_info(graph_model_path),
+                "ensemble": _checkpoint_info(ensemble_path),
+                "random_forest": _checkpoint_info(rf_path),
+            },
+        }
+        log_path = PROJECT_ROOT / "assets" / "evaluation" / "final_test_metrics.json"
+        os.makedirs(log_path.parent, exist_ok=True)
+        with open(log_path, "w", encoding="utf-8") as f:
+            json.dump(log_doc, f, indent=2)
+        print(f"\n[LOGGED] Final test metrics written to {log_path}")
 
     final_headers = ["Component", "Val-Selected Thresh", "Accuracy", "Precision", "Recall", "F1", "ROC-AUC", "PR-AUC"]
     print("\n=== FINAL LEAKAGE-FREE TEST RESULTS (Validation-Selected Thresholds) ===")

@@ -19,7 +19,7 @@ from src.models.graph_model import GATLinkPredictor, GINLinkPredictor
 from src.models.ensemble_model import PPIEnsemble
 from src.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT, CHECKPOINT_DIR
 from src.utils.bio_encoder import BioFeatureEncoder
-from src.analysis.biological_managers import BiologicalManager
+from src.analysis.biological_managers import BiologicalManager, ensemble_bio_score
 
 
 def load_base_models(seq_model_path, graph_model_path, graph_data, input_dim, in_channels, device):
@@ -38,7 +38,7 @@ def load_base_models(seq_model_path, graph_model_path, graph_data, input_dim, in
         print("Detected GIN architecture for Graph Model.")
         graph_model = GINLinkPredictor(in_channels=in_channels, hidden_channels=128).to(device)
     else:
-        print("Detected GAT architecture for Graph Model.")
+        print("Detected GraphSAGE architecture for Graph Model.")
         graph_model = GATLinkPredictor(in_channels=in_channels, hidden_channels=256).to(device)
     
     graph_model.load_state_dict(state_dict)
@@ -138,7 +138,7 @@ def train_fold_sequence(model, embeddings, bio_mapping, train_p1, train_p2, trai
 
 
 def train_fold_gat(model, fold_graph_data, train_p1, train_p2, train_labels, node_mapping, device, epochs=5, chunk_size=1000):
-    """Trains a GAT Link Predictor from scratch on a fold's training graph and pairs."""
+    """Trains a GraphSAGE link predictor from scratch on a fold's training graph and pairs."""
     model.train()
     optimizer = optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4)
     criterion = nn.BCEWithLogitsLoss()
@@ -205,7 +205,7 @@ def generate_oof_predictions(
         # 1. Assert disjoint splits
         assert set(train_idx).isdisjoint(set(val_idx)), f"Fold {fold+1}: Train and validation indices overlap!"
         
-        # 2. Construct Fold-Specific GAT Graph using ONLY positive training edges from in-fold train split
+        # 2. Construct Fold-Specific Graph using ONLY positive training edges from in-fold train split
         in_fold_train_df = train_df.iloc[train_idx]
         pos_train_df = in_fold_train_df[in_fold_train_df["label"] == 1]
         
@@ -217,7 +217,7 @@ def generate_oof_predictions(
         all_fold_dst = fold_dst_nodes + fold_src_nodes
         fold_edge_index = torch.tensor([all_fold_src, all_fold_dst], dtype=torch.long).to(device)
         
-        # Explicit verification: ensure no held-out validation edge is present in fold GAT graph
+        # Explicit verification: ensure no held-out validation edge is present in fold graph
         val_src = [node_mapping[p] for p in train_df.iloc[val_idx]["protein1"]]
         val_dst = [node_mapping[p] for p in train_df.iloc[val_idx]["protein2"]]
         val_pairs_set = set(zip(val_src, val_dst)).union(set(zip(val_dst, val_src)))
@@ -225,12 +225,12 @@ def generate_oof_predictions(
         
         leaked_edges = val_pairs_set.intersection(fold_edge_pairs_set)
         assert len(leaked_edges) == 0, f"LEAKAGE DETECTED in Fold {fold+1}: {len(leaked_edges)} held-out edges found in fold graph!"
-        print(f"  [VERIFIED] Zero held-out validation edges in Fold {fold+1} GAT graph.")
+        print(f"  [VERIFIED] Zero held-out validation edges in Fold {fold+1} graph.")
 
         fold_graph_data = Data(x=full_graph_data.x.clone(), edge_index=fold_edge_index)
 
         # 3. Instantiate fresh models from scratch (Zero checkpoint fallback)
-        print(f"  Initializing fresh Sequence and GAT models from scratch for Fold {fold+1}...")
+        print(f"  Initializing fresh Sequence and GraphSAGE models from scratch for Fold {fold+1}...")
         fold_seq_model = SequencePPIModel(input_dim=input_dim).to(device)
         fold_gat_model = GATLinkPredictor(in_channels=in_channels, hidden_channels=256).to(device)
 
@@ -239,7 +239,7 @@ def generate_oof_predictions(
         print(f"  Training Fold {fold+1} Sequence Model ({oof_epochs} epochs)...")
         train_fold_sequence(fold_seq_model, embeddings, bio_mapping, tr_p1, tr_p2, tr_lbl, device, bio_dim=bio_dim, epochs=oof_epochs)
         
-        print(f"  Training Fold {fold+1} GAT Model ({oof_epochs} epochs)...")
+        print(f"  Training Fold {fold+1} GraphSAGE Model ({oof_epochs} epochs)...")
         train_fold_gat(fold_gat_model, fold_graph_data, tr_p1, tr_p2, tr_lbl, node_mapping, device, epochs=oof_epochs)
 
         # 5. Predict ONLY on held-out validation fold (val_idx)
@@ -331,8 +331,7 @@ def train_ensemble(seq_model_path, graph_model_path, graph_data_path, k_folds=5,
     train_bio_scores = []
     for _, row in tqdm(filtered_train_df.iterrows(), total=len(filtered_train_df), desc="Bio Analysis (Train)"):
         p1, p2 = row["protein1"], row["protein2"]
-        comp = bio_manager.check_localization_compatibility(p1, p2, fetch_missing=False)
-        train_bio_scores.append(comp.get("score", 0.5))
+        train_bio_scores.append(ensemble_bio_score(bio_manager, p1, p2))
     
     train_bio_scores_np = np.array(train_bio_scores).reshape(-1, 1)
     train_labels_np = filtered_train_df["label"].values
@@ -377,8 +376,7 @@ def train_ensemble(seq_model_path, graph_model_path, graph_data_path, k_folds=5,
 
         val_bio_scores = []
         for _, row in filtered_val_df.iterrows():
-            comp = bio_manager.check_localization_compatibility(row["protein1"], row["protein2"], fetch_missing=False)
-            val_bio_scores.append(comp.get("score", 0.5))
+            val_bio_scores.append(ensemble_bio_score(bio_manager, row["protein1"], row["protein2"]))
         val_bio_scores_np = np.array(val_bio_scores).reshape(-1, 1)
 
         val_ensemble_preds = ensemble.predict(val_seq_preds, val_graph_preds, bio_features=val_bio_scores_np, method="stacking")
