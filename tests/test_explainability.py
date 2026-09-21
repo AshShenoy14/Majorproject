@@ -18,10 +18,9 @@ def test_explainers_integration():
     conf_graph = 0.2
     disagreement = 0.1
     max_conf = 0.3
-    bio_score = 1.0
     
     shap_vals = explainer.explain_prediction(
-        seq_prob, graph_prob, conf_seq, conf_graph, disagreement, max_conf, bio_score
+        seq_prob, graph_prob, conf_seq, conf_graph, disagreement, max_conf
     )
     # SHAP values should be returned as np array or list
     assert shap_vals is not None

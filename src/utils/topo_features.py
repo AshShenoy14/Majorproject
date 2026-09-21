@@ -47,3 +47,24 @@ class TopologicalFeatureExtractor:
                 
         print(f"Extracted 4 topological features for {len(proteins_list)} proteins.")
         return features
+
+
+def node_topology_columns(src, dst, num_nodes):
+    """
+    Per-node structural columns (degree centrality, clustering coefficient, PageRank a=0.85) computed on the
+    graph defined by the undirected edge list (src[i], dst[i]) over `num_nodes` nodes.
+
+    Same recipe as src/data/graph_construction.py. Called once per OOF fold on that fold's TRAINING edges only,
+    so held-out pairs never influence a fold's node features.
+    Returns a float32 tensor of shape (num_nodes, 3).
+    """
+    G = nx.Graph()
+    G.add_nodes_from(range(num_nodes))
+    G.add_edges_from(zip(list(src), list(dst)))
+    dc = nx.degree_centrality(G)
+    cl = nx.clustering(G)
+    pr = nx.pagerank(G, alpha=0.85)
+    cols = torch.zeros((num_nodes, 3), dtype=torch.float32)
+    for i in range(num_nodes):
+        cols[i, 0], cols[i, 1], cols[i, 2] = dc.get(i, 0), cl.get(i, 0), pr.get(i, 0)
+    return cols

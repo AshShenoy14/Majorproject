@@ -29,7 +29,7 @@ class BiologicalManager:
     def _save_cache(self):
         self.cache_df.to_csv(self.cache_path, index=False)
 
-    def get_bio_metadata(self, protein_ids: List[str], fetch_missing: bool = True, persist: bool = True) -> pd.DataFrame:
+    def get_bio_metadata(self, protein_ids: List[str], fetch_missing: bool = True, persist: bool = False) -> pd.DataFrame:
         """
         Fetches localization and pathway info for proteins.
         protein_ids: List of ENSP IDs.
@@ -141,14 +141,14 @@ class BiologicalManager:
 
         return self.cache_df[self.cache_df["protein_id"].isin(protein_ids)]
 
-    def check_biological_compatibility(self, p1_id: str, p2_id: str, fetch_missing: bool = True, persist: bool = True) -> Dict[str, Any]:
+    def check_biological_compatibility(self, p1_id: str, p2_id: str, fetch_missing: bool = True, persist: bool = False) -> Dict[str, Any]:
         """
         Checks if two proteins have compatible subcellular localizations AND 
         identifies 'Similarity Traps' (e.g. two co-chaperones with similar domains).
         """
         meta = self.get_bio_metadata([p1_id, p2_id], fetch_missing=fetch_missing, persist=persist)
         if len(meta) < 2:
-            return {"compatible": True, "score": 0.5, "reason": "Insufficient biological data", "p1_locs": [], "p2_locs": []}
+            return {"compatible": True, "score": 0.5, "reason": "Insufficient biological data", "p1_locs": [], "p2_locs": [], "intersection": []}
         
         row1 = meta[meta["protein_id"] == p1_id].iloc[0]
         row2 = meta[meta["protein_id"] == p2_id].iloc[0]
@@ -158,8 +158,10 @@ class BiologicalManager:
         l2 = set([x.strip().lower() for x in str(row2["localization"]).split(";") if x.strip()])
         
         loc_score = 0.5
+        intersection_list = []
         if l1 and l2:
             intersection = l1.intersection(l2)
+            intersection_list = sorted(list(intersection))
             if len(intersection) > 0:
                 loc_score = 1.0
                 # Nucleolar bias correction
@@ -193,12 +195,13 @@ class BiologicalManager:
             "compatible": loc_score > 0.3,
             "score": loc_score,
             "reason": reason,
-            "p1_locs": list(l1),
-            "p2_locs": list(l2),
+            "p1_locs": sorted(list(l1)),
+            "p2_locs": sorted(list(l2)),
+            "intersection": intersection_list,
             "trap_penalty": trap_penalty
         }
 
-    def check_localization_compatibility(self, p1_id: str, p2_id: str, fetch_missing: bool = True, persist: bool = True) -> Dict[str, Any]:
+    def check_localization_compatibility(self, p1_id: str, p2_id: str, fetch_missing: bool = True, persist: bool = False) -> Dict[str, Any]:
         """Backwards compatibility alias for the new logic"""
         return self.check_biological_compatibility(p1_id, p2_id, fetch_missing, persist)
     def calculate_pathway_vulnerability(self, p1_id: str, p2_id: str, delta_score: float) -> Dict[str, Any]:

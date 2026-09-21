@@ -4,6 +4,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000
 
 const api = axios.create({
   baseURL: API_BASE_URL,
+  timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -17,6 +18,9 @@ export const ppiService = {
       protein1_seq: p1_seq, 
       protein2_seq: p2_seq 
     }),
+
+  explainGNN: (protein1_id, protein2_id) =>
+    api.post('/analysis/explain-gnn', { protein1_id, protein2_id }),
 
   getNetwork: (limit = 100) => api.get(`/network?limit=${limit}`),
 

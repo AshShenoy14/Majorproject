@@ -1,0 +1,80 @@
+{
+  "split_sizes": {
+    "train": 161369,
+    "val": 20171,
+    "test": 20172
+  },
+  "negative_contamination": {
+    "train": {
+      "n_negatives": 80684,
+      "contaminated_any_score": 22496,
+      "contaminated_ge400": 9158,
+      "contaminated_ge700": 2907,
+      "contamination_pct_any": 27.882
+    },
+    "val": {
+      "n_negatives": 10086,
+      "contaminated_any_score": 2761,
+      "contaminated_ge400": 1116,
+      "contaminated_ge700": 364,
+      "contamination_pct_any": 27.375
+    },
+    "test": {
+      "n_negatives": 10086,
+      "contaminated_any_score": 2694,
+      "contaminated_ge400": 1105,
+      "contaminated_ge700": 357,
+      "contamination_pct_any": 26.71
+    },
+    "ALL": {
+      "n_negatives": 100856,
+      "contaminated_any_score": 27951,
+      "contaminated_ge400": 11379,
+      "contaminated_ge700": 3628,
+      "contamination_pct_any": 27.714
+    }
+  },
+  "degree_bias_baseline": {
+    "description": "logistic regression on log positive-degree of the two proteins only; fit on train, scored on test",
+    "test_accuracy": 0.6791,
+    "test_roc_auc": 0.7569,
+    "majority_class_accuracy": 0.5
+  },
+  "model_metrics": {
+    "calibration_val": {
+      "sequence": {
+        "ECE": 0.1319,
+        "Brier": 0.1115
+      },
+      "graph": {
+        "ECE": 0.1837,
+        "Brier": 0.1353
+      },
+      "ensemble": {
+        "ECE": 0.0673,
+        "Brier": 0.0706
+      }
+    },
+    "meta_feature_mean_abs_shap": {
+      "p_seq": 0.26178,
+      "p_graph": 0.32568,
+      "conf_seq": 0.05923,
+      "conf_graph": 0.07594,
+      "diff": 0.05915,
+      "max_conf": 0.13909,
+      "consensus": 1.39081,
+      "bio_score": 0.0
+    },
+    "meta_feature_xgb_gain": {
+      "p_seq": 0.2427,
+      "p_graph": 0.01838,
+      "conf_seq": 0.0341,
+      "conf_graph": 0.01596,
+      "diff": 0.02838,
+      "max_conf": 0.03435,
+      "consensus": 0.62613,
+      "bio_score": 0.0
+    },
+    "bio_score_pct_default_0.5_val": 99.995
+  }
+}

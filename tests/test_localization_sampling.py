@@ -1,6 +1,7 @@
 import pytest
 import pandas as pd
-from src.data.preprocess_data import generate_negative_samples, is_co_localized
+import numpy as np
+from src.data.preprocess_data import generate_negative_samples, is_co_localized, PairSet
 
 def test_localization_constrained_sampling():
     # Setup simple mock positive interactions
@@ -30,6 +31,7 @@ def test_localization_constrained_sampling():
     neg_df = generate_negative_samples(
         positive_df=positive_df,
         all_proteins=all_proteins,
+        exclusion_pairs=PairSet(all_proteins, np.array(["PROT_A", "PROT_B"]), np.array(["PROT_B", "PROT_C"])),
         ratio=2.0,
         hard_ratio=0.5,
         loc_dict=loc_dict
@@ -41,3 +43,17 @@ def test_localization_constrained_sampling():
     for _, row in neg_df.iterrows():
         p1, p2 = row["protein1"], row["protein2"]
         assert is_co_localized(p1, p2, loc_dict) is True
+
+
+def test_negatives_avoid_low_confidence_interactions():
+    """Pairs with a low-but-nonzero STRING score sit in the exclusion set and must never be sampled as negatives."""
+    all_proteins = ["P1", "P2", "P3", "P4", "P5", "P6"]
+    positive_df = pd.DataFrame([{"protein1": "P1", "protein2": "P2"}, {"protein1": "P2", "protein2": "P3"}])
+    # low-confidence STRING pairs (below the positive threshold) that are NOT positives
+    low_a = np.array(["P1", "P3", "P4", "P1"])
+    low_b = np.array(["P3", "P4", "P5", "P6"])
+    excl = PairSet(all_proteins, np.concatenate([np.array(["P1", "P2"]), low_a]), np.concatenate([np.array(["P2", "P3"]), low_b]))
+    forbidden = {("P1", "P2"), ("P2", "P3"), ("P1", "P3"), ("P3", "P4"), ("P4", "P5"), ("P1", "P6")}
+    neg_df = generate_negative_samples(positive_df, all_proteins, excl, ratio=2.0, hard_ratio=0.5)
+    sampled = set(zip(neg_df["protein1"], neg_df["protein2"]))
+    assert sampled and not (sampled & forbidden)

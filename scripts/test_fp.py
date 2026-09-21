@@ -9,7 +9,7 @@ from src.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT
 from src.data.sequence_manager import SequenceManager
 from src.analysis.biological_managers import BiologicalManager
 from src.models.sequence_model import SequencePPIModel
-from src.models.graph_model import GINLinkPredictor, GATLinkPredictor
+from src.models.graph_model import GINLinkPredictor, SAGELinkPredictor
 from src.models.ensemble_model import PPIEnsemble
 from src.data.feature_extraction import ESMFeatureExtractor
 from src.utils.bio_encoder import BioFeatureEncoder
@@ -65,7 +65,7 @@ def main():
     if is_gin:
         graph_model = GINLinkPredictor(in_channels=in_channels, hidden_channels=128).to(device)
     else:
-        graph_model = GATLinkPredictor(in_channels=in_channels, hidden_channels=128, heads=4).to(device)
+        graph_model = SAGELinkPredictor(in_channels=in_channels, hidden_channels=128).to(device)
     
     graph_model.load_state_dict(state_dict)
     graph_model.eval()
@@ -83,15 +83,11 @@ def main():
     ensemble_path = PROJECT_ROOT / "models" / "ensemble_model.pkl"
     if ensemble_path.exists():
         ens = PPIEnsemble(str(ensemble_path))
-        bio_comp = bio_mgr.check_localization_compatibility(p1, p2)
-        bio_score = bio_comp.get("score", 0.5)
-        print("Bio Score:", bio_score)
         
         # We need seq_prob, graph_prob, features
         ens_prob = ens.predict(
             np.array([seq_prob]), 
             np.array([graph_prob]), 
-            bio_features=np.array([[bio_score]]),
             method="stacking"
         )[0]
         print("Ensemble Prob:", ens_prob)

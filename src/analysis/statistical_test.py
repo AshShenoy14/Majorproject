@@ -14,7 +14,7 @@ from tabulate import tabulate
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
 from src.models.sequence_model import SequencePPIModel
-from src.models.graph_model import GATLinkPredictor
+from src.models.graph_model import SAGELinkPredictor
 from src.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT
 
 def get_metrics(y_true, y_probs):
@@ -95,10 +95,10 @@ def run_p_test(n_iterations=10):
             from src.models.graph_model import GINLinkPredictor
             graph_model = GINLinkPredictor(in_channels=in_channels, hidden_channels=128).to(device)
         else:
-            graph_model = GATLinkPredictor(in_channels=in_channels, hidden_channels=256).to(device)
+            graph_model = SAGELinkPredictor(in_channels=in_channels, hidden_channels=256).to(device)
         graph_model.load_state_dict(state_dict)
     else:
-        graph_model = GATLinkPredictor(in_channels=in_channels, hidden_channels=256).to(device)
+        graph_model = SAGELinkPredictor(in_channels=in_channels, hidden_channels=256).to(device)
     graph_model.eval()
 
     # Pre-calculate probabilities for the whole set to speed up bootstrapping

@@ -27,8 +27,9 @@ COPY src/ ./src/
 COPY app/ ./app/
 COPY models/ ./models/
 COPY data/ ./data/
+COPY assets/ ./assets/
 COPY config.yaml .
-COPY .env* ./
+
 
 # Expose backend port
 EXPOSE 8000

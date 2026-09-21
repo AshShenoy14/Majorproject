@@ -47,10 +47,12 @@ const InteractionVisualizer = ({ result, id1, id2 }) => {
         { subject: 'Sequence Match', A: explanation.Sequence_Model_Contribution * 100, fullMark: 100 },
         { subject: 'Network Proximity', A: explanation.Graph_Model_Contribution * 100, fullMark: 100 }
     ];
-    if (explanation.SHAP_Sequence !== undefined) {
+    const seqShapVal = explanation.SHAP_Sequence ?? (explanation.SHAP_Values ? explanation.SHAP_Values[0] : undefined);
+    const graphShapVal = explanation.SHAP_Graph ?? (explanation.SHAP_Values ? explanation.SHAP_Values[1] : undefined);
+    if (seqShapVal !== undefined && graphShapVal !== undefined) {
         // Normalize SHAP to 0-100 range roughly for visual purposes (absolute magnitude of influence)
-        const seqShap = Math.min(Math.abs(explanation.SHAP_Sequence) * 200, 100);
-        const graphShap = Math.min(Math.abs(explanation.SHAP_Graph) * 200, 100);
+        const seqShap = Math.min(Math.abs(seqShapVal) * 200, 100);
+        const graphShap = Math.min(Math.abs(graphShapVal) * 200, 100);
         radarData.push({ subject: 'Seq SHAP Impact', A: seqShap, fullMark: 100 });
         radarData.push({ subject: 'Graph SHAP Impact', A: graphShap, fullMark: 100 });
     }

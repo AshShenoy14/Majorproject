@@ -20,12 +20,13 @@ from tqdm import tqdm
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
 from src.models.sequence_model import SequencePPIModel
-from src.models.graph_model import GATLinkPredictor, GINLinkPredictor
+from src.models.graph_model import SAGELinkPredictor, GINLinkPredictor
 from src.analysis.explainability import PPIExplainer
-from src.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT
+from src.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT, MODELS_DIR
 from src.utils.rf_feature_builder import build_rf_features_for_df
 from src.utils.bio_encoder import BioFeatureEncoder
-from src.analysis.biological_managers import BiologicalManager, ensemble_bio_score
+from src.analysis.biological_managers import BiologicalManager
+from src.utils.calibration import PlattScaler
 
 def find_optimal_threshold(y_true, y_prob, method="f1"):
     """
@@ -167,6 +168,14 @@ def get_model_predictions(df, seq_model, graph_model, ensemble_model, rf_model, 
             graph_preds.extend(probs.cpu().numpy().flatten())
     graph_preds = np.array(graph_preds)
 
+    # GraphSAGE probabilities are Platt-calibrated (fit on val.csv by train_graph_model.py) before use, both for the
+    # Graph-Only row and as the p_graph meta-feature, exactly as the ensemble was trained.
+    cal_path = MODELS_DIR / "graph_calibrator.json"
+    if cal_path.exists():
+        graph_preds = PlattScaler.load(cal_path).transform_probs(graph_preds)
+    else:
+        print(f"WARNING: {cal_path} not found - GraphSAGE probabilities are UNCALIBRATED.")
+
     # Predict Random Forest Baseline (1941 features)
     rf_preds = None
     if rf_model is not None:
@@ -175,38 +184,21 @@ def get_model_predictions(df, seq_model, graph_model, ensemble_model, rf_model, 
         )
         rf_preds = rf_model.predict_proba(X_rf)[:, 1]
 
-    # Predict Ensemble — 8 features
+    # Predict Ensemble - 7 meta-features
     ens_preds = None
-    X_8feat = None
+    X_7feat = None
     if ensemble_model:
         conf_seq = np.abs(seq_preds - 0.5)
-        conf_gat = np.abs(graph_preds - 0.5)
+        conf_graph = np.abs(graph_preds - 0.5)
         disagreement = np.abs(seq_preds - graph_preds)
-        max_conf = np.maximum(conf_seq, conf_gat)
+        max_conf = np.maximum(conf_seq, conf_graph)
         consensus = seq_preds * graph_preds
         
-        bio_scores = []
-        for _, row in tqdm(filtered_df.iterrows(), total=len(filtered_df), desc=f"{desc} (Bio Score)"):
-            p1, p2 = row["protein1"], row["protein2"]
-            bio_scores.append(ensemble_bio_score(bio_manager, p1, p2))
-        
-        bio_scores_np = np.array(bio_scores)
-        
-        # 8-Feature Stack: [seq_prob, gat_prob, conf_seq, conf_gat, disagreement, max_conf, consensus, bio_score]
-        X_8feat = np.column_stack((
-            seq_preds, 
-            graph_preds, 
-            conf_seq, 
-            conf_gat, 
-            disagreement, 
-            max_conf, 
-            consensus,
-            bio_scores_np
-        ))
-        
-        ens_preds = ensemble_model.predict_proba(X_8feat)[:, 1]
+        # 7-Feature Stack: [p_seq, p_graph, conf_seq, conf_graph, diff, max_conf, consensus]
+        X_7feat = np.column_stack((seq_preds, graph_preds, conf_seq, conf_graph, disagreement, max_conf, consensus))
+        ens_preds = ensemble_model.predict_proba(X_7feat)[:, 1]
 
-    return labels, seq_preds, graph_preds, ens_preds, rf_preds, X_8feat, filtered_df
+    return labels, seq_preds, graph_preds, ens_preds, rf_preds, X_7feat, filtered_df
 
 def _checkpoint_info(path):
     """Identifier for a checkpoint file: name, size, mtime and SHA-256 prefix (None if missing)."""
@@ -287,7 +279,7 @@ def evaluate_models(dry_run=False):
         if is_gin:
             graph_model = GINLinkPredictor(in_channels=in_channels, hidden_channels=128).to(device)
         else:
-            graph_model = GATLinkPredictor(in_channels=in_channels, hidden_channels=256).to(device)
+            graph_model = SAGELinkPredictor(in_channels=in_channels, hidden_channels=256).to(device)
         graph_model.load_state_dict(state_dict)
     graph_model.eval()
 
@@ -303,7 +295,7 @@ def evaluate_models(dry_run=False):
     # STEP 1: VALIDATION THRESHOLD SELECTION (val.csv ONLY)
     # =========================================================================
     print("\n--- STEP 1: Selecting Decision Thresholds on Validation Set (val.csv ONLY) ---")
-    val_labels, val_seq, val_graph, val_ens, val_rf, val_X_8feat, _ = get_model_predictions(
+    val_labels, val_seq, val_graph, val_ens, val_rf, val_X_7feat, _ = get_model_predictions(
         val_df, seq_model, graph_model, ensemble_model, rf_model, embeddings, bio_mapping, bio_manager, node_mapping, graph_data, device, desc="Val Inference"
     )
 
@@ -332,7 +324,7 @@ def evaluate_models(dry_run=False):
     # STEP 2: LEAKAGE-FREE FINAL TEST EVALUATION (test.csv)
     # =========================================================================
     print("\n--- STEP 2: Evaluating on Test Set (test.csv) using Validation Thresholds ---")
-    test_labels, test_seq, test_graph, test_ens, test_rf, test_X_8feat, _ = get_model_predictions(
+    test_labels, test_seq, test_graph, test_ens, test_rf, test_X_7feat, _ = get_model_predictions(
         test_df, seq_model, graph_model, ensemble_model, rf_model, embeddings, bio_mapping, bio_manager, node_mapping, graph_data, device, desc="Test Inference"
     )
 
@@ -424,21 +416,21 @@ def evaluate_models(dry_run=False):
         )
 
     # =========================================================================
-    # STEP 3: SHAP EXPLAINABILITY (8-FEATURE MATRIX VERIFICATION)
+    # STEP 3: SHAP EXPLAINABILITY (7-FEATURE MATRIX VERIFICATION)
     # =========================================================================
-    if ensemble_model and test_X_8feat is not None:
-        print("\n--- SHAP Summary Plot Generation (8-Feature Matrix) ---")
-        assert test_X_8feat.shape[1] == 8, f"ERROR: SHAP input matrix must have 8 features, but got {test_X_8feat.shape[1]}!"
-        print(f"[VERIFIED] SHAP matrix dimension: {test_X_8feat.shape} (8 features).")
+    if ensemble_model and test_X_7feat is not None:
+        print("\n--- SHAP Summary Plot Generation (7-Feature Matrix) ---")
+        assert test_X_7feat.shape[1] == 7, f"ERROR: SHAP input matrix must have 7 features, but got {test_X_7feat.shape[1]}!"
+        print(f"[VERIFIED] SHAP matrix dimension: {test_X_7feat.shape} (7 features).")
         
         try:
             explainer = PPIExplainer(str(ensemble_path))
             feature_names = [
-                'seq_prob', 'gat_prob', 'conf_seq', 'conf_gat', 
-                'disagreement', 'max_conf', 'consensus', 'bio_score'
+                'p_seq', 'p_graph', 'conf_seq', 'conf_graph', 
+                'disagreement', 'max_conf', 'consensus'
             ]
             explainer.save_summary_plot(
-                test_X_8feat, 
+                test_X_7feat, 
                 output_path=str(PROJECT_ROOT / "data" / "processed" / "plots" / "shap_summary.png"),
                 feature_names=feature_names
             )

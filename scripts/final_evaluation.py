@@ -9,12 +9,11 @@ from tqdm import tqdm
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
 
 from src.models.sequence_model import SequencePPIModel
-from src.models.graph_model import GATLinkPredictor
+from src.models.graph_model import SAGELinkPredictor
 from src.models.ensemble_model import PPIEnsemble
 from src.evaluation.metrics_reporter import MetricsReporter
 from src.utils.paths import PROCESSED_DATA_DIR, MODELS_DIR, PROJECT_ROOT
 from src.utils.bio_encoder import BioFeatureEncoder
-from src.analysis.biological_managers import BiologicalManager, ensemble_bio_score
 
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -60,7 +59,6 @@ def main():
     bio_encoder = BioFeatureEncoder()
     bio_mapping = bio_encoder.get_feature_map()
     bio_dim = len(next(iter(bio_mapping.values()))) if bio_mapping else 0
-    bio_manager = BiologicalManager()
     print(f"Detected Dimensions: Sequence={input_dim}, Biology={bio_dim}")
 
     seq_model = SequencePPIModel(input_dim=input_dim).to(device)
@@ -76,7 +74,7 @@ def main():
     if is_gin:
         graph_model = GINLinkPredictor(in_channels=graph_data.x.shape[1], hidden_channels=128).to(device)
     else:
-        graph_model = GATLinkPredictor(in_channels=graph_data.x.shape[1], hidden_channels=256).to(device)
+        graph_model = SAGELinkPredictor(in_channels=graph_data.x.shape[1], hidden_channels=256).to(device)
         
     graph_model.load_state_dict(state_dict)
     graph_model.eval()
@@ -89,7 +87,6 @@ def main():
         batch_emb2 = []
         g_src = []
         g_dst = []
-        bio_features = []
     
         for _, row in tqdm(split_df.iterrows(), total=len(split_df), desc="Preparing Data"):
             p1, p2 = row["protein1"], row["protein2"]
@@ -108,12 +105,9 @@ def main():
             g_src.append(node_mapping[p1])
             g_dst.append(node_mapping[p2])
 
-            # Ensemble bio feature: same construction as training (cache-only, no live fetch)
-            bio_features.append([ensemble_bio_score(bio_manager, p1, p2)])
 
         batch_emb1 = torch.stack(batch_emb1)
         batch_emb2 = torch.stack(batch_emb2)
-        bio_features = np.array(bio_features)
     
         seq_probs = []
         with torch.no_grad():
@@ -135,7 +129,7 @@ def main():
         graph_probs = np.array(graph_probs)
 
         # Ensemble
-        ensemble_probs = ensemble.predict(seq_probs, graph_probs, bio_features=bio_features, method="stacking")
+        ensemble_probs = ensemble.predict(seq_probs, graph_probs, method="stacking")
 
         return seq_probs, graph_probs, ensemble_probs
 

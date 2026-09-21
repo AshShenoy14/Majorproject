@@ -184,26 +184,35 @@ const PredictionForm = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const cleanId1 = id1?.trim();
+    const cleanId2 = id2?.trim();
+    if (!cleanId1 || !cleanId2) {
+      setError('Please provide valid identifiers for both Protein A and Protein B.');
+      return;
+    }
     setLoading(true);
     setError(null);
     setResult(null);
     setBatchResults([]);
 
     try {
-      const payload = {
-        protein1_id: id1 || "Protein A",
-        protein2_id: id2 || "Protein B",
-        protein1_seq: seq1,
-        protein2_seq: seq2,
-      };
-      const response = await ppiService.predict(id1 || "Protein A", id2 || "Protein B", seq1, seq2);
+      const response = await ppiService.predict(cleanId1, cleanId2, seq1?.trim() || null, seq2?.trim() || null);
       setResult(response.data);
-      saveToHistory({ id1: id1 || "Protein A", id2: id2 || "Protein B", result: response.data });
+      saveToHistory({ id1: cleanId1, id2: cleanId2, result: response.data });
       
-      fetchBioData(id1, id2);
-      fetchAiInsight(id1, id2);
+      fetchBioData(cleanId1, cleanId2);
+      fetchAiInsight(cleanId1, cleanId2);
     } catch (err) {
-      setError('Failed to fetch prediction. Ensure backend is running.');
+      const detail = err.response?.data?.detail;
+      let errorMsg = 'Failed to fetch prediction. Ensure backend is running.';
+      if (typeof detail === 'string') {
+        errorMsg = detail;
+      } else if (Array.isArray(detail) && detail[0]?.msg) {
+        errorMsg = detail[0].msg;
+      } else if (err.message) {
+        errorMsg = err.message;
+      }
+      setError(errorMsg);
       console.error(err);
     } finally {
       setLoading(false);
@@ -607,35 +616,46 @@ const PredictionForm = () => {
                     </Box>
                   )}
 
-                  {/* Explainability (SHAP) Restored */}
-                  {result.shap_explanations && (
-                    <Box sx={{ p: 2, bgcolor: isDark ? 'rgba(255, 255, 255, 0.02)' : 'rgba(0, 0, 0, 0.02)', borderRadius: 2 }}>
-                      <Typography variant="subtitle2" color="text.secondary" gutterBottom>Feature Attribution (SHAP)</Typography>
-                      <Stack spacing={1}>
-                        {[
-                          { label: 'Seq Evidence', val: result.shap_explanations[0] },
-                          { label: 'Graph Evidence', val: result.shap_explanations[1] },
-                          { label: 'Seq Confidence', val: result.shap_explanations[2] },
-                          { label: 'Graph Confidence', val: result.shap_explanations[3] }
-                        ].map((item, idx) => (
-                          <Box key={idx} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Typography variant="caption" sx={{ minWidth: 100 }}>{item.label}</Typography>
-                            <Box sx={{ flex: 1, height: 4, bgcolor: 'rgba(0,0,0,0.1)', borderRadius: 2, overflow: 'hidden' }}>
-                              <Box sx={{ 
-                                height: '100%', 
-                                width: `${Math.min(100, Math.abs(item.val) * 500)}%`, 
-                                bgcolor: item.val > 0 ? 'success.main' : 'error.main',
-                                ml: item.val < 0 ? 'auto' : 0
-                              }} />
+                  {/* Explainability (SHAP Feature Attributions) */}
+                  {(() => {
+                    const shapVals = result.explanation?.SHAP_Values || result.shap_explanations;
+                    if (!shapVals || !shapVals.length) return null;
+                    const featureMap = [
+                      { label: 'Sequence Prob', val: shapVals[0] },
+                      { label: 'Graph Prob', val: shapVals[1] },
+                      { label: 'Seq Confidence', val: shapVals[2] },
+                      { label: 'Graph Confidence', val: shapVals[3] },
+                      { label: 'Disagreement', val: shapVals[4] },
+                      { label: 'Max Confidence', val: shapVals[5] },
+                      { label: 'Consensus (Seq×Graph)', val: shapVals[6] },
+                      { label: 'Bio Localization', val: shapVals[7] },
+                    ];
+                    return (
+                      <Box sx={{ p: 2, bgcolor: isDark ? 'rgba(255, 255, 255, 0.02)' : 'rgba(0, 0, 0, 0.02)', borderRadius: 2 }}>
+                        <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                          Feature Attribution (SHAP Explainer)
+                        </Typography>
+                        <Stack spacing={1}>
+                          {featureMap.map((item, idx) => (
+                            <Box key={idx} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Typography variant="caption" sx={{ minWidth: 130 }}>{item.label}</Typography>
+                              <Box sx={{ flex: 1, height: 6, bgcolor: 'rgba(0,0,0,0.1)', borderRadius: 3, overflow: 'hidden' }}>
+                                <Box sx={{ 
+                                  height: '100%', 
+                                  width: `${Math.min(100, Math.abs(item.val || 0) * 500)}%`, 
+                                  bgcolor: (item.val || 0) >= 0 ? 'success.main' : 'error.main',
+                                  ml: (item.val || 0) < 0 ? 'auto' : 0
+                                }} />
+                              </Box>
+                              <Typography variant="caption" sx={{ minWidth: 45, textAlign: 'right', fontWeight: 'bold' }}>
+                                {(item.val || 0) >= 0 ? '+' : ''}{((item.val || 0) * 100).toFixed(1)}%
+                              </Typography>
                             </Box>
-                            <Typography variant="caption" sx={{ minWidth: 30, textAlign: 'right', fontWeight: 'bold' }}>
-                              {item.val > 0 ? '+' : ''}{(item.val * 100).toFixed(1)}%
-                            </Typography>
-                          </Box>
-                        ))}
-                      </Stack>
-                    </Box>
-                  )}
+                          ))}
+                        </Stack>
+                      </Box>
+                    );
+                  })()}
 
                   {/* GNN Topological Insights (New) */}
                   {result.gnn_explanation && result.gnn_explanation.top_neighbors && (

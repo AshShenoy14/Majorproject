@@ -102,7 +102,7 @@ const Home = () => {
             transition={{ delay: 0.2 }}
             className="text-xl text-slate-500 mb-10 leading-relaxed font-medium"
           >
-            <span className="font-cursive text-emerald-600 text-2xl">TransGraph PPI</span> is a state-of-the-art hybrid AI framework combining protein language models (ESM-2)
+            <span className="font-cursive text-emerald-600 text-2xl">TransGraph PPI</span> is a research-grade hybrid AI framework combining protein language models (ESM-2)
             and graph neural networks (GraphSAGE) to analyze complex biological interactomes.
           </motion.p>
           <motion.div

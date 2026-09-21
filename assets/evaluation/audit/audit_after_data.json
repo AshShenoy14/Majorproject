@@ -1,0 +1,44 @@
+{
+  "split_sizes": {
+    "train": 161369,
+    "val": 20171,
+    "test": 20172
+  },
+  "negative_contamination": {
+    "train": {
+      "n_negatives": 80684,
+      "contaminated_any_score": 0,
+      "contaminated_ge400": 0,
+      "contaminated_ge700": 0,
+      "contamination_pct_any": 0.0
+    },
+    "val": {
+      "n_negatives": 10086,
+      "contaminated_any_score": 0,
+      "contaminated_ge400": 0,
+      "contaminated_ge700": 0,
+      "contamination_pct_any": 0.0
+    },
+    "test": {
+      "n_negatives": 10086,
+      "contaminated_any_score": 0,
+      "contaminated_ge400": 0,
+      "contaminated_ge700": 0,
+      "contamination_pct_any": 0.0
+    },
+    "ALL": {
+      "n_negatives": 100856,
+      "contaminated_any_score": 0,
+      "contaminated_ge400": 0,
+      "contaminated_ge700": 0,
+      "contamination_pct_any": 0.0
+    }
+  },
+  "degree_bias_baseline": {
+    "description": "logistic regression on log positive-degree of the two proteins only; fit on train, scored on test",
+    "test_accuracy": 0.7068,
+    "test_roc_auc": 0.783,
+    "majority_class_accuracy": 0.5
+  },
+  "model_metrics": "skipped: models must be retrained on the new splits (Colab) before SHAP/ECE are meaningful"
+}

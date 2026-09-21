@@ -220,11 +220,7 @@ if __name__ == "__main__":
     sequences = {}
     
     if not STRING_SEQUENCES_FILE.exists():
-        print(f"Error: Sequences file not found at {STRING_SEQUENCES_FILE}")
-        for p in proteins:
-            length = np.random.randint(50, 100)
-            aa = "ACDEFGHIKLMNPQRSTVWY"
-            sequences[p] = "".join(np.random.choice(list(aa), length))
+        raise FileNotFoundError(f"Sequences file not found at {STRING_SEQUENCES_FILE}. Run src/data/collect_ppi.py first.")
     else:
         with gzip.open(STRING_SEQUENCES_FILE, "rt") as handle:
              for record in SeqIO.parse(handle, "fasta"):

@@ -1,5 +1,8 @@
-from pydantic import BaseModel, Field
+import re
+from pydantic import BaseModel, Field, field_validator
 from typing import Any, List, Optional, Dict
+
+AMINO_ACID_PATTERN = re.compile(r"^[ACDEFGHIKLMNPQRSTVWY]+$")
 
 class ProteinPair(BaseModel):
     protein1_seq: Optional[str] = Field(None, description="Amino acid sequence for protein 1", json_schema_extra={"example": "MAH..."})
@@ -7,12 +10,34 @@ class ProteinPair(BaseModel):
     protein1_id: Optional[str] = Field(None, description="Identifier for protein 1 (e.g., ENSP ID)", json_schema_extra={"example": "ENSP00000327694"})
     protein2_id: Optional[str] = Field(None, description="Identifier for protein 2 (e.g., ENSP ID)", json_schema_extra={"example": "ENSP00000373627"})
 
+    @field_validator("protein1_seq", "protein2_seq")
+    @classmethod
+    def validate_amino_acid_sequence(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        cleaned = re.sub(r"\s+", "", v).upper()
+        if not cleaned:
+            return None
+        if len(cleaned) < 5:
+            raise ValueError("Protein sequence must be at least 5 amino acids long.")
+        if len(cleaned) > 2000:
+            raise ValueError("Protein sequence exceeds maximum supported length of 2000 residues.")
+        if not AMINO_ACID_PATTERN.match(cleaned):
+            invalid_chars = sorted(list(set(cleaned) - set("ACDEFGHIKLMNPQRSTVWY")))
+            raise ValueError(f"Invalid amino acid character(s): {invalid_chars}. Only standard 20 amino acids allowed.")
+        return cleaned
+
 class PredictionResponse(BaseModel):
-    interaction_probability: float = Field(..., description="Final ensemble prediction probability", json_schema_extra={"example": 0.88})
-    esm_probability: float = Field(..., description="Probability from the ESM-MLP sequence model", json_schema_extra={"example": 0.92})
-    gat_probability: float = Field(..., description="Probability from the GraphSAGE graph model (field name kept as gat_probability for API compatibility)", json_schema_extra={"example": 0.75})
-    confidence_score: float = Field(..., description="Normalized confidence score [0, 1]", json_schema_extra={"example": 0.76})
-    explanation: Dict[str, Any] = Field(..., description="Feature importance scores (e.g., SHAP values)")
+    protein1_id: Optional[str] = Field(None, description="Identifier for protein 1")
+    protein2_id: Optional[str] = Field(None, description="Identifier for protein 2")
+    status: str = Field("success", description="Prediction status: 'success' or 'error'")
+    error: Optional[str] = Field(None, description="Error message if prediction failed")
+    interaction_probability: Optional[float] = Field(None, description="Final ensemble prediction probability", json_schema_extra={"example": 0.88})
+    esm_probability: Optional[float] = Field(None, description="Probability from the ESM-MLP sequence model", json_schema_extra={"example": 0.92})
+    gat_probability: Optional[float] = Field(None, description="Probability from the GraphSAGE graph model (field name kept as gat_probability for API compatibility)", json_schema_extra={"example": 0.75})
+    confidence_score: Optional[float] = Field(None, description="Normalized confidence score [0, 1]", json_schema_extra={"example": 0.76})
+    explanation: Optional[Dict[str, Any]] = Field(None, description="Feature importance scores (e.g., SHAP values)")
+    shap_explanations: Optional[List[float]] = Field(None, description="Direct SHAP attribution array for easy UI consumption")
     gnn_explanation: Optional[Dict[str, Any]] = Field(None, description="Detailed GNN-specific neighbor importance")
     protein1_uniprot_id: Optional[str] = Field(None, description="Mapped UniProt ID for protein 1", json_schema_extra={"example": "P12345"})
     protein2_uniprot_id: Optional[str] = Field(None, description="Mapped UniProt ID for protein 2", json_schema_extra={"example": "Q67890"})
@@ -70,10 +95,10 @@ class BioMetaResponse(BaseModel):
 
 class FeasibilityResponse(BaseModel):
     compatible: bool = Field(..., description="Whether the proteins can physically interact based on localization")
-    intersection: List[str] = Field(..., description="Shared subcellular compartments")
-    p1_locs: List[str]
-    p2_locs: List[str]
-    reason: str
+    intersection: List[str] = Field(default=[], description="Shared subcellular compartments")
+    p1_locs: List[str] = Field(default=[], description="Protein 1 subcellular compartments")
+    p2_locs: List[str] = Field(default=[], description="Protein 2 subcellular compartments")
+    reason: str = Field(default="", description="Biological rationale for compatibility assessment")
 
 class ChatRequest(BaseModel):
     message: str = Field(..., description="User's question about proteins or biology", json_schema_extra={"example": "What is p53?"})

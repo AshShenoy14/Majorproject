@@ -18,7 +18,7 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
 from src.models.sequence_model import SequencePPIModel
-from src.models.graph_model import GATLinkPredictor
+from src.models.graph_model import SAGELinkPredictor
 from src.utils.dataset import PPIDataset
 from src.utils.paths import PROCESSED_DATA_DIR
 

@@ -17,17 +17,17 @@ import joblib
 from typing import List
 
 from src.models.sequence_model import SequencePPIModel
-from src.models.graph_model import GATLinkPredictor
+from src.models.graph_model import SAGELinkPredictor
 from src.models.ensemble_model import PPIEnsemble
 from src.data.feature_extraction import ESMFeatureExtractor
 from src.data.sequence_manager import SequenceManager
 from src.data.target_manager import TargetManager
 from src.data.id_mapper import IDMapper
 from src.analysis.explainability import PPIExplainer
-from src.analysis.explain_model import explain_prediction as explain_gnn
+from src.analysis.explain_model import explain_prediction as explain_gnn, get_topological_neighbors
 from src.analysis.network_analysis import NetworkAnalyzer
 from src.analysis.mutation_analyzer import MutationAnalyzer
-from src.analysis.biological_managers import BiologicalManager, ensemble_bio_score
+from src.analysis.biological_managers import BiologicalManager
 from src.analysis.protein_assistant import ProteinAssistant
 from src.utils.bio_encoder import BioFeatureEncoder
 from app.backend.schemas import (
@@ -125,7 +125,7 @@ async def load_system():
             raise RuntimeError(f"CRITICAL SAFETY ERROR: Failed to load sequence model from {seq_path}: {e}")
 
         # Graph Model
-        from src.models.graph_model import GATLinkPredictor, GINLinkPredictor
+        from src.models.graph_model import SAGELinkPredictor, GINLinkPredictor
         graph_path = PROJECT_ROOT / "models" / "graph_model_best.pth"
         graph_data_path = PROCESSED_DATA_DIR / "ppi_graph.pt"
         if not graph_path.exists() or not graph_data_path.exists():
@@ -141,7 +141,7 @@ async def load_system():
                 models["graph_model"] = GINLinkPredictor(in_channels=in_channels, hidden_channels=128).to(device)
             else:
                 print("Detected SAGEConv architecture for Graph Model.")
-                models["graph_model"] = GATLinkPredictor(in_channels=in_channels, hidden_channels=256).to(device)
+                models["graph_model"] = SAGELinkPredictor(in_channels=in_channels, hidden_channels=256).to(device)
             
             models["graph_model"].load_state_dict(state_dict)
             models["graph_model"].eval()
@@ -259,23 +259,8 @@ async def predict_interaction(pair: ProteinPair):
         
         # 3. Sequence Prediction
         with torch.no_grad():
-            # Add Biological Features to Sequence Input if available
-            bio_meta = managers["bio"].get_bio_metadata([p1, p2], fetch_missing=False)
-
-            # Helper to get encoded vector for an ID from the fetched metadata
-            def get_encoded(pid):
-                row = bio_meta[bio_meta["protein_id"] == pid]
-                loc_str = row.iloc[0]["localization"] if not row.empty else ""
-                return managers["bio_encoder"].encode_protein(loc_str).to(models["esm"].device).float()
-
-            b1 = get_encoded(p1).unsqueeze(0)
-            b2 = get_encoded(p2).unsqueeze(0)
-            
-            e1_final = torch.cat([e1, b1], dim=1)
-            e2_final = torch.cat([e2, b2], dim=1)
-            
             # Apply sigmoid to raw logits (model outputs logits, not probabilities)
-            seq_prob = torch.sigmoid(models["seq_model"](e1_final, e2_final)).item()
+            seq_prob = torch.sigmoid(models["seq_model"](e1, e2)).item()
             
         # 4. Graph Prediction (with Mapping Resilience and KNN Cold-Start)
         graph_prob = 0.5 
@@ -337,40 +322,33 @@ async def predict_interaction(pair: ProteinPair):
             raise HTTPException(status_code=503, detail="Ensemble meta-learner or SHAP explainer unavailable.")
 
         try:
-            # Ensemble bio feature: cache-only, identical to training/evaluation (never live-fetched)
-            bio_score = ensemble_bio_score(managers["bio"], p1, p2)
             # Display-only: live UniProt-backed compatibility, NOT fed to the ensemble
             bio_comp = managers["bio"].check_localization_compatibility(p1, p2, persist=False)
             bio_match = bio_comp.get("score", 0.5)
 
+            # The meta-learner consumes the CALIBRATED GraphSAGE probability
+            graph_prob_cal = float(models["ensemble"].calibrate_graph(np.array([graph_prob]))[0])
             conf_seq = abs(seq_prob - 0.5)
-            conf_graph = abs(graph_prob - 0.5)
-            disagreement = abs(seq_prob - graph_prob)
+            conf_graph = abs(graph_prob_cal - 0.5)
+            disagreement = abs(seq_prob - graph_prob_cal)
             max_conf = max(conf_seq, conf_graph)
-            
-            # Predict with XGBoost Meta-Learner
-            # PPIEnsemble._build_features constructs all 8 features:
-            # [seq, graph, conf_seq, conf_graph, disagreement, max_conf, consensus, bio_score]
+
+            # predict() takes the raw graph probability and calibrates it internally.
+            # 7 meta-features: [p_seq, p_graph, conf_seq, conf_graph, diff, max_conf, consensus]
             ens_prob = models["ensemble"].predict(
-                np.array([seq_prob]), 
-                np.array([graph_prob]), 
-                bio_features=np.array([[bio_score]]),
+                np.array([seq_prob]),
+                np.array([graph_prob]),
                 method="stacking"
             )[0]
-            
-            # Runtime defensive assertion to verify exact 8-feature alignment
-            feat_matrix = models["ensemble"]._build_features(
-                np.array([seq_prob]), 
-                np.array([graph_prob]), 
-                bio_features=np.array([[bio_score]])
-            )
-            assert feat_matrix.shape[1] == 8, f"Feature parity failure: Expected 8 features for XGBoost ensemble, got {feat_matrix.shape[1]}"
-            
+
+            feat_matrix = models["ensemble"]._build_features(np.array([seq_prob]), np.array([graph_prob_cal]))
+            assert feat_matrix.shape[1] == 7, f"Feature parity failure: Expected 7 features for XGBoost ensemble, got {feat_matrix.shape[1]}"
+
             final_prob = float(ens_prob)
             model_used = "XGBoost Ensemble"
             
-            # Generate SHAP explanation with 8 features
-            shap_val = explainer.explain_prediction(seq_prob, graph_prob, conf_seq, conf_graph, disagreement, max_conf, bio_score)
+            # Generate SHAP explanation with 7 features
+            shap_val = explainer.explain_prediction(seq_prob, graph_prob_cal, conf_seq, conf_graph, disagreement, max_conf)
             shap_values = shap_val.tolist()[0] 
         except Exception as e:
             import traceback
@@ -383,10 +361,12 @@ async def predict_interaction(pair: ProteinPair):
             "Graph_Model_Contribution": graph_prob,
             "Model_Used": model_used,
             "SHAP_Values": shap_values,
+            "SHAP_Sequence": shap_values[0] if shap_values and len(shap_values) > 0 else 0.0,
+            "SHAP_Graph": shap_values[1] if shap_values and len(shap_values) > 1 else 0.0,
             "Biological_Match": bio_match > 0.5
         }
         
-        # 6a. GNN Topological Explanation (Research Layer with Mapping Resilience)
+        # 6a. GNN Topological Evidence (< 2ms fast inspection from in-memory graph)
         gnn_explanation = None
         # Use resolved IDs to ensure topological insights for missing isoforms
         res_p1 = managers["id_mapper"].resolve_to_graph_id(p1, set(data_cache.get("mapping", {}).keys()))
@@ -394,12 +374,13 @@ async def predict_interaction(pair: ProteinPair):
 
         if "mapping" in data_cache and res_p1 in data_cache["mapping"] and res_p2 in data_cache["mapping"]:
             try:
-                # This call runs GNNExplainer (epochs=50) using resolved IDs
-                gnn_explanation = explain_gnn(res_p1, res_p2)
+                gnn_explanation = get_topological_neighbors(
+                    res_p1, res_p2,
+                    data=data_cache.get("graph"),
+                    node_mapping=data_cache.get("mapping")
+                )
             except Exception as e:
-                import traceback
-                traceback.print_exc()
-                print(f"GNN Explanation failed: {e}")
+                print(f"Topological graph inspection failed: {e}")
 
         # 7. Uniprot ID Mapping for 3D Visuals
         uniprot_maps = {}
@@ -407,11 +388,16 @@ async def predict_interaction(pair: ProteinPair):
             uniprot_maps = managers["id_mapper"].ensp_to_uniprot([p1, p2])
 
         return {
+            "protein1_id": p1,
+            "protein2_id": p2,
+            "status": "success",
+            "error": None,
             "interaction_probability": float(final_prob),
             "esm_probability": float(seq_prob),
             "gat_probability": float(graph_prob),
             "confidence_score": abs(float(final_prob) - 0.5) * 2,
             "explanation": explanation,
+            "shap_explanations": shap_values,
             "gnn_explanation": gnn_explanation,
             "protein1_uniprot_id": uniprot_maps.get(p1, p1),
             "protein2_uniprot_id": uniprot_maps.get(p2, p2),
@@ -439,18 +425,25 @@ async def predict_batch(request: BatchPredictionRequest):
 
     results = []
     for pair in request.pairs:
+        p1 = pair.protein1_id or "Unknown_P1"
+        p2 = pair.protein2_id or "Unknown_P2"
         try:
              res = await predict_interaction(pair)
              results.append(res)
         except Exception as e:
-             p1 = pair.protein1_id
-             p2 = pair.protein2_id
-             print(f"Error in batch for pair {p1}-{p2}: {e}")
+             error_msg = str(e)
+             if hasattr(e, "detail"):
+                 error_msg = str(e.detail)
+             print(f"Error in batch for pair {p1}-{p2}: {error_msg}")
              results.append({
-                 "interaction_probability": 0.0,
-                 "esm_probability": 0.0,
-                 "gat_probability": 0.0,
-                 "confidence_score": 0.0,
+                 "protein1_id": p1,
+                 "protein2_id": p2,
+                 "status": "error",
+                 "error": error_msg,
+                 "interaction_probability": None,
+                 "esm_probability": None,
+                 "gat_probability": None,
+                 "confidence_score": None,
                  "explanation": {
                      "Sequence_Model_Contribution": 0.0,
                      "Graph_Model_Contribution": 0.0,
@@ -458,6 +451,7 @@ async def predict_batch(request: BatchPredictionRequest):
                      "SHAP_Values": None,
                      "Biological_Match": False
                  },
+                 "shap_explanations": None,
                  "gnn_explanation": None,
                  "protein1_uniprot_id": p1,
                  "protein2_uniprot_id": p2,
@@ -757,26 +751,62 @@ async def get_hotspots(request: ProteinPair):
     if "hotspot" not in analyzers:
         raise HTTPException(status_code=503, detail="Hotspot Analyzer not initialized")
     
+    p1 = request.protein1_id.strip() if request.protein1_id else None
+    p2 = request.protein2_id.strip() if request.protein2_id else None
+    if not p1 or not p2:
+        raise HTTPException(status_code=400, detail="Both protein1_id and protein2_id are required.")
+
     try:
         # Get sequences if missing
         sequences = {}
         to_fetch = []
-        if not request.protein1_seq: to_fetch.append(request.protein1_id)
-        else: sequences[request.protein1_id] = request.protein1_seq
-        if not request.protein2_seq: to_fetch.append(request.protein2_id)
-        else: sequences[request.protein2_id] = request.protein2_seq
+        if not request.protein1_seq: to_fetch.append(p1)
+        else: sequences[p1] = request.protein1_seq
+        if not request.protein2_seq: to_fetch.append(p2)
+        else: sequences[p2] = request.protein2_seq
         
         if to_fetch:
             sequences.update(managers["sequence"].get_sequences(to_fetch))
             
+        if p1 not in sequences or p2 not in sequences:
+            raise HTTPException(status_code=404, detail="Could not find sequences for one or both proteins.")
+
         return analyzers["hotspot"].identify_hotspots(
-            request.protein1_id, sequences[request.protein1_id],
-            request.protein2_id, sequences[request.protein2_id]
+            p1, sequences[p1],
+            p2, sequences[p2]
         )
     except HTTPException as he:
         raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/analysis/explain-gnn",
+          summary="Deep GNN Feature and Neighbor Explanation",
+          description="Runs PyTorch Geometric GNNExplainer on a pair for detailed research explainability.",
+          tags=["Analysis"])
+async def explain_gnn_deep(request: ProteinPair):
+    p1 = request.protein1_id.strip() if request.protein1_id else None
+    p2 = request.protein2_id.strip() if request.protein2_id else None
+    if not p1 or not p2:
+        raise HTTPException(status_code=400, detail="Both protein1_id and protein2_id are required.")
+    
+    res_p1 = managers["id_mapper"].resolve_to_graph_id(p1, set(data_cache.get("mapping", {}).keys()))
+    res_p2 = managers["id_mapper"].resolve_to_graph_id(p2, set(data_cache.get("mapping", {}).keys()))
+    
+    if "mapping" not in data_cache or res_p1 not in data_cache["mapping"] or res_p2 not in data_cache["mapping"]:
+        raise HTTPException(status_code=404, detail="One or both proteins not found in the graph network.")
+        
+    try:
+        return explain_gnn(
+            res_p1, res_p2,
+            model=models.get("graph_model"),
+            data=data_cache.get("graph"),
+            node_mapping=data_cache.get("mapping"),
+            epochs=15
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"GNNExplainer failed: {e}")
 
 
 @app.post("/analysis/residue_graph",

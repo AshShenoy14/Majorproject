@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from src.utils.paths import PROCESSED_DATA_DIR, MODELS_DIR
 from src.models.sequence_model import SequencePPIModel
-from src.models.graph_model import GINLinkPredictor, GATLinkPredictor
+from src.models.graph_model import GINLinkPredictor, SAGELinkPredictor
 from src.models.ensemble_model import PPIEnsemble
 from src.data.feature_extraction import ESMFeatureExtractor
 from src.utils.bio_encoder import BioFeatureEncoder
@@ -54,7 +54,7 @@ def analyze_case(p1, p2):
     if is_gin:
         graph_model = GINLinkPredictor(in_channels=in_channels, hidden_channels=128).to(device)
     else:
-        graph_model = GATLinkPredictor(in_channels=in_channels, hidden_channels=128, heads=4).to(device)
+        graph_model = SAGELinkPredictor(in_channels=in_channels, hidden_channels=128).to(device)
         
     graph_model.load_state_dict(state_dict)
     graph_model.eval()
@@ -68,31 +68,29 @@ def analyze_case(p1, p2):
             
     # Ensemble
     ens = PPIEnsemble(str(MODELS_DIR / "ensemble_model.pkl"))
-    bio_comp = bio_mgr.check_biological_compatibility(p1, p2)
-    bio_score = bio_comp.get("score", 0.5)
     
     # 2. SHAP Explanation
     explainer = PPIExplainer(str(MODELS_DIR / "ensemble_model.pkl"))
     
     # Features for the ensemble
     conf_s = abs(s_prob - 0.5)
-    conf_g = abs(g_prob - 0.5)
-    disagreement = abs(s_prob - g_prob)
+    g_cal = float(ens.calibrate_graph(np.array([g_prob]))[0])  # meta-learner consumes the calibrated probability
+    conf_g = abs(g_cal - 0.5)
+    disagreement = abs(s_prob - g_cal)
     max_conf = max(conf_s, conf_g)
     
     shap_vals = explainer.explain_prediction(
-        s_prob, g_prob, conf_s, conf_g, disagreement, max_conf, bio_score
+        s_prob, g_cal, conf_s, conf_g, disagreement, max_conf
     )
     
     print("\n--- Deep Analysis ---")
     print(f"Pair: {p1} - {p2}")
     print(f"Sequence Prob: {s_prob:.4f}")
     print(f"Graph Prob: {g_prob:.4f}")
-    print(f"Bio Score: {bio_score}")
-    print(f"Ensemble Prob: {ens.predict(np.array([s_prob]), np.array([g_prob]), np.array([[bio_score]]))[0]:.4f}")
+    print(f"Ensemble Prob: {ens.predict(np.array([s_prob]), np.array([g_prob]))[0]:.4f}")
     
     print("\nSHAP Contributions (Positive means pushing towards Interaction):")
-    features = ["ESM-MLP", "GraphSAGE", "Conf-Seq", "Conf-GraphSAGE", "Disagreement", "MaxConf", "Bio-Loc"]
+    features = ["ESM-MLP", "GraphSAGE", "Conf-Seq", "Conf-GraphSAGE", "Disagreement", "MaxConf", "Consensus"]
     for name, val in zip(features, shap_vals[0]):
         print(f"{name:12}: {val:+.4f}")
 

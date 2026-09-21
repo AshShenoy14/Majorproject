@@ -29,17 +29,14 @@ class NetworkAnalyzer:
         print("Calculating Degree Centrality...")
         deg = nx.degree_centrality(self.graph)
         
-        print("Calculating Betweenness Centrality (approx)...")
+        print("Calculating Betweenness Centrality (deterministic sampling)...")
         k = 50 if len(self.graph) > 1000 else None
-        bet = nx.betweenness_centrality(self.graph, k=k)
-        
-        print("Skipping Closeness Centrality for performance...")
-        clo = {n: 0.0 for n in self.graph.nodes()}
+        bet = nx.betweenness_centrality(self.graph, k=k, seed=42)
 
         print("Calculating Eigenvector Centrality...")
         try:
             eig = nx.eigenvector_centrality(self.graph, max_iter=500)
-        except:
+        except Exception:
             eig = {n: 0.0 for n in self.graph.nodes()} # Fallback if convergence fails
         
         data = []
@@ -51,7 +48,7 @@ class NetworkAnalyzer:
                 "protein_id": node,
                 "degree_centrality": deg[node],
                 "betweenness_centrality": bet[node],
-                "closeness_centrality": clo[node],
+                "closeness_centrality": None,
                 "eigenvector_centrality": eig[node]
             })
             

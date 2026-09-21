@@ -61,6 +61,18 @@ def verify_splits():
     print(f"Train AND Test:       {train_test_overlap}")
     print(f"Validation AND Test:  {val_test_overlap}")
 
+    # 3b. Node-Level (Protein) Transductive Distribution
+    train_nodes = set(train_df['protein1']).union(set(train_df['protein2']))
+    val_nodes   = set(val_df['protein1']).union(set(val_df['protein2']))
+    test_nodes  = set(test_df['protein1']).union(set(test_df['protein2']))
+
+    print(f"\n--- Node-Level (Protein) Representation ---")
+    print(f"Train Unique Proteins: {len(train_nodes)}")
+    print(f"Val Unique Proteins:   {len(val_nodes)}")
+    print(f"Test Unique Proteins:  {len(test_nodes)}")
+    print(f"Test Proteins in Train: {len(test_nodes.intersection(train_nodes))} / {len(test_nodes)} ({len(test_nodes.intersection(train_nodes))/len(test_nodes)*100:.1f}%) [Transductive Link Prediction]")
+    print(f"Test Novel Proteins:    {len(test_nodes - train_nodes)} ({len(test_nodes - train_nodes)/len(test_nodes)*100:.1f}%) [Inductive / Cold-Start Candidates]")
+
     # 4. Check Positives vs Negatives Integrity
     all_dfs = pd.concat([train_df, val_df, test_df], ignore_index=True)
     pos_pairs = set(canonical_pair(r['protein1'], r['protein2']) for _, r in all_dfs[all_dfs['label'] == 1].iterrows())

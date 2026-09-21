@@ -1,25 +1,27 @@
 import numpy as np
 import torch
-import torch.nn as nn
-import torch.optim as optim
 import pandas as pd
 import argparse
+import hashlib
 import os
 import sys
-from tqdm import tqdm
-from sklearn.model_selection import StratifiedKFold
-from sklearn.metrics import roc_curve, auc, precision_recall_curve, average_precision_score, accuracy_score, f1_score, roc_auc_score
-import matplotlib.pyplot as plt
-from torch_geometric.data import Data
+import time
+from sklearn.model_selection import StratifiedKFold, train_test_split
+from sklearn.metrics import accuracy_score, roc_auc_score
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
 from src.models.sequence_model import SequencePPIModel
-from src.models.graph_model import GATLinkPredictor, GINLinkPredictor
+from src.models.graph_model import SAGELinkPredictor, GINLinkPredictor
 from src.models.ensemble_model import PPIEnsemble
+from src.training.base_trainers import (
+    SEQ_CFG, GRAPH_CFG, get_device, build_embedding_table, fit_sequence, fit_graph, graph_logits, sequence_probs,
+)
 from src.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT, CHECKPOINT_DIR
 from src.utils.bio_encoder import BioFeatureEncoder
-from src.analysis.biological_managers import BiologicalManager, ensemble_bio_score
+from src.utils.calibration import PlattScaler, calibration_report
+from src.utils.seed import set_seed
+from src.utils.topo_features import node_topology_columns
 
 
 def load_base_models(seq_model_path, graph_model_path, graph_data, input_dim, in_channels, device):
@@ -39,8 +41,8 @@ def load_base_models(seq_model_path, graph_model_path, graph_data, input_dim, in
         graph_model = GINLinkPredictor(in_channels=in_channels, hidden_channels=128).to(device)
     else:
         print("Detected GraphSAGE architecture for Graph Model.")
-        graph_model = GATLinkPredictor(in_channels=in_channels, hidden_channels=256).to(device)
-    
+        graph_model = SAGELinkPredictor(in_channels=in_channels, hidden_channels=256).to(device)
+
     graph_model.load_state_dict(state_dict)
     print(f"Loaded Final Graph Model from {graph_model_path}")
     graph_model.eval()
@@ -56,7 +58,7 @@ def predict_sequence_model(model, embeddings, bio_mapping, p1_list, p2_list, dev
         for i in range(0, len(p1_list), batch_size):
             p1_batch = p1_list[i:i+batch_size]
             p2_batch = p2_list[i:i+batch_size]
-            
+
             b_emb1, b_emb2 = [], []
             for p1, p2 in zip(p1_batch, p2_batch):
                 e1 = embeddings[p1].float()
@@ -70,7 +72,7 @@ def predict_sequence_model(model, embeddings, bio_mapping, p1_list, p2_list, dev
                     e2_v = torch.cat([e2_v, b2])
                 b_emb1.append(e1_v)
                 b_emb2.append(e2_v)
-            
+
             e1_t = torch.stack(b_emb1).to(device)
             e2_t = torch.stack(b_emb2).to(device)
             out = model(e1_t, e2_t)
@@ -85,10 +87,10 @@ def predict_graph_model(graph_model, fold_graph_data, node_mapping, p1_list, p2_
     src_indices = [node_mapping[p1] for p1 in p1_list]
     dst_indices = [node_mapping[p2] for p2 in p2_list]
     edge_label_index = torch.tensor([src_indices, dst_indices], dtype=torch.long).to(device)
-    
+
     preds = []
     with torch.no_grad():
-        z = graph_model.encode(fold_graph_data.x, fold_graph_data.edge_index)
+        z = graph_model.encode(fold_graph_data.x.to(device), fold_graph_data.edge_index.to(device))
         num_edges = edge_label_index.size(1)
         for i in range(0, num_edges, chunk_size):
             chunk = edge_label_index[:, i:i+chunk_size]
@@ -98,179 +100,164 @@ def predict_graph_model(graph_model, fold_graph_data, node_mapping, p1_list, p2_
     return np.array(preds)
 
 
-def train_fold_sequence(model, embeddings, bio_mapping, train_p1, train_p2, train_labels, device, bio_dim=0, epochs=5, batch_size=64):
-    """Trains a Sequence PPI Model from scratch on a fold's training split."""
-    model.train()
-    optimizer = optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-3)
-    criterion = nn.BCEWithLogitsLoss()
-    num_samples = len(train_p1)
-
-    for ep in range(epochs):
-        perm = np.random.permutation(num_samples)
-        for b in range(0, num_samples, batch_size):
-            batch_ids = perm[b:b+batch_size]
-            b_p1, b_p2, b_lbl = train_p1[batch_ids], train_p2[batch_ids], train_labels[batch_ids]
-            
-            b_e1, b_e2 = [], []
-            for p1, p2 in zip(b_p1, b_p2):
-                e1 = embeddings[p1].float()
-                e2 = embeddings[p2].float()
-                e1_v = e1.mean(dim=0) if e1.dim() > 1 else e1
-                e2_v = e2.mean(dim=0) if e2.dim() > 1 else e2
-                if bio_mapping:
-                    b1 = bio_mapping.get(p1, torch.zeros(bio_dim))
-                    b2 = bio_mapping.get(p2, torch.zeros(bio_dim))
-                    e1_v = torch.cat([e1_v, b1])
-                    e2_v = torch.cat([e2_v, b2])
-                b_e1.append(e1_v)
-                b_e2.append(e2_v)
-            
-            e1_t = torch.stack(b_e1).to(device)
-            e2_t = torch.stack(b_e2).to(device)
-            lbl_t = torch.tensor(b_lbl, dtype=torch.float32).to(device).unsqueeze(1)
-            
-            optimizer.zero_grad()
-            out = model(e1_t, e2_t)
-            loss = criterion(out, lbl_t)
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-            optimizer.step()
-
-
-def train_fold_gat(model, fold_graph_data, train_p1, train_p2, train_labels, node_mapping, device, epochs=5, chunk_size=1000):
-    """Trains a GraphSAGE link predictor from scratch on a fold's training graph and pairs."""
-    model.train()
-    optimizer = optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4)
-    criterion = nn.BCEWithLogitsLoss()
-    
-    src = [node_mapping[p1] for p1 in train_p1]
-    dst = [node_mapping[p2] for p2 in train_p2]
-    edge_label_index = torch.tensor([src, dst], dtype=torch.long).to(device)
-    labels_t = torch.tensor(train_labels, dtype=torch.float32).to(device)
-    num_edges = edge_label_index.size(1)
-
-    for ep in range(epochs):
-        optimizer.zero_grad()
-        z = model.encode(fold_graph_data.x, fold_graph_data.edge_index)
-        z_detached = z.detach().requires_grad_(True)
-        
-        for i in range(0, num_edges, chunk_size):
-            chunk = edge_label_index[:, i:i+chunk_size]
-            lbl_c = labels_t[i:i+chunk_size]
-            out_c = model.decode(z_detached, chunk[0], chunk[1])
-            loss_c = criterion(out_c.squeeze(), lbl_c)
-            (loss_c * 10.0).backward()
-            
-        z.backward(z_detached.grad)
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-        optimizer.step()
+def _fingerprint(df):
+    h = hashlib.md5()
+    h.update("|".join(df["protein1"].astype(str)).encode())
+    h.update("|".join(df["protein2"].astype(str)).encode())
+    h.update(df["label"].values.tobytes())
+    return h.hexdigest()
 
 
 def generate_oof_predictions(
-    train_df, 
-    embeddings, 
-    bio_mapping, 
-    node_mapping, 
-    full_graph_data, 
-    device, 
-    k_folds=5, 
-    oof_epochs=5,
-    dry_run=False
+    train_df,
+    embeddings,
+    node_mapping,
+    full_graph_data,
+    device,
+    k_folds=5,
+    es_frac=0.1,
+    seed=42,
+    checkpoint_dir=None,
+    ckpt_every=5,
+    seq_cfg=SEQ_CFG,
+    graph_cfg=GRAPH_CFG,
+    dry_run=False,
 ):
     """
-    Generates STRICT, leakage-free out-of-fold (OOF) predictions on train.csv.
-    Each fold initializes base models from scratch and trains strictly on the in-fold training portion.
-    Full-data checkpoints (sequence_model_best.pth / graph_model_best.pth) are NEVER loaded here.
+    Generates leakage-free out-of-fold (OOF) predictions on train.csv.
+
+    Per fold, everything a base model sees is derived from the fold's TRAINING rows only:
+      * the message-passing graph holds only in-fold positive pairs, and its node columns
+        (degree centrality, clustering coefficient, PageRank) are RECOMPUTED on that graph;
+      * models are trained with the same max-epoch budget / patience / loss / scheduler as the production
+        models (base_trainers.SEQ_CFG / GRAPH_CFG). Early stopping uses an inner validation split carved
+        from the fold's training rows (es_frac), never the held-out rows.
+    Completed folds are cached in checkpoint_dir so an interrupted Colab session resumes at the next fold.
+
+    GraphSAGE calibration: per fold, a Platt scaler is fit on the fold's inner early-stopping logits (never on the
+    held-out rows) and applied to the held-out logits, mirroring how the production calibrator is fit on val.csv.
+    Returns (oof_seq, oof_graph_raw, oof_graph_calibrated, visited).
     """
-    print(f"\n--- Generating Strict Leakage-Free OOF Predictions ({k_folds} folds, {oof_epochs} epochs/fold) ---")
-    
+    print(f"\n--- Leakage-free OOF predictions: {k_folds} folds, max {seq_cfg['max_epochs']}/{graph_cfg['max_epochs']} "
+          f"epochs (seq/graph) with early stopping, device={device} ---")
+
     n_samples = len(train_df)
-    oof_seq_preds = np.zeros(n_samples, dtype=np.float32)
-    oof_graph_preds = np.zeros(n_samples, dtype=np.float32)
-    visited_indices = np.zeros(n_samples, dtype=bool)
-    
-    skf = StratifiedKFold(n_splits=k_folds, shuffle=True, random_state=42)
-    p1_all = train_df["protein1"].values
-    p2_all = train_df["protein2"].values
+    oof_seq = np.zeros(n_samples, dtype=np.float32)
+    oof_graph = np.zeros(n_samples, dtype=np.float32)
+    oof_graph_logit = np.zeros(n_samples, dtype=np.float32)
+    oof_graph_cal = np.zeros(n_samples, dtype=np.float32)
+    visited = np.zeros(n_samples, dtype=bool)
+
+    p1_all, p2_all = train_df["protein1"].values, train_df["protein2"].values
     labels_all = train_df["label"].values
+    fp = _fingerprint(train_df)
+    oof_dir = os.path.join(checkpoint_dir, "oof") if checkpoint_dir else None
+    if oof_dir:
+        os.makedirs(oof_dir, exist_ok=True)
 
-    sample_emb = next(iter(embeddings.values()))
-    input_dim = sample_emb.shape[-1]
-    bio_dim = len(next(iter(bio_mapping.values()))) if bio_mapping else 0
-    in_channels = full_graph_data.x.shape[1]
+    protein_list = sorted(set(p1_all) | set(p2_all))
+    table, row_of = build_embedding_table(embeddings, protein_list, device)
+    seq_a = np.array([row_of[p] for p in p1_all])
+    seq_b = np.array([row_of[p] for p in p2_all])
+    g_u = np.array([node_mapping[p] for p in p1_all])
+    g_v = np.array([node_mapping[p] for p in p2_all])
 
-    for fold, (train_idx, val_idx) in enumerate(skf.split(train_df, labels_all)):
-        print(f"\nProcessing Fold {fold+1}/{k_folds} (In-Fold Train: {len(train_idx)}, Held-Out OOF: {len(val_idx)})...")
-        
-        # 1. Assert disjoint splits
-        assert set(train_idx).isdisjoint(set(val_idx)), f"Fold {fold+1}: Train and validation indices overlap!"
-        
-        # 2. Construct Fold-Specific Graph using ONLY positive training edges from in-fold train split
-        in_fold_train_df = train_df.iloc[train_idx]
-        pos_train_df = in_fold_train_df[in_fold_train_df["label"] == 1]
-        
-        fold_src_nodes = [node_mapping[p] for p in pos_train_df["protein1"]]
-        fold_dst_nodes = [node_mapping[p] for p in pos_train_df["protein2"]]
-        
-        # Undirected graph edge tensor
-        all_fold_src = fold_src_nodes + fold_dst_nodes
-        all_fold_dst = fold_dst_nodes + fold_src_nodes
-        fold_edge_index = torch.tensor([all_fold_src, all_fold_dst], dtype=torch.long).to(device)
-        
-        # Explicit verification: ensure no held-out validation edge is present in fold graph
-        val_src = [node_mapping[p] for p in train_df.iloc[val_idx]["protein1"]]
-        val_dst = [node_mapping[p] for p in train_df.iloc[val_idx]["protein2"]]
-        val_pairs_set = set(zip(val_src, val_dst)).union(set(zip(val_dst, val_src)))
-        fold_edge_pairs_set = set(zip(all_fold_src, all_fold_dst))
-        
-        leaked_edges = val_pairs_set.intersection(fold_edge_pairs_set)
-        assert len(leaked_edges) == 0, f"LEAKAGE DETECTED in Fold {fold+1}: {len(leaked_edges)} held-out edges found in fold graph!"
-        print(f"  [VERIFIED] Zero held-out validation edges in Fold {fold+1} graph.")
+    base_x = full_graph_data.x.cpu()
+    num_nodes = base_x.shape[0]
+    in_channels = base_x.shape[1]
+    input_dim = table.shape[1]
 
-        fold_graph_data = Data(x=full_graph_data.x.clone(), edge_index=fold_edge_index)
+    skf = StratifiedKFold(n_splits=k_folds, shuffle=True, random_state=seed)
+    fold_times = []
+    for fold, (train_idx, ho_idx) in enumerate(skf.split(train_df, labels_all)):
+        cache_file = os.path.join(oof_dir, f"fold{fold + 1}.npz") if oof_dir else None
+        if cache_file and os.path.exists(cache_file) and not dry_run:
+            c = np.load(cache_file, allow_pickle=False)
+            if str(c["fingerprint"]) == fp and np.array_equal(c["ho_idx"], ho_idx):
+                oof_seq[ho_idx], oof_graph[ho_idx], oof_graph_logit[ho_idx] = c["seq"], c["graph"], c["graph_logit"]
+                oof_graph_cal[ho_idx] = c["graph_cal"]
+                visited[ho_idx] = True
+                print(f"\nFold {fold + 1}/{k_folds}: loaded finished result from {cache_file}")
+                continue
 
-        # 3. Instantiate fresh models from scratch (Zero checkpoint fallback)
-        print(f"  Initializing fresh Sequence and GraphSAGE models from scratch for Fold {fold+1}...")
-        fold_seq_model = SequencePPIModel(input_dim=input_dim).to(device)
-        fold_gat_model = GATLinkPredictor(in_channels=in_channels, hidden_channels=256).to(device)
+        t_fold = time.time()
+        set_seed(seed + fold)
+        print(f"\nFold {fold + 1}/{k_folds} (in-fold train: {len(train_idx)}, held-out OOF: {len(ho_idx)})")
+        assert set(train_idx).isdisjoint(set(ho_idx)), f"Fold {fold + 1}: train and held-out indices overlap!"
 
-        # 4. Train Fold Models strictly on in-fold training data
-        tr_p1, tr_p2, tr_lbl = p1_all[train_idx], p2_all[train_idx], labels_all[train_idx]
-        print(f"  Training Fold {fold+1} Sequence Model ({oof_epochs} epochs)...")
-        train_fold_sequence(fold_seq_model, embeddings, bio_mapping, tr_p1, tr_p2, tr_lbl, device, bio_dim=bio_dim, epochs=oof_epochs)
-        
-        print(f"  Training Fold {fold+1} GraphSAGE Model ({oof_epochs} epochs)...")
-        train_fold_gat(fold_gat_model, fold_graph_data, tr_p1, tr_p2, tr_lbl, node_mapping, device, epochs=oof_epochs)
+        # inner split of the fold's training rows: fit / early-stopping validation
+        fit_idx, es_idx = train_test_split(train_idx, test_size=es_frac, stratify=labels_all[train_idx],
+                                           random_state=seed + fold)
 
-        # 5. Predict ONLY on held-out validation fold (val_idx)
-        val_p1 = p1_all[val_idx]
-        val_p2 = p2_all[val_idx]
-        
-        print(f"  Predicting held-out OOF samples for Fold {fold+1}...")
-        fold_seq_preds = predict_sequence_model(fold_seq_model, embeddings, bio_mapping, val_p1, val_p2, device, bio_dim=bio_dim)
-        fold_graph_preds = predict_graph_model(fold_gat_model, fold_graph_data, node_mapping, val_p1, val_p2, device)
-        
-        oof_seq_preds[val_idx] = fold_seq_preds
-        oof_graph_preds[val_idx] = fold_graph_preds
-        visited_indices[val_idx] = True
+        # fold graph = positive FIT pairs only; ES and held-out pairs must not be message-passing edges
+        pos_fit = fit_idx[labels_all[fit_idx] == 1]
+        f_src, f_dst = g_u[pos_fit].tolist(), g_v[pos_fit].tolist()
+        fold_edges = set(zip(f_src, f_dst)) | set(zip(f_dst, f_src))
+        for name, idx in (("held-out", ho_idx), ("early-stop", es_idx)):
+            pairs = set(zip(g_u[idx].tolist(), g_v[idx].tolist())) | set(zip(g_v[idx].tolist(), g_u[idx].tolist()))
+            leaked = pairs & fold_edges
+            assert not leaked, f"LEAKAGE in fold {fold + 1}: {len(leaked)} {name} pairs are edges of the fold graph!"
+        print(f"  [VERIFIED] no held-out / early-stop pair is an edge of the fold graph ({len(pos_fit)} positive edges).")
 
+        # per-fold node columns, computed ONLY from this fold's edges (never copied from the full graph)
+        topo = node_topology_columns(f_src, f_dst, num_nodes)
+        x_fold = torch.cat([base_x[:, :-3], topo], dim=-1)
+        assert x_fold.shape[1] == in_channels
+        assert not torch.equal(x_fold[:, -3:], base_x[:, -3:]), "fold node features equal the full-graph features"
+        ei_fold = torch.tensor([f_src + f_dst, f_dst + f_src], dtype=torch.long)
+
+        print("  Training sequence model...")
+        seq_m = SequencePPIModel(input_dim=input_dim).to(device)
+        fit_sequence(seq_m, table, seq_a[fit_idx], seq_b[fit_idx], labels_all[fit_idx],
+                     seq_a[es_idx], seq_b[es_idx], labels_all[es_idx], device, cfg=seq_cfg,
+                     ckpt_path=os.path.join(checkpoint_dir, f"seq_fold{fold + 1}.pt") if checkpoint_dir else None,
+                     ckpt_every=ckpt_every, tag=f"seq f{fold + 1}")
+
+        print("  Training GraphSAGE model...")
+        gnn_m = SAGELinkPredictor(in_channels=in_channels, hidden_channels=256).to(device)
+        fit_graph(gnn_m, x_fold, ei_fold, g_u[fit_idx], g_v[fit_idx], labels_all[fit_idx],
+                  g_u[es_idx], g_v[es_idx], labels_all[es_idx], device, cfg=graph_cfg,
+                  ckpt_path=os.path.join(checkpoint_dir, f"graph_fold{fold + 1}.pt") if checkpoint_dir else None,
+                  ckpt_every=ckpt_every, tag=f"graph f{fold + 1}")
+
+        oof_seq[ho_idx] = sequence_probs(seq_m, table, seq_a[ho_idx], seq_b[ho_idx], device)
+        logits = graph_logits(gnn_m, x_fold, ei_fold, g_u[ho_idx], g_v[ho_idx], device)
+        oof_graph_logit[ho_idx] = logits
+        oof_graph[ho_idx] = 1.0 / (1.0 + np.exp(-logits))
+        es_logits = graph_logits(gnn_m, x_fold, ei_fold, g_u[es_idx], g_v[es_idx], device)
+        fold_cal = PlattScaler().fit(es_logits, labels_all[es_idx])
+        oof_graph_cal[ho_idx] = fold_cal.transform_logits(logits)
+        print(f"  Fold {fold + 1} Platt scaler (fit on early-stop split): a={fold_cal.a:.3f} b={fold_cal.b:.3f}")
+        visited[ho_idx] = True
+
+        print(f"  Fold {fold + 1} held-out AUC: seq {roc_auc_score(labels_all[ho_idx], oof_seq[ho_idx]):.4f} | "
+              f"graph {roc_auc_score(labels_all[ho_idx], oof_graph[ho_idx]):.4f}")
+
+        if cache_file and not dry_run:
+            np.savez(cache_file, fingerprint=fp, ho_idx=ho_idx, seq=oof_seq[ho_idx], graph=oof_graph[ho_idx],
+                     graph_logit=oof_graph_logit[ho_idx], graph_cal=oof_graph_cal[ho_idx])
+        fold_times.append(time.time() - t_fold)
+        remaining = (k_folds - fold - 1) * float(np.mean(fold_times))
+        print(f"  Fold {fold + 1} took {fold_times[-1] / 60:.1f} min | est. remaining {remaining / 60:.1f} min")
+
+        del seq_m, gnn_m
+        if device.type == "cuda":
+            torch.cuda.empty_cache()
         if dry_run:
-            print(f"[DRY-RUN] Stopping after Fold 1 verification pass.")
+            print("[DRY-RUN] Stopping after fold 1.")
             break
 
-    # 6. Post-Generation Coverage & Dimension Verification
     if not dry_run:
-        assert visited_indices.all(), "ERROR: Not all train.csv samples received an OOF prediction!"
-        assert oof_seq_preds.shape[0] == n_samples, f"OOF sequence prediction shape mismatch ({oof_seq_preds.shape[0]} vs {n_samples})!"
-        assert oof_graph_preds.shape[0] == n_samples, f"OOF graph prediction shape mismatch ({oof_graph_preds.shape[0]} vs {n_samples})!"
-        print(f"\n[VERIFIED] All {n_samples} training samples received exactly 1 leakage-free OOF prediction.")
-
-    return oof_seq_preds, oof_graph_preds, visited_indices
+        assert visited.all(), "Not all train.csv samples received an OOF prediction!"
+        print(f"\n[VERIFIED] All {n_samples} training samples received exactly one leakage-free OOF prediction.")
+    return oof_seq, oof_graph, oof_graph_cal, visited
 
 
-def train_ensemble(seq_model_path, graph_model_path, graph_data_path, k_folds=5, oof_epochs=5, dry_run=False, max_samples=None):
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+def train_ensemble(seq_model_path, graph_model_path, graph_data_path, k_folds=5, dry_run=False, max_samples=None,
+                   seed=42, checkpoint_dir=None, ckpt_every=5, force_cpu=False, es_frac=0.1):
+    device = get_device(force_cpu)
     print(f"Running Ensemble Training Pipeline on {device}...")
+    t_start = time.time()
 
     # 1. Load Support Files
     print("Loading support files (embeddings, graph data, node mapping, bio features)...")
@@ -285,7 +272,7 @@ def train_ensemble(seq_model_path, graph_model_path, graph_data_path, k_folds=5,
     embeddings = torch.load(emb_path, weights_only=False)
     embeddings = {k: v.float() if v.dtype == torch.float16 else v for k, v in embeddings.items()}
     node_mapping = torch.load(map_path, weights_only=False)
-    full_graph_data = torch.load(graph_data_path, weights_only=False).to(device)
+    full_graph_data = torch.load(graph_data_path, weights_only=False)  # stays on CPU; moved to `device` where used
 
     # 2. Load Train Dataset for Meta-Learner Training
     train_path = PROCESSED_DATA_DIR / "train.csv"
@@ -293,10 +280,10 @@ def train_ensemble(seq_model_path, graph_model_path, graph_data_path, k_folds=5,
         raise FileNotFoundError(f"Training data not found at {train_path}")
 
     train_df = pd.read_csv(train_path)
-    
+
     # Filter train_df to valid entries present in mapping & embeddings
     filtered_train_df = train_df[
-        train_df["protein1"].isin(embeddings) & 
+        train_df["protein1"].isin(embeddings) &
         train_df["protein2"].isin(embeddings) &
         train_df["protein1"].isin(node_mapping) &
         train_df["protein2"].isin(node_mapping)
@@ -309,37 +296,46 @@ def train_ensemble(seq_model_path, graph_model_path, graph_data_path, k_folds=5,
     print(f"Meta-Learner Training Dataset: {len(filtered_train_df)} samples from train.csv.")
 
     # 3. Generate Leakage-Free OOF Base-Model Predictions on train.csv
-    oof_seq_preds, oof_graph_preds, visited_indices = generate_oof_predictions(
+    seq_cfg, graph_cfg = dict(SEQ_CFG), dict(GRAPH_CFG)
+    if dry_run:  # structure/leakage check only: 2 epochs per model
+        seq_cfg["max_epochs"] = graph_cfg["max_epochs"] = 2
+    oof_seq_preds, oof_graph_raw, oof_graph_cal, visited_indices = generate_oof_predictions(
         filtered_train_df,
         embeddings,
-        bio_mapping,
         node_mapping,
         full_graph_data,
         device,
         k_folds=k_folds,
-        oof_epochs=oof_epochs,
-        dry_run=dry_run
+        es_frac=es_frac,
+        seed=seed,
+        checkpoint_dir=checkpoint_dir,
+        ckpt_every=ckpt_every,
+        seq_cfg=seq_cfg,
+        graph_cfg=graph_cfg,
+        dry_run=dry_run,
     )
 
     if dry_run:
         print("\n[DRY-RUN VERIFICATION COMPLETE] OOF pipeline structure and leakage assertions passed successfully.")
         return
 
-    # 4. Calculate Biological Compatibility Scores for Train Set
-    print("Calculating biological compatibility scores for training set...")
-    bio_manager = BiologicalManager()
-    train_bio_scores = []
-    for _, row in tqdm(filtered_train_df.iterrows(), total=len(filtered_train_df), desc="Bio Analysis (Train)"):
-        p1, p2 = row["protein1"], row["protein2"]
-        train_bio_scores.append(ensemble_bio_score(bio_manager, p1, p2))
-    
-    train_bio_scores_np = np.array(train_bio_scores).reshape(-1, 1)
     train_labels_np = filtered_train_df["label"].values
+
+    # 4. GraphSAGE calibration on the OOF predictions (raw vs per-fold Platt-calibrated)
+    rep = calibration_report(train_labels_np, oof_graph_raw, oof_graph_cal)
+    print(f"OOF GraphSAGE calibration  before: {rep['before']}  after: {rep['after']}")
+    print(f"OOF AUC  seq {roc_auc_score(train_labels_np, oof_seq_preds):.4f} | graph {roc_auc_score(train_labels_np, oof_graph_raw):.4f}")
+    graph_cal_path = os.path.join(os.path.dirname(str(graph_model_path)), "graph_calibrator.json")
+    if not os.path.exists(graph_cal_path):
+        raise FileNotFoundError(f"{graph_cal_path} missing. Run train_graph_model.py first: it fits the production "
+                                "GraphSAGE calibrator on val.csv, and the meta-learner must be paired with it.")
+    graph_calibrator = PlattScaler.load(graph_cal_path)
 
     # 5. Train XGBoost Meta-Learner strictly on OOF predictions and train labels
     print("\n--- Fitting XGBoost Meta-Learner ---")
     ensemble = PPIEnsemble()
-    ensemble.train_stacking(oof_seq_preds, oof_graph_preds, train_labels_np, bio_features=train_bio_scores_np)
+    ensemble.train_stacking(oof_seq_preds, oof_graph_cal, train_labels_np)
+    ensemble.graph_calibrator = graph_calibrator  # saved next to the meta-learner; applied inside predict()
 
     # Save Meta-Learner Model
     out_path = PROJECT_ROOT / "models" / "ensemble_model.pkl"
@@ -353,14 +349,14 @@ def train_ensemble(seq_model_path, graph_model_path, graph_data_path, k_folds=5,
     if val_path.exists():
         val_df = pd.read_csv(val_path)
         filtered_val_df = val_df[
-            val_df["protein1"].isin(embeddings) & 
+            val_df["protein1"].isin(embeddings) &
             val_df["protein2"].isin(embeddings) &
             val_df["protein1"].isin(node_mapping) &
             val_df["protein2"].isin(node_mapping)
         ].copy().reset_index(drop=True)
 
         print(f"Validation Dataset: {len(filtered_val_df)} samples from val.csv.")
-        
+
         # Load final trained base models for validation evaluation ONLY
         sample_emb = next(iter(embeddings.values()))
         input_dim = sample_emb.shape[-1]
@@ -374,45 +370,53 @@ def train_ensemble(seq_model_path, graph_model_path, graph_data_path, k_folds=5,
         val_seq_preds = predict_sequence_model(seq_model, embeddings, bio_mapping, val_p1, val_p2, device, bio_dim=len(next(iter(bio_mapping.values()))) if bio_mapping else 0)
         val_graph_preds = predict_graph_model(graph_model, full_graph_data, node_mapping, val_p1, val_p2, device)
 
-        val_bio_scores = []
-        for _, row in filtered_val_df.iterrows():
-            val_bio_scores.append(ensemble_bio_score(bio_manager, row["protein1"], row["protein2"]))
-        val_bio_scores_np = np.array(val_bio_scores).reshape(-1, 1)
-
-        val_ensemble_preds = ensemble.predict(val_seq_preds, val_graph_preds, bio_features=val_bio_scores_np, method="stacking")
+        val_ensemble_preds = ensemble.predict(val_seq_preds, val_graph_preds, method="stacking")  # raw graph in, calibrated inside
+        val_graph_cal = ensemble.calibrate_graph(val_graph_preds)
 
         acc_seq = accuracy_score(val_labels_np, (val_seq_preds > 0.5).astype(int))
-        acc_graph = accuracy_score(val_labels_np, (val_graph_preds > 0.5).astype(int))
+        acc_graph = accuracy_score(val_labels_np, (val_graph_cal > 0.5).astype(int))
         acc_ens = accuracy_score(val_labels_np, (val_ensemble_preds > 0.5).astype(int))
-        
+
         auc_seq = roc_auc_score(val_labels_np, val_seq_preds)
         auc_graph = roc_auc_score(val_labels_np, val_graph_preds)
         auc_ens = roc_auc_score(val_labels_np, val_ensemble_preds)
 
         print(f"\n--- Validation Set Performance (val.csv) ---")
         print(f"Sequence Model Acc: {acc_seq*100:.2f}% | ROC-AUC: {auc_seq:.4f}")
-        print(f"Graph Model Acc:    {acc_graph*100:.2f}% | ROC-AUC: {auc_graph:.4f}")
+        print(f"Graph Model Acc (calibrated): {acc_graph*100:.2f}% | ROC-AUC: {auc_graph:.4f}")
         print(f"Ensemble Model Acc: {acc_ens*100:.2f}% | ROC-AUC: {auc_ens:.4f}")
+    print(f"\nTotal ensemble pipeline time: {(time.time() - t_start) / 60:.1f} min")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train Ensemble Stacking Meta-Learner using OOF Predictions.")
     parser.add_argument("--k_folds", type=int, default=5, help="Number of folds for OOF generation.")
-    parser.add_argument("--oof_epochs", type=int, default=5, help="Epochs to train each base model from scratch per fold.")
-    parser.add_argument("--dry_run", action="store_true", help="Run fast dry-run verification (1 fold, subsampled).")
+    parser.add_argument("--es_frac", type=float, default=0.1,
+                        help="Fraction of each fold's training rows held out for early stopping.")
+    parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--checkpoint_dir", type=str, default=str(CHECKPOINT_DIR),
+                        help="Where fold results / epoch checkpoints are written (mount Google Drive here on Colab).")
+    parser.add_argument("--ckpt_every", type=int, default=5, help="Save a training checkpoint every N epochs.")
+    parser.add_argument("--force-cpu", action="store_true", help="Ignore CUDA even if available.")
+    parser.add_argument("--dry_run", action="store_true", help="Run fast dry-run verification (1 fold, subsampled, 2 epochs).")
     parser.add_argument("--max_samples", type=int, default=500, help="Maximum samples for dry-run verification.")
     args = parser.parse_args()
+    set_seed(args.seed)
 
     seq_path = PROJECT_ROOT / "models" / "sequence_model_best.pth"
     graph_path = PROJECT_ROOT / "models" / "graph_model_best.pth"
     graph_data = PROCESSED_DATA_DIR / "ppi_graph.pt"
 
     train_ensemble(
-        seq_path, 
-        graph_path, 
-        graph_data, 
-        k_folds=args.k_folds, 
-        oof_epochs=args.oof_epochs, 
-        dry_run=args.dry_run, 
-        max_samples=args.max_samples
+        seq_path,
+        graph_path,
+        graph_data,
+        k_folds=args.k_folds,
+        dry_run=args.dry_run,
+        max_samples=args.max_samples,
+        seed=args.seed,
+        checkpoint_dir=args.checkpoint_dir,
+        ckpt_every=args.ckpt_every,
+        force_cpu=args.force_cpu,
+        es_frac=args.es_frac,
     )

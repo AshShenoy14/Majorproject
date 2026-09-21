@@ -8,7 +8,7 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
 
 from src.models.sequence_model import SequencePPIModel
-from src.models.graph_model import GATLinkPredictor
+from src.models.graph_model import SAGELinkPredictor
 from src.models.ensemble_model import PPIEnsemble
 from src.evaluation.metrics_reporter import report_all_metrics
 from src.utils.paths import PROCESSED_DATA_DIR, MODELS_DIR
@@ -56,7 +56,7 @@ def main():
     # No extra features added here to maintain compatibility with trained models
 
     # Graph Model — updated to support auto-detection (GraphSAGE/GIN)
-    from src.models.graph_model import GATLinkPredictor, GINLinkPredictor
+    from src.models.graph_model import SAGELinkPredictor, GINLinkPredictor
     in_channels = graph_data.x.shape[1]
     
     graph_model_path = MODELS_DIR / "graph_model_best.pth"
@@ -69,12 +69,12 @@ def main():
             graph_model = GINLinkPredictor(in_channels=in_channels, hidden_channels=128).to(device)
         else:
             print("Detected GraphSAGE architecture for Graph Model.")
-            graph_model = GATLinkPredictor(in_channels=in_channels, hidden_channels=256).to(device)
+            graph_model = SAGELinkPredictor(in_channels=in_channels, hidden_channels=256).to(device)
             
         graph_model.load_state_dict(state_dict)
     else:
         print(f"Graph model not found at {graph_model_path}. Defaulting to GraphSAGE.")
-        graph_model = GATLinkPredictor(in_channels=in_channels, hidden_channels=256).to(device)
+        graph_model = SAGELinkPredictor(in_channels=in_channels, hidden_channels=256).to(device)
     
     graph_model.eval()
 
@@ -84,7 +84,6 @@ def main():
     batch_emb2 = []
     g_src = []
     g_dst = []
-    bio_features = []
     
     for _, row in filtered_df.iterrows():
         p1, p2 = row["protein1"], row["protein2"]
@@ -103,13 +102,8 @@ def main():
         g_src.append(node_mapping[p1])
         g_dst.append(node_mapping[p2])
         
-        # Binary compatibility score for ensemble meta-learner
-        loc1, loc2 = bio_df.get(p1, "unk1"), bio_df.get(p2, "unk2")
-        bio_features.append([1.0 if loc1 == loc2 and loc1 != "unk1" else 0.0])
-
     batch_emb1 = torch.stack(batch_emb1)
     batch_emb2 = torch.stack(batch_emb2)
-    bio_features = np.array(bio_features)
     
     seq_probs = []
     with torch.no_grad():
@@ -129,7 +123,7 @@ def main():
             graph_probs.extend(torch.sigmoid(out).cpu().numpy().flatten())
     graph_probs = np.array(graph_probs)
 
-    ensemble_probs = ensemble.predict(seq_probs, graph_probs, bio_features=bio_features, method="stacking")
+    ensemble_probs = ensemble.predict(seq_probs, graph_probs, method="stacking")
 
     from sklearn.metrics import accuracy_score, f1_score, roc_auc_score
     print(f"RESULTS_ACC: {accuracy_score(y_true, ensemble_probs.round())}")

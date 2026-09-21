@@ -15,6 +15,7 @@ from sklearn.metrics import (
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
 from src.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT
+from src.utils.seed import set_seed
 from src.utils.bio_encoder import BioFeatureEncoder
 from src.analysis.biological_managers import BiologicalManager
 from src.utils.rf_feature_builder import build_rf_features_for_df
@@ -163,6 +164,7 @@ if __name__ == "__main__":
     parser.add_argument("--dry_run", action="store_true", help="Run fast dry-run verification on a small subset")
     parser.add_argument("--max_samples", type=int, default=500, help="Max train samples for dry-run")
     args = parser.parse_args()
+    set_seed(args.random_state)
 
     train_random_forest(
         n_estimators=args.n_estimators,

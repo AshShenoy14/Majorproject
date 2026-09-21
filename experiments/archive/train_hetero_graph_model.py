@@ -16,7 +16,8 @@ from torch_geometric.data import HeteroData
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 
 from src.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT, CHECKPOINT_DIR, MODELS_DIR
-from src.models.hetero_graph_model import HeteroGNNLinkPredictor
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from hetero_graph_model import HeteroGNNLinkPredictor
 
 def configure_runtime(force_cpu: bool = False, cpu_threads: int = None):
     """Configure runtime device and CPU thread counts for thermally stable training."""

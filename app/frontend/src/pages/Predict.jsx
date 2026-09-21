@@ -82,24 +82,22 @@ const Predict = () => {
     setLoading(true);
     setError(null);
     setLogs([]);
-    const startTime = performance.now();
-    
-    addLog("Initializing TransGraph-PPI Pipeline...", "info");
-    await new Promise(r => setTimeout(r, 400));
-    addLog("Extracting ESM-2 Language Embeddings...", "process");
-    await new Promise(r => setTimeout(r, 300));
-    addLog("Analyzing graph neighborhood via GraphSAGE...", "process");
+    addLog("Sending interaction query to TransGraph-PPI backend...", "process");
 
     try {
-      const p1 = protein1.trim() || "Protein_1";
-      const p2 = protein2.trim() || "Protein_2";
+      const p1 = protein1.trim();
+      const p2 = protein2.trim();
+      if (!p1 || !p2) {
+        throw new Error("Both Protein 1 and Protein 2 identifiers are required.");
+      }
       const s1 = inputMode === 'sequence' ? seq1.trim() : null;
       const s2 = inputMode === 'sequence' ? seq2.trim() : null;
 
+      const startTime = performance.now();
       const response = await ppiService.predict(p1, p2, s1, s2);
       const elapsed = Math.round(performance.now() - startTime);
       setLatency(elapsed);
-      addLog(`Ensemble Meta-Learner Converged in ${elapsed}ms.`, "success");
+      addLog(`Ensemble Meta-Learner completed in ${elapsed}ms.`, "success");
       setResult(response.data);
       setActiveResultPage('probability'); // Default to Page 1 on new result
 
@@ -222,10 +220,19 @@ const Predict = () => {
   // ── BATCH CSV DOWNLOAD ────────────────────────────────────
   const downloadBatchCSV = useCallback(() => {
     if (!batchResults.length) return;
-    const header = 'protein1_id,protein2_id,interaction_probability,esm_probability,gat_probability,confidence_score,interacts\n';
-    const rows = batchResults.map(r =>
-      `${r.protein1_id || ''},${r.protein2_id || ''},${r.interaction_probability?.toFixed(4) || ''},${r.esm_probability?.toFixed(4) || ''},${r.gat_probability?.toFixed(4) || ''},${r.confidence_score?.toFixed(4) || ''},${r.interaction_probability > 0.5 ? 'YES' : 'NO'}`
-    ).join('\n');
+    const header = 'protein1_id,protein2_id,status,interaction_probability,esm_probability,gat_probability,confidence_score,interacts,error\n';
+    const rows = batchResults.map(r => {
+      const p1 = r.protein1_id || '';
+      const p2 = r.protein2_id || '';
+      const status = r.status || (r.error ? 'error' : 'success');
+      const prob = r.interaction_probability != null ? r.interaction_probability.toFixed(4) : '';
+      const esm = r.esm_probability != null ? r.esm_probability.toFixed(4) : '';
+      const gat = r.gat_probability != null ? r.gat_probability.toFixed(4) : '';
+      const conf = r.confidence_score != null ? r.confidence_score.toFixed(4) : '';
+      const interacts = status === 'error' ? 'ERROR' : (r.interaction_probability > 0.5 ? 'YES' : 'NO');
+      const err = r.error ? `"${r.error.replace(/"/g, '""')}"` : '';
+      return `${p1},${p2},${status},${prob},${esm},${gat},${conf},${interacts},${err}`;
+    }).join('\n');
     const blob = new Blob([header + rows], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -253,11 +260,11 @@ const Predict = () => {
           </div>
           <div className="flex items-center gap-1.5">
             <Gauge size={14} className="text-indigo-400" />
-            <span>ROC-AUC: <strong className="text-white">0.976</strong></span>
+            <span>ROC-AUC: <strong className="text-white">0.9626</strong></span>
           </div>
           <div className="flex items-center gap-1.5">
             <Server size={14} className="text-amber-400" />
-            <span>Graph: <strong className="text-white">12,238 Nodes | 96,829 Edges</strong></span>
+            <span>Graph: <strong className="text-white">12,323 Nodes | 80,685 Edges</strong></span>
           </div>
         </div>
       </div>
@@ -666,7 +673,7 @@ const Predict = () => {
                                 { label: 'Prediction Confidence', value: `${(result.confidence_score * 100).toFixed(1)}%`, color: 'text-indigo-600 bg-indigo-50 border-indigo-200' },
                                 { label: 'ESM Sequence Signal', value: `${(result.esm_probability * 100).toFixed(1)}%`, color: 'text-teal-600 bg-teal-50 border-teal-200' },
                                 { label: 'GraphSAGE Graph Signal', value: `${(result.gat_probability * 100).toFixed(1)}%`, color: 'text-violet-600 bg-violet-50 border-violet-200' },
-                                { label: 'Biological Importance', value: result.interaction_probability > 0.75 ? 'High' : result.interaction_probability > 0.5 ? 'Moderate' : 'Low', color: 'text-slate-600 bg-slate-50 border-slate-200' },
+                                { label: 'Confidence Band', value: result.interaction_probability > 0.75 ? 'High Confidence' : result.interaction_probability > 0.5 ? 'Moderate Confidence' : 'Low Confidence', color: 'text-slate-600 bg-slate-50 border-slate-200' },
                               ].map((m, i) => (
                                 <div key={i} className={`flex items-center justify-between px-3 py-1.5 rounded-xl border text-[10px] font-bold ${m.color}`}>
                                   <span>{m.label}</span>

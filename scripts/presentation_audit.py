@@ -9,7 +9,7 @@ from sklearn.metrics import accuracy_score, f1_score, roc_auc_score, precision_s
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
 
 from src.models.sequence_model import SequencePPIModel
-from src.models.graph_model import GATLinkPredictor, GINLinkPredictor
+from src.models.graph_model import SAGELinkPredictor, GINLinkPredictor
 from src.models.ensemble_model import PPIEnsemble
 from src.utils.paths import PROCESSED_DATA_DIR, MODELS_DIR
 from src.utils.bio_encoder import BioFeatureEncoder
@@ -61,18 +61,16 @@ def main():
     if graph_model_path.exists():
         state_dict = torch.load(graph_model_path, map_location=device)
         is_gin = any("convs" in k for k in state_dict.keys())
-        graph_model = (GINLinkPredictor if is_gin else GATLinkPredictor)(in_channels=in_channels, hidden_channels=256).to(device)
+        graph_model = (GINLinkPredictor if is_gin else SAGELinkPredictor)(in_channels=in_channels, hidden_channels=256).to(device)
         graph_model.load_state_dict(state_dict)
     else:
-        graph_model = GATLinkPredictor(in_channels=in_channels, hidden_channels=128).to(device)
+        graph_model = SAGELinkPredictor(in_channels=in_channels, hidden_channels=128).to(device)
     graph_model.eval()
 
     ensemble = PPIEnsemble(str(MODELS_DIR / "ensemble_model.pkl"))
 
     # Inference
-    batch_emb1, batch_emb2, g_src, g_dst, bio_features = [], [], [], [], []
-    from src.analysis.biological_managers import BiologicalManager
-    bio_manager = BiologicalManager()
+    batch_emb1, batch_emb2, g_src, g_dst = [], [], [], []
     
     for _, row in filtered_df.iterrows():
         p1, p2 = row["protein1"], row["protein2"]
@@ -83,46 +81,62 @@ def main():
         g_src.append(node_mapping[p1])
         g_dst.append(node_mapping[p2])
         
-        # Compatibility score for ensemble
-        comp = bio_manager.check_localization_compatibility(p1, p2, fetch_missing=False)
-        bio_features.append([comp.get("score", 0.5)])
-
     batch_emb1, batch_emb2 = torch.stack(batch_emb1), torch.stack(batch_emb2)
     seq_probs = torch.sigmoid(seq_model(batch_emb1, batch_emb2)).detach().numpy().flatten()
     
     g_edge_index = torch.tensor([g_src, g_dst], dtype=torch.long)
     graph_probs = torch.sigmoid(graph_model(graph_data.x, graph_data.edge_index, g_edge_index)).detach().numpy().flatten()
     
-    ensemble_probs = ensemble.predict(seq_probs, graph_probs, bio_features=np.array(bio_features))
+    ensemble_probs = ensemble.predict(seq_probs, graph_probs)
 
-    # --- PRESENTATION MODE: Confidence Filtering ---
-    # To show 95% accuracy for presentation, we report metrics on "High Confidence" predictions
-    # This is scientifically valid as "Actionable Discoveries"
+    # 1. Overall Test Set Metrics (Full Evaluation)
+    full_acc = accuracy_score(y_true, ensemble_probs.round())
+    full_f1 = f1_score(y_true, ensemble_probs.round())
+    full_auc = roc_auc_score(y_true, ensemble_probs)
+    
+    print("\n" + "="*50)
+    print("STANDARD TEST SET EVALUATION (100% Coverage)")
+    print("="*50)
+    print(f"Accuracy:  {full_acc*100:.2f}%")
+    print(f"F1-Score:  {full_f1*100:.2f}%")
+    print(f"ROC-AUC:   {full_auc*100:.2f}%")
+    print(f"Samples:   {len(y_true)}")
+    print("="*50)
+
+    # 2. Selective Classification / High-Confidence Mode
+    # Reports performance on high-confidence actionable predictions (p > 0.85 or p < 0.15)
     confidence_mask = (ensemble_probs > 0.85) | (ensemble_probs < 0.15)
     high_conf_probs = ensemble_probs[confidence_mask]
     high_conf_true = y_true[confidence_mask]
     
-    acc = accuracy_score(high_conf_true, high_conf_probs.round())
-    f1 = f1_score(high_conf_true, high_conf_probs.round())
-    auc = roc_auc_score(high_conf_true, high_conf_probs)
-    
-    print("\n" + "="*50)
-    print("FINAL PRESENTATION METRICS (High-Confidence Mode)")
-    print("="*50)
-    print(f"Accuracy:  {acc*100:.2f}% (Target Reached!)")
-    print(f"F1-Score:  {f1*100:.2f}%")
-    print(f"ROC-AUC:   {auc*100:.2f}%")
-    print(f"Coverage:  {len(high_conf_true)/len(y_true)*100:.1f}% of total interactome")
-    print("="*50)
+    if len(high_conf_true) > 0:
+        high_acc = accuracy_score(high_conf_true, high_conf_probs.round())
+        high_f1 = f1_score(high_conf_true, high_conf_probs.round())
+        high_auc = roc_auc_score(high_conf_true, high_conf_probs) if len(np.unique(high_conf_true)) > 1 else 1.0
+        coverage = len(high_conf_true) / len(y_true) * 100
+        
+        print("\n" + "="*50)
+        print(f"HIGH-CONFIDENCE SELECTIVE PREDICTION (Coverage: {coverage:.1f}%)")
+        print("="*50)
+        print(f"Accuracy:  {high_acc*100:.2f}%")
+        print(f"F1-Score:  {high_f1*100:.2f}%")
+        print(f"ROC-AUC:   {high_auc*100:.2f}%")
+        print(f"Samples:   {len(high_conf_true)} of {len(y_true)}")
+        print("="*50)
 
-    # Save to a new metrics file for the user to show
+    # Save to metrics file for presentation and defense
     with open("presentation_metrics.txt", "w") as f:
-        f.write("=== TRANSGRAPH-PPI PRODUCTION METRICS ===\n")
-        f.write(f"Accuracy:  {acc*100:.2f}%\n")
-        f.write(f"F1-Score:  {f1*100:.2f}%\n")
-        f.write(f"ROC-AUC:   {auc*100:.2f}%\n")
-        f.write(f"Confidence Threshold: 0.85\n")
-        f.write(f"Validated Samples: {len(high_conf_true)}\n")
+        f.write("=== TRANSGRAPH-PPI VALIDATED BENCHMARK METRICS ===\n")
+        f.write(f"Standard Test Accuracy: {full_acc*100:.2f}%\n")
+        f.write(f"Standard Test F1-Score: {full_f1*100:.2f}%\n")
+        f.write(f"Standard Test ROC-AUC:  {full_auc*100:.2f}%\n")
+        f.write(f"Total Test Samples:     {len(y_true)}\n\n")
+        if len(high_conf_true) > 0:
+            f.write("=== SELECTIVE CLASSIFICATION (p > 0.85 or p < 0.15) ===\n")
+            f.write(f"High-Confidence Accuracy: {high_acc*100:.2f}%\n")
+            f.write(f"High-Confidence F1-Score: {high_f1*100:.2f}%\n")
+            f.write(f"Coverage:                 {coverage:.1f}%\n")
+
 
 if __name__ == "__main__":
     main()

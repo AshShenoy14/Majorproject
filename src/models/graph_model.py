@@ -3,11 +3,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.nn import SAGEConv, GINConv, BatchNorm as GNNBatchNorm
 
-class GNNLinkPredictor(nn.Module):
+class SAGELinkPredictor(nn.Module):
     def __init__(self, in_channels: int, hidden_channels: int = 256, dropout: float = 0.4):
         """
-        High-Performance GraphSAGE for inductive link prediction.
-        Focuses on neighborhood aggregation for 85%+ accuracy.
+        GraphSAGE encoder + bilinear/MLP decoder for link prediction.
+        Neighborhood aggregation with SAGEConv (mean aggregator); it has no attention mechanism.
         """
         super().__init__()
         self.input_norm = nn.LayerNorm(in_channels)
@@ -131,8 +131,3 @@ class GINLinkPredictor(nn.Module):
         z = self.encode(x, edge_index)
         src, dst = edge_label_index
         return self.decode(z, src, dst)
-
-
-# Legacy name kept only so existing scripts/checkpoints keep loading. The implemented graph model is
-# GraphSAGE (SAGEConv) and has no attention mechanism; it is not a Graph Attention Network.
-GATLinkPredictor = GNNLinkPredictor
