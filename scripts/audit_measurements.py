@@ -105,7 +105,10 @@ def model_metrics():
     from sklearn.metrics import brier_score_loss
     from src.models.ensemble_model import PPIEnsemble
 
-    cache = np.load(MODELS_DIR / "experiments" / "features_cache.npz")
+    cache_path = MODELS_DIR / "experiments" / "features_cache.npz"
+    if not cache_path.exists():
+        return "skipped: features_cache.npz not present"
+    cache = np.load(cache_path)
     y = cache["va_y"]
     out = {"calibration_val": {}}
     for name, key in [("sequence", "va_seq"), ("graph", "va_graph")]:
