@@ -1,0 +1,23 @@
+{
+  "before": {
+    "ECE": 0.15287,
+    "Brier": 0.11847,
+    "accuracy@0.5": 0.82961
+  },
+  "after": {
+    "ECE": 0.05035,
+    "Brier": 0.07456,
+    "accuracy@0.5": 0.90422
+  },
+  "after_cross_fitted_on_val": {
+    "ECE": 0.05028,
+    "Brier": 0.07457,
+    "accuracy@0.5": 0.90412
+  },
+  "platt": {
+    "a": 1.5055970696466254,
+    "b": -1.6727252503737349
+  },
+  "n_val": 20171,
+  "note": "Calibrator fit and scored on val.csv; the cross-fitted row is the out-of-sample estimate."
+}

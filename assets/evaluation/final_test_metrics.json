@@ -1,5 +1,5 @@
 {
-  "timestamp_utc": "2026-09-20T08:31:14.182265+00:00",
+  "timestamp_utc": "2026-09-21T13:50:31.561208+00:00",
   "protocol": "thresholds (F1-max, sweep 0.1-0.9) selected on val.csv; metrics computed on test.csv only",
   "split_design": "pair-level stratified 80/10/10 split (random_state=42); pair-disjoint, NOT node-disjoint - evaluation is transductive pair prediction",
   "dataset_rows": {
@@ -14,66 +14,66 @@
   },
   "models": {
     "Sequence-Only (ESM-MLP)": {
-      "val_selected_threshold": 0.46999999999999986,
-      "accuracy": 0.8708110251834226,
-      "precision": 0.8540996023480402,
-      "recall": 0.8944080904223677,
-      "f1": 0.8737892289810151,
-      "roc_auc": 0.9442120734123578,
-      "pr_auc": 0.9467481985227696
+      "val_selected_threshold": 0.48999999999999977,
+      "accuracy": 0.8710588935157644,
+      "precision": 0.8599596037318458,
+      "recall": 0.8864763037874281,
+      "f1": 0.8730166479519602,
+      "roc_auc": 0.9437563751263228,
+      "pr_auc": 0.9473972474015873
     },
     "Graph-Only (GraphSAGE)": {
-      "val_selected_threshold": 0.7899999999999996,
-      "accuracy": 0.9010013880626612,
-      "precision": 0.9082466942565862,
-      "recall": 0.8921277017648225,
-      "f1": 0.9001150402640924,
-      "roc_auc": 0.9473869654542224,
-      "pr_auc": 0.9616595496536556
+      "val_selected_threshold": 0.5799999999999997,
+      "accuracy": 0.9035296450525481,
+      "precision": 0.9174358974358975,
+      "recall": 0.886872893119175,
+      "f1": 0.901895543456342,
+      "roc_auc": 0.948847761717994,
+      "pr_auc": 0.9616612190738012
     },
     "Random Forest Baseline": {
-      "val_selected_threshold": 0.47999999999999976,
-      "accuracy": 0.8422565932976402,
-      "precision": 0.830019120458891,
-      "recall": 0.8607971445568114,
-      "f1": 0.8451280054511827,
-      "roc_auc": 0.9209018089876201,
-      "pr_auc": 0.9245065704583466
+      "val_selected_threshold": 0.46999999999999986,
+      "accuracy": 0.8234186000396589,
+      "precision": 0.8113783886979763,
+      "recall": 0.842752329962324,
+      "f1": 0.8267678241416204,
+      "roc_auc": 0.9064697724101776,
+      "pr_auc": 0.9124179072932124
     },
     "Full Ensemble (XGBoost)": {
-      "val_selected_threshold": 0.5099999999999998,
-      "accuracy": 0.917509418996629,
-      "precision": 0.9380982105701207,
-      "recall": 0.8940115010906207,
-      "f1": 0.915524418722713,
-      "roc_auc": 0.9626265868439217,
-      "pr_auc": 0.9696104163812087
+      "val_selected_threshold": 0.4999999999999998,
+      "accuracy": 0.9210787229823518,
+      "precision": 0.9356791136643414,
+      "recall": 0.904322823716042,
+      "f1": 0.9197337904608248,
+      "roc_auc": 0.9708157132027639,
+      "pr_auc": 0.9759304925808385
     }
   },
   "checkpoints": {
     "sequence_model": {
       "file": "sequence_model_best.pth",
-      "size_bytes": 23162131,
-      "modified": "2026-08-16T11:37:12.909351+00:00",
-      "sha256_16": "fae81e2844d06411"
+      "size_bytes": 23161235,
+      "modified": "2026-09-21T13:03:57.540573+00:00",
+      "sha256_16": "7ad93da5e17d757b"
     },
     "graph_model": {
       "file": "graph_model_best.pth",
-      "size_bytes": 4436243,
-      "modified": "2026-08-16T12:48:47.313317+00:00",
-      "sha256_16": "cdbb21ae1825b632"
+      "size_bytes": 4435475,
+      "modified": "2026-09-21T13:05:48.679132+00:00",
+      "sha256_16": "767dfc254c7a6b4d"
     },
     "ensemble": {
       "file": "ensemble_model.pkl",
-      "size_bytes": 3193288,
-      "modified": "2026-08-16T13:59:11.469932+00:00",
-      "sha256_16": "9a06a06885f7fc1b"
+      "size_bytes": 3120520,
+      "modified": "2026-09-21T13:49:38.017764+00:00",
+      "sha256_16": "874eee164d0e7f9e"
     },
     "random_forest": {
       "file": "random_forest_baseline.pkl",
-      "size_bytes": 216202857,
-      "modified": "2026-08-16T15:39:08.261186+00:00",
-      "sha256_16": "ac06c428acc1a1c0"
+      "size_bytes": 222467849,
+      "modified": "2026-09-21T13:25:59.550112+00:00",
+      "sha256_16": "5bddcaeea2abe28c"
     }
   }
 }

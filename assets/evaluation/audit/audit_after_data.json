@@ -36,8 +36,8 @@
   },
   "degree_bias_baseline": {
     "description": "logistic regression on log positive-degree of the two proteins only; fit on train, scored on test",
-    "test_accuracy": 0.7068,
-    "test_roc_auc": 0.783,
+    "test_accuracy": 0.7063,
+    "test_roc_auc": 0.7838,
     "majority_class_accuracy": 0.5
   },
   "model_metrics": "skipped: models must be retrained on the new splits (Colab) before SHAP/ECE are meaningful"
