@@ -113,7 +113,7 @@ def calc_metrics(y_true, y_prob, threshold=0.5):
 def get_model_predictions(df, seq_model, graph_model, ensemble_model, rf_model, embeddings, bio_mapping, bio_manager, node_mapping, graph_data, device, desc="Inference"):
     """
     Generates sequence, graph, ensemble, and random forest predictions for a given dataset dataframe.
-    Constructs the exact 8-feature matrix for the XGBoost ensemble.
+    Constructs the exact 7-feature matrix for the XGBoost ensemble.
     """
     filtered_df = df[
         df["protein1"].isin(embeddings) & 
@@ -307,6 +307,11 @@ def evaluate_models(dry_run=False):
     val_thresh_rf = 0.5
     if val_rf is not None:
         val_thresh_rf, _ = find_optimal_threshold(val_labels, val_rf, method="f1")
+
+    # Fresh validation predictions for scripts/audit_measurements.py (SHAP / ECE / Brier of THIS run's models).
+    if not dry_run:
+        os.makedirs(MODELS_DIR / "experiments", exist_ok=True)
+        np.savez(MODELS_DIR / "experiments" / "features_cache.npz", va_y=val_labels, va_seq=val_seq, va_graph=val_graph)
 
     print("\n[VALIDATION THRESHOLDS SELECTED]")
     print(f"  Sequence Model Optimal Threshold (val.csv): {val_thresh_seq:.4f}")

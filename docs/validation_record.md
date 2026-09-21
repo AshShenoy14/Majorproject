@@ -61,37 +61,35 @@ Verified in the current `src/training/train_ensemble.py`: **5-fold pair-level st
 - Every training pair receives an out-of-fold prediction from each base model; the XGBoost meta-learner is fitted on these predictions, the training labels and the bio feature.
 - The folds are split by pair, not by protein, so proteins are shared across folds.
 - At evaluation and serving time the meta-learner receives predictions from the full-data base-model checkpoints, not from the fold models.
-- The evaluation scripts load the saved `models/ensemble_model.pkl`; they do not retrain it. Provenance caveat: the checkpoint's file timestamp (2026-08-16 19:29, local time) is earlier than the commit that introduced this OOF script (2026-08-16 20:30 +0530), so the repository cannot prove that the checkpoint was produced by exactly this script version. The checkpoint hash is recorded in section 8.
+- The evaluation scripts load the saved `models/ensemble_model.pkl`; they do not retrain it. Provenance: training timestamps and hash prefixes are recorded inside `final_test_metrics.json` (`checkpoints` block), written by `compare_models.py`. Filesystem mtimes of a local copy are not evidence of training time (the Colab outputs were copied in together).
 
 ## 6. Ensemble Input Features and the Biological Feature
 
-The XGBoost ensemble has 8 input features:
-`seq_prob`, `graph_prob`, `conf_seq`, `conf_graph`, `disagreement`, `max_conf`, `consensus`, `bio_score`.
+The XGBoost ensemble has 7 input features:
+`p_seq`, `p_graph` (Platt-calibrated GraphSAGE), `conf_seq`, `conf_graph`, `diff`, `max_conf`, `consensus` (the loaded `ensemble_model.pkl` reports `n_features_in_ = 7`).
 
-- The trained booster does not split on `bio_score`, so there is no evidence that it contributes to the reported performance. The score is 0.5 for almost every pair because the UniProt cache covers very few proteins. No claim is made that biological compatibility improved any metric.
-- The same cache-only helper builds this feature in training, evaluation and the `/predict` endpoint. Live UniProt lookups in `/predict` are display-only and are not written to the cache.
+- `bio_score` (co-localization) is not part of the meta-vector; it is computed for display only and is not an ensemble input.
 - `/predict` returns the XGBoost meta-learner's probability directly, with no rule-based post-processing.
 
 ## 7. Explainability
 
-- **SHAP feature contributions**: `/predict` returns one SHAP value per ensemble input feature for the requested pair, and `compare_models.py` saves a SHAP summary plot of the 8-feature test matrix to `data/processed/plots/shap_summary.png`.
-- **XGBoost tree gain** is a different quantity and is not SHAP. Total gain from the trained booster: `consensus` (seq x graph) 2,611,499; `seq_prob` 529,501; `conf_seq` 140,990; `disagreement` 120,812; `graph_prob` 118,164; `max_conf` 113,451; `conf_graph` 31,992; `bio_score` 0 (never used in a split).
-- SHAP and tree gain can rank features differently; this record does not report a SHAP-based ranking.
+- **SHAP feature contributions**: `/predict` returns one SHAP value per ensemble input feature for the requested pair, and `compare_models.py` saves a SHAP summary plot of the 7-feature test matrix to `data/processed/plots/shap_summary.png`.
+- No SHAP ranking or tree-gain totals are recorded in a committed artifact for the current checkpoint, so none are quoted here. (The tree-gain totals previously listed belonged to the superseded 8-feature booster.)
 
 ## 8. Model Provenance (checkpoint SHA-256 prefixes)
 
 | Artifact | SHA-256 (first 16 hex) |
 | :--- | :--- |
-| `models/sequence_model_best.pth` | `fae81e2844d06411` |
-| `models/graph_model_best.pth` | `cdbb21ae1825b632` |
-| `models/ensemble_model.pkl` | `9a06a06885f7fc1b` |
-| `models/random_forest_baseline.pkl` | `ac06c428acc1a1c0` |
+| `models/sequence_model_best.pth` | `7ad93da5e17d757b` |
+| `models/graph_model_best.pth` | `767dfc254c7a6b4d` |
+| `models/ensemble_model.pkl` | `874eee164d0e7f9e` |
+| `models/random_forest_baseline.pkl` | `5bddcaeea2abe28c` |
 
 The graph checkpoint is a GraphSAGE (`SAGEConv`) model with no attention mechanism.
 
 ## 9. Software Verification
 
-- `pytest tests/`: 13 tests collected and passing in the project `.venv`.
+- Test-suite status: see the verification report; the earlier "13 passing" claim is not currently backed by a fresh run.
 - `npm run build` in `app/frontend` succeeds.
 - `/predict`: HTTP 200 with `Model_Used` = "XGBoost Ensemble"; the probability equals the direct meta-learner output on the same inputs; the bio-metadata cache file is unchanged by the request (checked by file hash).
 - `/analysis/centrality` returns PageRank values equal to the PageRank feature stored in the graph.
@@ -102,7 +100,9 @@ The graph checkpoint is a GraphSAGE (`SAGEConv`) model with no attention mechani
 - Pair-disjoint but not node-disjoint; the evaluation is transductive pair prediction.
 - No evidence of cold-start or unseen-protein generalization. The nearest-neighbor node-insertion path in `/predict` and the Cross-Species page are exploratory and unevaluated.
 - One split and one seed; no confidence intervals or significance tests.
+- Degree-only baseline (logistic regression on log positive-degree): accuracy 0.7063, ROC-AUC 0.7838 on test (`audit_after_data.json`).
+- GraphSAGE Platt calibration on val.csv: ECE 0.15287 -> 0.05035, Brier 0.11847 -> 0.07456 (`graph_calibration.json`); fit and scored on the same set.
 - No external-dataset benchmark; no comparison with published methods.
 - Sampled negatives may include unannotated true interactions.
 - The therapeutic-target priority score (0.40 degree + 0.35 betweenness + 0.25 ChEMBL indicator) is a heuristic, not a validated ranking. The ChEMBL target lookup writes newly fetched targets into `data/processed/chembl_targets.csv`, and requesting proteins missing from that cache triggers live ChEMBL queries.
-- The biological feature is currently inactive in the trained ensemble.
+- The biological feature is not an ensemble input.

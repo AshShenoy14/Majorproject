@@ -23,17 +23,18 @@ This is an internal component and baseline comparison on the same held-out test 
 
 | Configuration | Role | Threshold | Accuracy | Precision | Recall | F1 | ROC-AUC | PR-AUC |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| Random Forest | Baseline | 0.48 | 0.8423 | 0.8300 | 0.8608 | 0.8451 | 0.9209 | 0.9245 |
-| ESM-MLP | Sequence branch | 0.47 | 0.8708 | 0.8541 | 0.8944 | 0.8738 | 0.9442 | 0.9467 |
-| GraphSAGE | Graph branch | 0.79 | 0.9010 | 0.9082 | 0.8921 | 0.9001 | 0.9474 | 0.9617 |
-| XGBoost Ensemble | Combined model | 0.51 | 0.9175 | 0.9381 | 0.8940 | 0.9155 | 0.9626 | 0.9696 |
+| Random Forest | Baseline | 0.47 | 0.8234 | 0.8114 | 0.8428 | 0.8268 | 0.9065 | 0.9124 |
+| ESM-MLP | Sequence branch | 0.49 | 0.8711 | 0.8600 | 0.8865 | 0.8730 | 0.9438 | 0.9474 |
+| GraphSAGE (Platt-calibrated) | Graph branch | 0.58 | 0.9035 | 0.9174 | 0.8869 | 0.9019 | 0.9488 | 0.9617 |
+| XGBoost Ensemble | Combined model | 0.50 | 0.9211 | 0.9357 | 0.9043 | 0.9197 | 0.9708 | 0.9759 |
 
-The ensemble combines sequence and graph-derived predictions and achieves the highest F1, ROC-AUC and PR-AUC among the evaluated configurations on this test split. It also has the highest accuracy and precision; ESM-MLP's recall (0.8944) is marginally above the ensemble's (0.8940).
+The ensemble has the highest value in every reported metric on this test split.
 
 ### Caveats
 - Single run on a single split; no confidence intervals or significance tests.
 - Because the split is not node-disjoint, all test proteins are present in the training graph. This may favor the graph branch, and it was not tested.
-- The ensemble's biological feature (`bio_score`) is never used by the trained booster, so it is not a source of any difference in this table.
+- The biological feature (`bio_score`) is not an input to the 7-feature meta-learner.
+- A degree-only logistic regression reaches accuracy 0.7063 / ROC-AUC 0.7838 on the same test set (`assets/evaluation/audit/audit_after_data.json`).
 - Whether the ensemble's gain comes from combining the branches specifically was not tested with a controlled ablation.
 
 ## 3. Literature Context

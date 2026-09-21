@@ -9,7 +9,7 @@
 ![PyTorch](https://img.shields.io/badge/PyTorch-DeepLearning-red)
 ![React](https://img.shields.io/badge/Frontend-ReactJS-blue)
 ![FastAPI](https://img.shields.io/badge/Backend-FastAPI-green)
-![Tests](https://img.shields.io/badge/Tests-13%2F13%20Passing-brightgreen)
+
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 
 **TransGraph-PPI** is a research-oriented multimodal machine learning framework designed for **Protein–Protein Interaction (PPI) prediction**. It integrates deep protein sequence embeddings (ESM-2), graph topological representations (GraphSAGE), an Out-Of-Fold XGBoost stacking meta-ensemble, SHAP explainability, and ChEMBL-based downstream therapeutic-target analysis.
@@ -28,7 +28,7 @@ Protein–Protein Interactions govern fundamental cellular processes. TransGraph
 | **Graph Model** | GraphSAGE (`SAGEConv`) over the training PPI graph | Neighborhood aggregation for link prediction. It has no attention mechanism; the original proposal specified a GAT, but the implemented and evaluated model is GraphSAGE |
 | **Biological Context** | UniProt subcellular localization (cache-only score) | One of the 8 ensemble input features; the trained XGBoost model never splits on it, so it has no measurable effect on the reported metrics |
 | **Ensemble Meta-Learner** | XGBoost (OOF Stacking) | Stacks the two base-model probabilities plus derived confidence/disagreement features (7 meta-features: `p_seq`, `p_graph`, `conf_seq`, `conf_graph`, `diff`, `max_conf`, `consensus`; `p_graph` is the Platt-calibrated GraphSAGE probability) |
-| **Explainability (XAI)** | SHAP (SHapley Additive exPlanations) | Feature attribution on the ensemble's 8 input features |
+| **Explainability (XAI)** | SHAP (SHapley Additive exPlanations) | Feature attribution on the ensemble's 7 input features (`p_seq`, `p_graph`, `conf_seq`, `conf_graph`, `diff`, `max_conf`, `consensus`) |
 | **Downstream Analysis** | Degree / betweenness / PageRank centrality + ChEMBL target lookup | Therapeutic-target prioritization (a heuristic score, not a validated ranking) |
 
 ---
@@ -225,7 +225,9 @@ TransGraph-PPI
 
 1. **Transductive evaluation**: the split is pair-disjoint, not node-disjoint, so the reported metrics do not measure generalization to unseen proteins or other species. The cold-start path (nearest-neighbour node insertion in `/predict`) and the Cross-Species page are exploratory and have not been evaluated.
 2. **Single split, single run**: results come from one seed/split with no confidence intervals or significance testing.
-3. **Biological feature**: the co-localization score is part of the ensemble input, but the trained XGBoost trees never split on it (it is 0.5 for almost every pair, since the UniProt cache covers few proteins), so it contributes nothing measurable.
+3. **Biological feature**: the co-localization score is display-only and is not an ensemble input (the meta-vector has 7 features).
+3a. **Degree-bias baseline**: a logistic regression on the log positive-degree of the two proteins alone reaches accuracy 0.7063 / ROC-AUC 0.7838 on the test set (`assets/evaluation/audit/audit_after_data.json`), so a substantial part of the signal is node-degree bias that the transductive split does not remove.
+3b. **Calibration**: on val.csv the Platt calibrator lowered GraphSAGE ECE from 0.15287 to 0.05035 and Brier from 0.11847 to 0.07456 (`assets/evaluation/graph_calibration.json`; the calibrator is fit and scored on the same val set, the cross-fitted ECE is 0.05028).
 4. **Synthetic negatives**: negatives are sampled, not experimentally validated, and may include unannotated true interactions.
 5. **No external benchmark**: no evaluation on other datasets (e.g. SHS27k, SHS148k, HuRI, BioGRID) has been run, so no comparison with published methods is made.
 6. **Embedding scale**: only the 35M-parameter ESM-2 model was used.
