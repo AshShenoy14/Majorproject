@@ -111,22 +111,21 @@ def model_metrics():
     cache = np.load(cache_path)
     y = cache["va_y"]
     out = {"calibration_val": {}}
-    for name, key in [("sequence", "va_seq"), ("graph", "va_graph")]:
+    for name, key in [("sequence", "va_seq"), ("graph_calibrated", "va_graph")]:
         p = cache[key].astype(float)
         out["calibration_val"][name] = {"ECE": round(ece(y, p), 4), "Brier": round(float(brier_score_loss(y, p)), 4)}
 
     meta = joblib.load(MODELS_DIR / "ensemble_model.pkl")
     n_feat = meta.n_features_in_
-    bio = cache["va_bio"].reshape(-1, 1) if n_feat == 8 else None
-    X = PPIEnsemble._build_features(cache["va_seq"], cache["va_graph"], bio)
-    names = ["p_seq", "p_graph", "conf_seq", "conf_graph", "diff", "max_conf", "consensus", "bio_score"][:X.shape[1]]
+    assert n_feat == 7, f"expected the 7-feature meta-vector, model has {n_feat}"
+    # cache["va_graph"] is already the Platt-calibrated GraphSAGE probability (saved by compare_models.py)
+    X = PPIEnsemble._build_features(cache["va_seq"], cache["va_graph"])
+    names = ["p_seq", "p_graph", "conf_seq", "conf_graph", "diff", "max_conf", "consensus"]
     pe = meta.predict_proba(X)[:, 1]
     out["calibration_val"]["ensemble"] = {"ECE": round(ece(y, pe), 4), "Brier": round(float(brier_score_loss(y, pe)), 4)}
     sv = shap.TreeExplainer(meta).shap_values(X)
     out["meta_feature_mean_abs_shap"] = {n: round(float(v), 5) for n, v in zip(names, np.abs(sv).mean(0))}
     out["meta_feature_xgb_gain"] = {n: round(float(v), 5) for n, v in zip(names, meta.feature_importances_)}
-    if n_feat == 8:
-        out["bio_score_pct_default_0.5_val"] = round(float((np.abs(cache["va_bio"] - 0.5) < 1e-9).mean() * 100), 3)
     return out
 
 

@@ -1,5 +1,10 @@
 # Colab run evidence (console excerpt)
 
+> **Run 1 log.** This excerpt is from the first Colab run. The repository's current artifacts come from a second, independent Colab run (finished 2026-09-21 16:44 UTC), whose
+> checkpoint hashes are in `assets/evaluation/final_test_metrics.json` and whose data/model hashes are in `assets/evaluation/artifact_hashes.txt`. Run 2 differs by <=0.1 point
+> (ensemble accuracy 0.9213 vs 0.9211; GraphSAGE and ensemble checkpoints differ, the sequence model and random-forest checkpoints are byte-identical). No console log of run 2 is available;
+> its fold-leak assertions are not separately evidenced, but the code path is unchanged and run 1's assertions fired.
+
 Excerpt of the console output of the Colab T4 run that produced `models/*` and `assets/evaluation/final_test_metrics.json`
 (hash prefixes of those checkpoints are recorded in the JSON). Only the lines relevant to verification are kept; the
 per-epoch training lines are omitted. This is a transcription of pasted console output, not a machine-generated log file.

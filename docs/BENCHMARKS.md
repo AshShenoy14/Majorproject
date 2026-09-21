@@ -25,8 +25,8 @@ This is an internal component and baseline comparison on the same held-out test 
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | Random Forest | Baseline | 0.47 | 0.8234 | 0.8114 | 0.8428 | 0.8268 | 0.9065 | 0.9124 |
 | ESM-MLP | Sequence branch | 0.49 | 0.8711 | 0.8600 | 0.8865 | 0.8730 | 0.9438 | 0.9474 |
-| GraphSAGE (Platt-calibrated) | Graph branch | 0.58 | 0.9035 | 0.9174 | 0.8869 | 0.9019 | 0.9488 | 0.9617 |
-| XGBoost Ensemble | Combined model | 0.50 | 0.9211 | 0.9357 | 0.9043 | 0.9197 | 0.9708 | 0.9759 |
+| GraphSAGE (Platt-calibrated) | Graph branch | 0.59 | 0.9042 | 0.9201 | 0.8852 | 0.9023 | 0.9487 | 0.9616 |
+| XGBoost Ensemble | Combined model | 0.50 | 0.9213 | 0.9359 | 0.9046 | 0.9200 | 0.9708 | 0.9759 |
 
 The ensemble has the highest value in every reported metric on this test split.
 

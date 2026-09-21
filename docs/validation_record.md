@@ -47,8 +47,8 @@ The Random Forest is a separate baseline. Legacy API field names in the code kee
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | Random Forest Baseline | 0.4700 | 0.8234 | 0.8114 | 0.8428 | 0.8268 | 0.9065 | 0.9124 |
 | ESM-MLP (Sequence-Only) | 0.4900 | 0.8711 | 0.8600 | 0.8865 | 0.8730 | 0.9438 | 0.9474 |
-| GraphSAGE (Graph-Only, Calibrated) | 0.5800 | 0.9035 | 0.9174 | 0.8869 | 0.9019 | 0.9488 | 0.9617 |
-| **XGBoost Ensemble (Full Multimodal)** | **0.5000** | **0.9211** | **0.9357** | **0.9043** | **0.9197** | **0.9708** | **0.9759** |
+| GraphSAGE (Graph-Only, Calibrated) | 0.5900 | 0.9042 | 0.9201 | 0.8852 | 0.9023 | 0.9487 | 0.9616 |
+| **XGBoost Ensemble (Full Multimodal)** | **0.5000** | **0.9213** | **0.9359** | **0.9046** | **0.9200** | **0.9708** | **0.9759** |
 
 The ensemble combines sequence and graph-derived predictions and achieves the highest Accuracy, Precision, Recall, F1, ROC-AUC and PR-AUC among the evaluated configurations on this test split.
 
@@ -74,15 +74,17 @@ The XGBoost ensemble has 7 input features:
 ## 7. Explainability
 
 - **SHAP feature contributions**: `/predict` returns one SHAP value per ensemble input feature for the requested pair, and `compare_models.py` saves a SHAP summary plot of the 7-feature test matrix to `data/processed/plots/shap_summary.png`.
-- No SHAP ranking or tree-gain totals are recorded in a committed artifact for the current checkpoint, so none are quoted here. (The tree-gain totals previously listed belonged to the superseded 8-feature booster.)
+- **Mean |SHAP| of the current meta-learner** (test matrix, 20,172 pairs, recomputed locally from the hash-verified checkpoints): `consensus` 2.07, `p_graph` 0.73, `p_seq` 0.57 (top 3); then `max_conf` 0.23, `conf_graph` 0.14, `diff` 0.09, `conf_seq` 0.06. Validation-set values from `assets/evaluation/audit/audit_after_full.json` give the same order (2.074 / 0.728 / 0.569). `consensus` is the product `p_seq * p_graph`, so the ranking says the meta-learner relies on the agreement of both branches; it does not show which single branch matters more.
+- **XGBoost gain importance** (normalised, `feature_importances_`): `consensus` 0.622, `p_graph` 0.231, `p_seq` 0.077 (a different quantity from SHAP).
+- **Calibration of the final probabilities (val.csv, 15 bins)**: sequence ECE 0.1018 / Brier 0.1026; Platt-calibrated GraphSAGE ECE 0.0502 / Brier 0.0745; ensemble ECE 0.0099 / Brier 0.0567 (`audit_after_full.json`).
 
 ## 8. Model Provenance (checkpoint SHA-256 prefixes)
 
 | Artifact | SHA-256 (first 16 hex) |
 | :--- | :--- |
 | `models/sequence_model_best.pth` | `7ad93da5e17d757b` |
-| `models/graph_model_best.pth` | `767dfc254c7a6b4d` |
-| `models/ensemble_model.pkl` | `874eee164d0e7f9e` |
+| `models/graph_model_best.pth` | `8d904bfd553752d1` |
+| `models/ensemble_model.pkl` | `87bae8e32dc78d6b` |
 | `models/random_forest_baseline.pkl` | `5bddcaeea2abe28c` |
 
 The graph checkpoint is a GraphSAGE (`SAGEConv`) model with no attention mechanism.
@@ -101,7 +103,7 @@ The graph checkpoint is a GraphSAGE (`SAGEConv`) model with no attention mechani
 - No evidence of cold-start or unseen-protein generalization. The nearest-neighbor node-insertion path in `/predict` and the Cross-Species page are exploratory and unevaluated.
 - One split and one seed; no confidence intervals or significance tests.
 - Degree-only baseline (logistic regression on log positive-degree): accuracy 0.7063, ROC-AUC 0.7838 on test (`audit_after_data.json`).
-- GraphSAGE Platt calibration on val.csv: ECE 0.15287 -> 0.05035, Brier 0.11847 -> 0.07456 (`graph_calibration.json`); fit and scored on the same set.
+- GraphSAGE Platt calibration on val.csv: ECE 0.15344 -> 0.05018, Brier 0.11871 -> 0.07455 (`graph_calibration.json`); fit and scored on the same set.
 - No external-dataset benchmark; no comparison with published methods.
 - Sampled negatives may include unannotated true interactions.
 - The therapeutic-target priority score (0.40 degree + 0.35 betweenness + 0.25 ChEMBL indicator) is a heuristic, not a validated ranking. The ChEMBL target lookup writes newly fetched targets into `data/processed/chembl_targets.csv`, and requesting proteins missing from that cache triggers live ChEMBL queries.

@@ -68,14 +68,14 @@ All 20,172 test rows were evaluated (none filtered).
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | **Random Forest baseline** | 0.4700 | 0.8234 | 0.8114 | 0.8428 | 0.8268 | 0.9065 | 0.9124 |
 | **ESM-MLP (sequence only)** | 0.4900 | 0.8711 | 0.8600 | 0.8865 | 0.8730 | 0.9438 | 0.9474 |
-| **GraphSAGE (graph only, calibrated)** | 0.5800 | 0.9035 | 0.9174 | 0.8869 | 0.9019 | 0.9488 | 0.9617 |
-| **XGBoost Ensemble (OOF stacking)** | **0.5000** | **0.9211** | **0.9357** | **0.9043** | **0.9197** | **0.9708** | **0.9759** |
+| **GraphSAGE (graph only, calibrated)** | 0.5900 | 0.9042 | 0.9201 | 0.8852 | 0.9023 | 0.9487 | 0.9616 |
+| **XGBoost Ensemble (OOF stacking)** | **0.5000** | **0.9213** | **0.9359** | **0.9046** | **0.9200** | **0.9708** | **0.9759** |
 
 > **Status: Verified Clean Benchmark.** Evaluated end-to-end on clean, contamination-free negatives (0 STRING pairs at any score) and strictly disjoint 5-fold OOF training graphs with zero edge leakage. All predictions use the 7-feature meta-learner with Platt-calibrated GraphSAGE probabilities.
 
 Notes:
 - 5-fold pair-level stratified OOF predictions are used to train the XGBoost meta-learner (`src/training/train_ensemble.py`).
-- The ensemble achieves the highest accuracy (**92.11%**), precision (**93.57%**), recall (**90.43%**), F1 (**0.9197**), ROC-AUC (**0.9708**) and PR-AUC (**0.9759**) among all evaluated configurations on this held-out test split.
+- The ensemble achieves the highest accuracy (**92.13%**), precision (**93.59%**), recall (**90.46%**), F1 (**0.9200**), ROC-AUC (**0.9708**) and PR-AUC (**0.9759**) among all evaluated configurations on this held-out test split.
 - The evaluation is **transductive pair prediction** (see below).
 
 ---
@@ -227,7 +227,7 @@ TransGraph-PPI
 2. **Single split, single run**: results come from one seed/split with no confidence intervals or significance testing.
 3. **Biological feature**: the co-localization score is display-only and is not an ensemble input (the meta-vector has 7 features).
 3a. **Degree-bias baseline**: a logistic regression on the log positive-degree of the two proteins alone reaches accuracy 0.7063 / ROC-AUC 0.7838 on the test set (`assets/evaluation/audit/audit_after_data.json`), so a substantial part of the signal is node-degree bias that the transductive split does not remove.
-3b. **Calibration**: on val.csv the Platt calibrator lowered GraphSAGE ECE from 0.15287 to 0.05035 and Brier from 0.11847 to 0.07456 (`assets/evaluation/graph_calibration.json`; the calibrator is fit and scored on the same val set, the cross-fitted ECE is 0.05028).
+3b. **Calibration**: on val.csv the Platt calibrator lowered GraphSAGE ECE from 0.15344 to 0.05018 and Brier from 0.11871 to 0.07455 (`assets/evaluation/graph_calibration.json`; the calibrator is fit and scored on the same val set, the cross-fitted ECE is 0.05009).
 4. **Synthetic negatives**: negatives are sampled, not experimentally validated, and may include unannotated true interactions.
 5. **No external benchmark**: no evaluation on other datasets (e.g. SHS27k, SHS148k, HuRI, BioGRID) has been run, so no comparison with published methods is made.
 6. **Embedding scale**: only the 35M-parameter ESM-2 model was used.

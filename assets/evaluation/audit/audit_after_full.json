@@ -1,0 +1,77 @@
+{
+  "split_sizes": {
+    "train": 161369,
+    "val": 20171,
+    "test": 20172
+  },
+  "negative_contamination": {
+    "train": {
+      "n_negatives": 80684,
+      "contaminated_any_score": 0,
+      "contaminated_ge400": 0,
+      "contaminated_ge700": 0,
+      "contamination_pct_any": 0.0
+    },
+    "val": {
+      "n_negatives": 10086,
+      "contaminated_any_score": 0,
+      "contaminated_ge400": 0,
+      "contaminated_ge700": 0,
+      "contamination_pct_any": 0.0
+    },
+    "test": {
+      "n_negatives": 10086,
+      "contaminated_any_score": 0,
+      "contaminated_ge400": 0,
+      "contaminated_ge700": 0,
+      "contamination_pct_any": 0.0
+    },
+    "ALL": {
+      "n_negatives": 100856,
+      "contaminated_any_score": 0,
+      "contaminated_ge400": 0,
+      "contaminated_ge700": 0,
+      "contamination_pct_any": 0.0
+    }
+  },
+  "degree_bias_baseline": {
+    "description": "logistic regression on log positive-degree of the two proteins only; fit on train, scored on test",
+    "test_accuracy": 0.7063,
+    "test_roc_auc": 0.7838,
+    "majority_class_accuracy": 0.5
+  },
+  "model_metrics": {
+    "calibration_val": {
+      "sequence": {
+        "ECE": 0.1018,
+        "Brier": 0.1026
+      },
+      "graph_calibrated": {
+        "ECE": 0.0502,
+        "Brier": 0.0745
+      },
+      "ensemble": {
+        "ECE": 0.0099,
+        "Brier": 0.0567
+      }
+    },
+    "meta_feature_mean_abs_shap": {
+      "p_seq": 0.5692,
+      "p_graph": 0.72759,
+      "conf_seq": 0.05602,
+      "conf_graph": 0.13853,
+      "diff": 0.09161,
+      "max_conf": 0.22571,
+      "consensus": 2.07402
+    },
+    "meta_feature_xgb_gain": {
+      "p_seq": 0.0768,
+      "p_graph": 0.23075,
+      "conf_seq": 0.0089,
+      "conf_graph": 0.01147,
+      "diff": 0.02035,
+      "max_conf": 0.02943,
+      "consensus": 0.6223
+    }
+  }
+}
