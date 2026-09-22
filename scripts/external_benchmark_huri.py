@@ -112,6 +112,17 @@ def main():
     print(f"Using device: {dev}")
 
     huri_path = RAW_DATA_DIR / "huri" / "HI-union.tsv"
+    if not huri_path.exists():
+        print(f"HuRI dataset not found at {huri_path}. Downloading from interactome-atlas.org...", flush=True)
+        huri_path.parent.mkdir(parents=True, exist_ok=True)
+        import requests
+        url = "http://interactome-atlas.org/data/HI-union.tsv"
+        r = requests.get(url, verify=False, stream=True, timeout=120)
+        r.raise_for_status()
+        with open(huri_path, "wb") as f:
+            for chunk in r.iter_content(chunk_size=8192):
+                f.write(chunk)
+        print(f"Downloaded HuRI HI-union.tsv ({huri_path.stat().st_size / 1e6:.2f} MB)", flush=True)
     full = pd.read_csv(huri_path, sep="\t", header=None, names=["g1", "g2"])
     print(f"Full HI-union: {len(full)} pairs, {len(set(full.g1)|set(full.g2))} unique genes")
     sample_idx = rng.choice(len(full), size=min(args.n_pairs, len(full)), replace=False)

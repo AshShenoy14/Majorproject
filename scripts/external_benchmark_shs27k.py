@@ -52,6 +52,17 @@ def main():
     print(f"Using device: {dev}")
 
     shs_path = RAW_DATA_DIR / "data" / "SHS27k" / "data" / "train-00000-of-00001.parquet"
+    if not shs_path.exists():
+        print(f"SHS27k dataset not found at {shs_path}. Downloading from HuggingFace...", flush=True)
+        shs_path.parent.mkdir(parents=True, exist_ok=True)
+        import requests
+        url = "https://huggingface.co/datasets/Synthyra/SHS27k/resolve/main/data/train-00000-of-00001.parquet"
+        r = requests.get(url, stream=True, timeout=120)
+        r.raise_for_status()
+        with open(shs_path, "wb") as f:
+            for chunk in r.iter_content(chunk_size=8192):
+                f.write(chunk)
+        print(f"Downloaded SHS27k ({shs_path.stat().st_size / 1e6:.2f} MB)", flush=True)
     df = pd.read_parquet(shs_path)
     print(f"Loaded SHS27k: {len(df)} rows")
 
