@@ -100,8 +100,8 @@ The graph checkpoint is a GraphSAGE (`SAGEConv`) model with no attention mechani
 ## 10. Limitations
 
 - Pair-disjoint but not node-disjoint; the evaluation is transductive pair prediction.
-- No evidence of cold-start or unseen-protein generalization. The nearest-neighbor node-insertion path in `/predict` and the Cross-Species page are exploratory and unevaluated.
-- One split and one seed; no confidence intervals or significance tests.
+- No evidence of true unseen-protein generalization (a from-scratch protein-disjoint retrain has not been done). A simulated semi-cold-start check does exist: `scripts/cold_start_eval.py` removes 400 proteins from the trained graph and scores the exact production `insert_novel_node_knn` reconstruction path against real test.csv labels: accuracy 0.833 / ROC-AUC 0.937, vs. 0.910 / 0.960 for the same pairs with the real node present (`assets/evaluation/cold_start_eval.json`; a second seed/held-out set gives 0.839/0.958 vs. 0.927/0.980, see `assets/evaluation/cold_start_eval_seed7.json`). Because the base models were originally trained with these proteins' data available, this shows the reconstruction mechanism is functional and degrades gracefully, not that the model generalizes to truly unseen proteins. The Cross-Species page remains exploratory and unevaluated.
+- One split and one seed for training; a 2,000-resample bootstrap on the test set gives 95% CIs for the ensemble: accuracy [0.9176, 0.9251], ROC-AUC [0.9687, 0.9729], F1 [0.9162, 0.9239] (`bootstrap_ci.json`) - no independent multi-seed retraining has been done.
 - Degree-only baseline (logistic regression on log positive-degree): accuracy 0.7063, ROC-AUC 0.7838 on test (`audit_after_data.json`).
 - GraphSAGE Platt calibration on val.csv: ECE 0.15344 -> 0.05018, Brier 0.11871 -> 0.07455 (`graph_calibration.json`); fit and scored on the same set.
 - No external-dataset benchmark; no comparison with published methods.

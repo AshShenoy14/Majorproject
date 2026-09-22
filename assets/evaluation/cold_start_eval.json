@@ -1,0 +1,20 @@
+{
+  "description": "Simulated semi-cold-start eval: one pair endpoint physically removed from the trained graph and reconstructed via the production insert_novel_node_knn() path; no retraining. See scripts/cold_start_eval.py docstring for caveats before citing as inductive generalization.",
+  "n_novel_proteins_removed": 400,
+  "k_neighbors": 2,
+  "seed": 42,
+  "cold_start_novel_protein_via_knn": {
+    "n": 1152,
+    "accuracy": 0.8333333333333334,
+    "roc_auc": 0.937349052479233,
+    "f1": 0.8048780487804879,
+    "positive_rate": 0.4904513888888889
+  },
+  "warm_baseline_same_pairs_full_graph": {
+    "n": 1152,
+    "accuracy": 0.9097222222222222,
+    "roc_auc": 0.9604091601212104,
+    "f1": 0.9064748201438849,
+    "positive_rate": 0.4904513888888889
+  }
+}

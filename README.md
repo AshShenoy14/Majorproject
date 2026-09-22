@@ -223,8 +223,8 @@ TransGraph-PPI
 
 ## ⚠️ Explicit Limitations
 
-1. **Transductive evaluation**: the split is pair-disjoint, not node-disjoint, so the reported metrics do not measure generalization to unseen proteins or other species. The cold-start path (nearest-neighbour node insertion in `/predict`) and the Cross-Species page are exploratory and have not been evaluated.
-2. **Single split, single run**: results come from one seed/split with no confidence intervals or significance testing.
+1. **Transductive evaluation**: the split is pair-disjoint, not node-disjoint, so the main results table does not measure generalization to unseen proteins. A simulated semi-cold-start check (`scripts/cold_start_eval.py`, `assets/evaluation/cold_start_eval.json`) removes 400 proteins from the trained graph, forces them through the exact production `insert_novel_node_knn` reconstruction path in `/predict`, and scores against real test.csv labels: accuracy 0.833 / ROC-AUC 0.937 (vs. 0.910 / 0.960 for the same pairs when the protein's real node is present), stable across a second seed/held-out set (0.839 / 0.958 vs. 0.927 / 0.980). This is real evidence that the cold-start path works and degrades gracefully rather than failing, but is **not** a from-scratch protein-disjoint retrain — the base models' weights were still originally fit with these proteins' data available, so this should be read as "the inference-time reconstruction mechanism is functional," not "the model generalizes to truly unseen proteins." The Cross-Species page remains exploratory and unevaluated.
+2. **Single split, single run**: the main results come from one seed/split. A 2,000-resample bootstrap on the test set gives 95% CIs for the ensemble: accuracy [0.9176, 0.9251], ROC-AUC [0.9687, 0.9729], F1 [0.9162, 0.9239] (`assets/evaluation/bootstrap_ci.json`) — no independent multi-seed retraining has been done.
 3. **Biological feature**: the co-localization score is display-only and is not an ensemble input (the meta-vector has 7 features).
 3a. **Degree-bias baseline**: a logistic regression on the log positive-degree of the two proteins alone reaches accuracy 0.7063 / ROC-AUC 0.7838 on the test set (`assets/evaluation/audit/audit_after_data.json`), so a substantial part of the signal is node-degree bias that the transductive split does not remove.
 3b. **Calibration**: on val.csv the Platt calibrator lowered GraphSAGE ECE from 0.15344 to 0.05018 and Brier from 0.11871 to 0.07455 (`assets/evaluation/graph_calibration.json`; the calibrator is fit and scored on the same val set, the cross-fitted ECE is 0.05009).
@@ -237,7 +237,7 @@ TransGraph-PPI
 
 ## 🔮 Future Research Directions
 
-- **Node-disjoint / cold-start evaluation**: protein-disjoint splits and external datasets (such as HuRI or BioGRID) to measure generalization to unseen proteins.
+- **From-scratch protein-disjoint retrain**: a genuinely held-out-protein split and retrain (the simulated cold-start check above reuses the existing trained weights, so it is a weaker check than this) and external datasets (such as HuRI or BioGRID) to measure generalization to unseen proteins.
 - **Model scaling**: higher-capacity ESM-2 variants for the sequence model.
 
 ---
