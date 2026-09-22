@@ -229,7 +229,10 @@ TransGraph-PPI
 3a. **Degree-bias baseline**: a logistic regression on the log positive-degree of the two proteins alone reaches accuracy 0.7063 / ROC-AUC 0.7838 on the test set (`assets/evaluation/audit/audit_after_data.json`), so a substantial part of the signal is node-degree bias that the transductive split does not remove.
 3b. **Calibration**: on val.csv the Platt calibrator lowered GraphSAGE ECE from 0.15344 to 0.05018 and Brier from 0.11871 to 0.07455 (`assets/evaluation/graph_calibration.json`; the calibrator is fit and scored on the same val set, the cross-fitted ECE is 0.05009).
 4. **Synthetic negatives**: negatives are sampled, not experimentally validated, and may include unannotated true interactions.
-5. **No external benchmark**: no evaluation on other datasets (e.g. SHS27k, SHS148k, HuRI, BioGRID) has been run, so no comparison with published methods is made.
+5. **External benchmarks**: run with the same, unretrained checkpoints via the exact `/predict` inference path (`scripts/external_benchmark_shs27k.py`, `scripts/external_benchmark_huri.py`), against real labels, not against a curated "easy" slice.
+   - **SHS27k** (Chen et al.; 15,248 pairs, 1,690 proteins, 81% byte-identical to training proteins — same underlying database, STRING, just a different curated snapshot, not an independent source): accuracy 0.698, ROC-AUC 0.802, F1 0.612 (`assets/evaluation/external_benchmark_shs27k.json`). A steep drop from the 92.13% in-domain result, consistent with this project's own cited literature that cross-dataset PPI accuracy plateaus well below in-domain numbers.
+   - **HuRI / HI-union** (Luck et al. 2020, systematic yeast-two-hybrid screen — a genuinely independent source, not derived from STRING; 1,394 pairs sampled from the full 64,006-pair set, 1,028 proteins): accuracy 0.523, ROC-AUC 0.573, F1 0.144 (`assets/evaluation/external_benchmark_huri.json`), barely above chance. The confusion matrix shows the model predicts positive on only 5.7% of pairs versus the true 50% positive rate — a strong under-confidence bias on this out-of-distribution data, not random noise. This is the clearest evidence in the whole project that the model does not generalize to a genuinely different interaction-detection modality, and should be stated plainly as a limitation, not minimized.
+   - Neither benchmark involved any retraining; both reuse the checkpoints behind the main 92.13% result and the same cold-start reconstruction path as `scripts/cold_start_eval.py` for proteins absent from the training graph.
 6. **Embedding scale**: only the 35M-parameter ESM-2 model was used.
 7. **Therapeutic targets**: the TTPS score (0.40 degree + 0.35 betweenness + 0.25 ChEMBL indicator) is a heuristic with user-chosen weights, not a validated ranking.
 
@@ -237,7 +240,7 @@ TransGraph-PPI
 
 ## 🔮 Future Research Directions
 
-- **From-scratch protein-disjoint retrain**: a genuinely held-out-protein split and retrain (the simulated cold-start check above reuses the existing trained weights, so it is a weaker check than this) and external datasets (such as HuRI or BioGRID) to measure generalization to unseen proteins.
+- **From-scratch protein-disjoint retrain**: a genuinely held-out-protein split and retrain (the simulated cold-start check above and the external benchmarks both reuse the existing trained weights, so neither is a from-scratch inductive test) to properly measure generalization to unseen proteins; the HuRI result above suggests this gap is real and currently large.
 - **Model scaling**: higher-capacity ESM-2 variants for the sequence model.
 
 ---

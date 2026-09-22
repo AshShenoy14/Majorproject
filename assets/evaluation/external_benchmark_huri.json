@@ -8,22 +8,46 @@
   "overall": {
     "n": 1394,
     "accuracy": 0.5229555236728838,
-    "roc_auc": 0.5758405052191293,
-    "f1": 0.14634146341463414,
-    "positive_rate": 0.5
+    "roc_auc": 0.5725737892875595,
+    "f1": 0.14414414414414414,
+    "positive_rate": 0.5,
+    "predicted_positive_rate": 0.05738880918220947,
+    "mean_predicted_prob": 0.13590401411056519,
+    "confusion_matrix": {
+      "tn": 673,
+      "fp": 24,
+      "fn": 641,
+      "tp": 56
+    }
   },
   "both_proteins_seen_in_training_subset": {
     "n": 166,
     "accuracy": 0.6204819277108434,
     "roc_auc": 0.6358079245838857,
     "f1": 0.3368421052631579,
-    "positive_rate": 0.4397590361445783
+    "positive_rate": 0.4397590361445783,
+    "predicted_positive_rate": 0.13253012048192772,
+    "mean_predicted_prob": 0.20672032237052917,
+    "confusion_matrix": {
+      "tn": 87,
+      "fp": 6,
+      "fn": 57,
+      "tp": 16
+    }
   },
   "at_least_one_novel_protein_subset": {
     "n": 1228,
     "accuracy": 0.509771986970684,
-    "roc_auc": 0.5707914119544915,
-    "f1": 0.11988304093567251,
-    "positive_rate": 0.50814332247557
+    "roc_auc": 0.5665024303786721,
+    "f1": 0.11730205278592376,
+    "positive_rate": 0.50814332247557,
+    "predicted_positive_rate": 0.04723127035830619,
+    "mean_predicted_prob": 0.1263311207294464,
+    "confusion_matrix": {
+      "tn": 586,
+      "fp": 18,
+      "fn": 584,
+      "tp": 40
+    }
   }
 }

@@ -104,7 +104,7 @@ The graph checkpoint is a GraphSAGE (`SAGEConv`) model with no attention mechani
 - One split and one seed for training; a 2,000-resample bootstrap on the test set gives 95% CIs for the ensemble: accuracy [0.9176, 0.9251], ROC-AUC [0.9687, 0.9729], F1 [0.9162, 0.9239] (`bootstrap_ci.json`) - no independent multi-seed retraining has been done.
 - Degree-only baseline (logistic regression on log positive-degree): accuracy 0.7063, ROC-AUC 0.7838 on test (`audit_after_data.json`).
 - GraphSAGE Platt calibration on val.csv: ECE 0.15344 -> 0.05018, Brier 0.11871 -> 0.07455 (`graph_calibration.json`); fit and scored on the same set.
-- No external-dataset benchmark; no comparison with published methods.
+- External benchmarks (existing checkpoints, no retraining, same `/predict` inference path as production): SHS27k (same-source STRING, different curated snapshot) accuracy 0.698 / ROC-AUC 0.802 (`assets/evaluation/external_benchmark_shs27k.json`); HuRI/HI-union (independent-source, yeast-two-hybrid) accuracy 0.523 / ROC-AUC 0.573, with a confusion matrix showing a strong bias toward predicting non-interacting (`assets/evaluation/external_benchmark_huri.json`). Still no comparison with published methods' own reported numbers.
 - Sampled negatives may include unannotated true interactions.
 - The therapeutic-target priority score (0.40 degree + 0.35 betweenness + 0.25 ChEMBL indicator) is a heuristic, not a validated ranking. The ChEMBL target lookup writes newly fetched targets into `data/processed/chembl_targets.csv`, and requesting proteins missing from that cache triggers live ChEMBL queries.
 - The biological feature is not an ensemble input.
