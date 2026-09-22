@@ -1,0 +1,29 @@
+{
+  "description": "HuRI / HI-union (Luck et al. 2020, yeast-two-hybrid) -- a genuinely independent-source benchmark (not derived from STRING). Subsampled and scored with the existing checkpoints via the exact production inference path; no retraining. See this script's module docstring for full caveats.",
+  "n_pairs_sampled_from_full_huri": 700,
+  "n_total_pairs_scored": 1394,
+  "n_unique_genes": 1028,
+  "n_proteins_byte_identical_to_training": 381,
+  "n_proteins_novel": 647,
+  "overall": {
+    "n": 1394,
+    "accuracy": 0.5229555236728838,
+    "roc_auc": 0.5758405052191293,
+    "f1": 0.14634146341463414,
+    "positive_rate": 0.5
+  },
+  "both_proteins_seen_in_training_subset": {
+    "n": 166,
+    "accuracy": 0.6204819277108434,
+    "roc_auc": 0.6358079245838857,
+    "f1": 0.3368421052631579,
+    "positive_rate": 0.4397590361445783
+  },
+  "at_least_one_novel_protein_subset": {
+    "n": 1228,
+    "accuracy": 0.509771986970684,
+    "roc_auc": 0.5707914119544915,
+    "f1": 0.11988304093567251,
+    "positive_rate": 0.50814332247557
+  }
+}
