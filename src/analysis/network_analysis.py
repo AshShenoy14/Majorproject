@@ -23,6 +23,9 @@ class NetworkAnalyzer:
         Calculates Degree, Betweenness, and Closeness centrality.
         Returns a DataFrame sorted by Degree Centrality.
         """
+        if getattr(self, '_centralities_cache', None) is not None:
+            return self._centralities_cache.copy()
+
         if self.graph is None or len(self.graph) == 0:
             return pd.DataFrame()
 
@@ -35,7 +38,7 @@ class NetworkAnalyzer:
 
         print("Calculating Eigenvector Centrality...")
         try:
-            eig = nx.eigenvector_centrality(self.graph, max_iter=500)
+            eig = nx.eigenvector_centrality(self.graph, max_iter=100)
         except Exception:
             eig = {n: 0.0 for n in self.graph.nodes()} # Fallback if convergence fails
         
@@ -52,8 +55,9 @@ class NetworkAnalyzer:
                 "eigenvector_centrality": eig[node]
             })
             
-        df = pd.DataFrame(data)
-        return df.sort_values("degree", ascending=False)
+        df = pd.DataFrame(data).sort_values("degree", ascending=False)
+        self._centralities_cache = df
+        return df.copy()
 
     def identify_hubs(self, top_k: int = 10) -> List[Dict[str, Any]]:
         """

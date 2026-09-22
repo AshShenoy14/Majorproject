@@ -14,7 +14,8 @@ class TargetManager:
             from chembl_webresource_client.new_client import new_client
             self.target_client = new_client.target
         except Exception as e:
-            print(f"Warning: ChEMBL API is unreachable ({e}). Drug target generation will be limited.")
+            err_msg = str(e).split('\n')[0][:120].encode('ascii', errors='ignore').decode('ascii')
+            print(f"Warning: ChEMBL API is unreachable ({err_msg}). Drug target generation will be limited.")
             self.target_client = None
         self.mapper = IDMapper()
 

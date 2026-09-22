@@ -36,6 +36,7 @@ export const ppiService = {
   getNetworkStats: () => api.get('/analysis/stats'),
 
   getFinalEvaluation: () => api.get('/evaluation/final'),
+  getAllBenchmarks: () => api.get('/evaluation/benchmarks'),
 
   getBioMetadata: (proteins) => api.get(`/bio/metadata?proteins=${proteins}`),
 

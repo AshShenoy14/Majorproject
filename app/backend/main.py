@@ -631,6 +631,32 @@ async def get_final_evaluation():
         raise HTTPException(status_code=500, detail=f"Could not read final evaluation results: {e}")
 
 
+@app.get("/evaluation/benchmarks",
+         summary="Get All Evaluation Benchmarks",
+         description="Returns bootstrap CIs, cold-start metrics, and external benchmarks (SHS27k, HuRI).",
+         tags=["Analysis"])
+async def get_all_benchmarks():
+    """
+    Returns bootstrap confidence intervals, cold-start simulation, and external benchmark artifacts.
+    """
+    eval_dir = PROJECT_ROOT / "assets" / "evaluation"
+    res = {}
+    for key, filename in [
+        ("bootstrap_ci", "bootstrap_ci.json"),
+        ("cold_start", "cold_start_eval.json"),
+        ("shs27k", "external_benchmark_shs27k.json"),
+        ("huri", "external_benchmark_huri.json"),
+        ("calibration", "graph_calibration.json")
+    ]:
+        p = eval_dir / filename
+        if p.exists():
+            try:
+                res[key] = json.loads(p.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+    return res
+
+
 @app.get("/analysis/stats",
          summary="Get Network Statistics",
          description="Returns global statistics of the protein interaction network.",

@@ -16,26 +16,32 @@ import ProteinPreloader from './components/ProteinPreloader';
 import CrossSpeciesTesting from './components/CrossSpeciesTesting';
 
 function App() {
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(() => {
+        return !sessionStorage.getItem('transgraph_loaded');
+    });
     const [progress, setProgress] = useState(0);
 
     useEffect(() => {
+        if (!loading) return;
+
         const interval = setInterval(() => {
             setProgress((prev) => {
                 if (prev >= 100) {
                     clearInterval(interval);
+                    sessionStorage.setItem('transgraph_loaded', 'true');
                     return 100;
                 }
-                // Random increments for a more natural feel
-                const increment = Math.random() * 15 + 5;
+                // Fast, smooth increments for responsive load feel
+                const increment = Math.random() * 25 + 15;
                 return Math.min(prev + increment, 100);
             });
-        }, 400); // Progress over ~2.5 - 3 seconds
+        }, 150); // Snappy ~1 second initial load
 
         return () => clearInterval(interval);
-    }, []);
+    }, [loading]);
 
     const handleLoadingComplete = () => {
+        sessionStorage.setItem('transgraph_loaded', 'true');
         setLoading(false);
     };
 

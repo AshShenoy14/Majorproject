@@ -74,6 +74,9 @@ const Predict = () => {
     setSelectedCase(caseObj.label);
     setProtein1(caseObj.p1);
     setProtein2(caseObj.p2);
+    if (inputMode === 'sequence') {
+      setInputMode('ids');
+    }
     addLog(`Preset selected: ${caseObj.label}`, 'info');
   };
 
@@ -288,10 +291,37 @@ const Predict = () => {
               </div>
             </div>
 
+            {/* Quick 1-Click Viva Demo Presets */}
+            <div className="mb-4 bg-slate-50/80 border border-slate-200/80 rounded-2xl p-3">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500 flex items-center gap-1.5">
+                  <Sparkles size={12} className="text-amber-500" /> Quick Demo Presets
+                </span>
+                <span className="text-[10px] text-slate-400 font-medium">1-click populate</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {CASE_STUDIES.map((c, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => handleSelectCase(c)}
+                    className={`p-2 text-left rounded-xl border transition-all text-xs flex flex-col justify-between ${
+                      selectedCase === c.label
+                        ? 'bg-emerald-50 border-emerald-400 text-emerald-900 shadow-xs ring-1 ring-emerald-400/30'
+                        : 'bg-white hover:bg-slate-100/80 border-slate-200 text-slate-700 hover:border-slate-300'
+                    }`}
+                  >
+                    <span className="font-bold text-[11px] truncate">{c.label}</span>
+                    <span className="text-[9px] text-slate-400 font-mono mt-0.5 truncate">{c.p1.slice(0, 11)}... & {c.p2.slice(0, 11)}...</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Input Method Dropdown Selector */}
             <div className="mb-4 space-y-1">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-1">
-                <Sparkles size={12} className="text-emerald-500" /> Input Method
+                <Layers size={12} className="text-emerald-500" /> Custom Input Mode
               </label>
               <select
                 value={inputMode}
