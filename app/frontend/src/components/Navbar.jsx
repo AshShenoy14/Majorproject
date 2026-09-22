@@ -21,8 +21,12 @@ const Navbar = () => {
     const navItems = [
         { name: 'Home', path: '/' },
         { name: 'Predict', path: '/predict' },
-        { name: 'Cross-Species', path: '/zero-shot' },
+        { name: '3D Studio', path: '/structure' },
+        { name: 'Mutation', path: '/mutation' },
         { name: '3D Graph', path: '/network-3d' },
+        { name: 'Drugs', path: '/drug-targets' },
+        { name: 'Benchmark', path: '/benchmark' },
+        { name: 'Copilot', path: '/assistant' },
         { name: 'About', path: '/about' }
     ];
 

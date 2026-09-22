@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Search, Activity, BarChart3, Info, CheckCircle2, 
@@ -6,7 +7,8 @@ import {
   ShieldCheck, Cpu, Database, Terminal as TerminalIcon,
   Zap, ArrowRightLeft, LayoutGrid, Box, BookOpen, Download,
   Sparkles, Gauge, Server, Clock, UploadCloud, ToggleLeft, ToggleRight,
-  GraduationCap, FlaskConical, Table2, FileDown, Camera, FileText, Layers, Image
+  GraduationCap, FlaskConical, Table2, FileDown, Camera, FileText, Layers, Image,
+  Dna, Pill, Share2, GitCompare, Bot, Boxes, ArrowRight, ExternalLink, Compass
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, 
@@ -609,6 +611,18 @@ const Predict = () => {
                       <BarChart3 size={15} />
                       <span>Page 2: Evidence Weightage</span>
                     </button>
+
+                    <button
+                      onClick={() => setActiveResultPage('discovery')}
+                      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                        activeResultPage === 'discovery'
+                          ? 'bg-gradient-to-r from-amber-500 to-rose-500 text-white shadow-lg shadow-amber-500/20'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                      }`}
+                    >
+                      <Sparkles size={15} />
+                      <span>Page 3: Discovery Hub</span>
+                    </button>
                   </div>
 
                   {/* Main Scientific PDF Download Button */}
@@ -749,6 +763,157 @@ const Predict = () => {
                               </div>
                             </div>
                           </div>
+
+                          {/* ── DOWNSTREAM BIOLOGICAL INVESTIGATION DOCK ── */}
+                          <div className="md:col-span-3 bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950 p-6 md:p-8 rounded-[2.5rem] border border-slate-800 text-white shadow-xl relative overflow-hidden">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-white/10">
+                              <div>
+                                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase tracking-widest border border-emerald-500/30 mb-2">
+                                  <Sparkles size={12} /> Downstream Biological Workflows
+                                </div>
+                                <h4 className="text-lg md:text-xl font-black text-white tracking-tight">
+                                  Next Research Actions for {protein1} ↔ {protein2}
+                                </h4>
+                                <p className="text-xs text-slate-400 mt-0.5">
+                                  TransGraph-PPI is an integrated discovery platform. Select a downstream engine to continue your investigation:
+                                </p>
+                              </div>
+                              <button
+                                onClick={() => setActiveResultPage('discovery')}
+                                className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-xl border border-white/15 transition-all flex items-center gap-1.5 self-start md:self-auto cursor-pointer"
+                              >
+                                View Detailed Workbench <ChevronRight size={14} />
+                              </button>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
+                              {/* 1. 3D Structure */}
+                              <Link
+                                to={`/structure?protein=${protein1}`}
+                                className="p-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-cyan-500/50 transition-all group flex flex-col justify-between"
+                              >
+                                <div className="flex items-start justify-between mb-3">
+                                  <div className="p-2.5 rounded-xl bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
+                                    <Boxes size={18} />
+                                  </div>
+                                  <span className="text-[10px] font-bold text-slate-400 group-hover:text-cyan-400 flex items-center gap-1 transition-colors">
+                                    Open 3D <ArrowRight size={12} />
+                                  </span>
+                                </div>
+                                <div>
+                                  <p className="text-xs font-bold text-white group-hover:text-cyan-300 transition-colors">AlphaFold 3D Studio</p>
+                                  <p className="text-[11px] text-slate-400 mt-1 leading-snug">
+                                    Inspect full atomic CIF structures for {protein1} with Mol* viewer controls.
+                                  </p>
+                                </div>
+                              </Link>
+
+                              {/* 2. In-Silico Mutagenesis */}
+                              <Link
+                                to={`/mutation?p1=${protein1}&p2=${protein2}`}
+                                className="p-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-teal-500/50 transition-all group flex flex-col justify-between"
+                              >
+                                <div className="flex items-start justify-between mb-3">
+                                  <div className="p-2.5 rounded-xl bg-teal-500/20 text-teal-400 border border-teal-500/30">
+                                    <Dna size={18} />
+                                  </div>
+                                  <span className="text-[10px] font-bold text-slate-400 group-hover:text-teal-400 flex items-center gap-1 transition-colors">
+                                    Simulate <ArrowRight size={12} />
+                                  </span>
+                                </div>
+                                <div>
+                                  <p className="text-xs font-bold text-white group-hover:text-teal-300 transition-colors">In-Silico Mutagenesis</p>
+                                  <p className="text-[11px] text-slate-400 mt-1 leading-snug">
+                                    Scan point mutations on this complex to identify affinity destabilizing hotspots.
+                                  </p>
+                                </div>
+                              </Link>
+
+                              {/* 3. Drug Insights */}
+                              <Link
+                                to={`/drug-targets?q=${protein1}`}
+                                className="p-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-indigo-500/50 transition-all group flex flex-col justify-between"
+                              >
+                                <div className="flex items-start justify-between mb-3">
+                                  <div className="p-2.5 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
+                                    <Pill size={18} />
+                                  </div>
+                                  <span className="text-[10px] font-bold text-slate-400 group-hover:text-indigo-400 flex items-center gap-1 transition-colors">
+                                    Screen <ArrowRight size={12} />
+                                  </span>
+                                </div>
+                                <div>
+                                  <p className="text-xs font-bold text-white group-hover:text-indigo-300 transition-colors">ChEMBL Drug Targets</p>
+                                  <p className="text-[11px] text-slate-400 mt-1 leading-snug">
+                                    Evaluate Therapeutic Target Priority Scores (TTPS) and approved drug leads for {protein1}.
+                                  </p>
+                                </div>
+                              </Link>
+
+                              {/* 4. Network Path */}
+                              <Link
+                                to={`/network?start=${protein1}&end=${protein2}`}
+                                className="p-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-violet-500/50 transition-all group flex flex-col justify-between"
+                              >
+                                <div className="flex items-start justify-between mb-3">
+                                  <div className="p-2.5 rounded-xl bg-violet-500/20 text-violet-400 border border-violet-500/30">
+                                    <Share2 size={18} />
+                                  </div>
+                                  <span className="text-[10px] font-bold text-slate-400 group-hover:text-violet-400 flex items-center gap-1 transition-colors">
+                                    Trace <ArrowRight size={12} />
+                                  </span>
+                                </div>
+                                <div>
+                                  <p className="text-xs font-bold text-white group-hover:text-violet-300 transition-colors">Interactome Path & Hubs</p>
+                                  <p className="text-[11px] text-slate-400 mt-1 leading-snug">
+                                    Trace shortest path and common interactors across the 12,000-node graph.
+                                  </p>
+                                </div>
+                              </Link>
+
+                              {/* 5. Compare WT vs Mutant */}
+                              <Link
+                                to={`/compare?p1=${protein1}&p2=${protein2}`}
+                                className="p-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-amber-500/50 transition-all group flex flex-col justify-between"
+                              >
+                                <div className="flex items-start justify-between mb-3">
+                                  <div className="p-2.5 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                                    <GitCompare size={18} />
+                                  </div>
+                                  <span className="text-[10px] font-bold text-slate-400 group-hover:text-amber-400 flex items-center gap-1 transition-colors">
+                                    Compare <ArrowRight size={12} />
+                                  </span>
+                                </div>
+                                <div>
+                                  <p className="text-xs font-bold text-white group-hover:text-amber-300 transition-colors">WT vs Mutant Comparison</p>
+                                  <p className="text-[11px] text-slate-400 mt-1 leading-snug">
+                                    Quantify exact probability delta between native and mutated sequence variants.
+                                  </p>
+                                </div>
+                              </Link>
+
+                              {/* 6. Bio-Copilot Assistant */}
+                              <Link
+                                to={`/assistant?q=${encodeURIComponent(`Explain the molecular mechanism and biological significance of the interaction between ${protein1} and ${protein2}`)}`}
+                                className="p-4 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-rose-500/50 transition-all group flex flex-col justify-between"
+                              >
+                                <div className="flex items-start justify-between mb-3">
+                                  <div className="p-2.5 rounded-xl bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                                    <Bot size={18} />
+                                  </div>
+                                  <span className="text-[10px] font-bold text-slate-400 group-hover:text-rose-400 flex items-center gap-1 transition-colors">
+                                    Ask AI <ArrowRight size={12} />
+                                  </span>
+                                </div>
+                                <div>
+                                  <p className="text-xs font-bold text-white group-hover:text-rose-300 transition-colors">Bio-Copilot AI Consultation</p>
+                                  <p className="text-[11px] text-slate-400 mt-1 leading-snug">
+                                    Ask our domain LLM to synthesize disease linkages and cellular function for this pair.
+                                  </p>
+                                </div>
+                              </Link>
+                            </div>
+                          </div>
                         </div>
                       </motion.div>
                     )}
@@ -879,8 +1044,224 @@ const Predict = () => {
 
                             <div className="flex items-center gap-4 text-[10px] text-slate-400 border-t border-white/10 pt-4 mt-4 font-mono">
                               <span>Actionable Next Step:</span>
-                              <span className="text-emerald-400 font-bold">Run In-Silico Mutation Scan to pinpoint binding hotspots.</span>
+                              <Link 
+                                to={`/mutation?p1=${protein1}&p2=${protein2}`}
+                                className="text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 transition-colors"
+                              >
+                                Run In-Silico Mutation Scan to pinpoint binding hotspots <ArrowRight size={12} />
+                              </Link>
                             </div>
+                          </div>
+
+                        </div>
+                      </motion.div>
+                    )}
+
+                    {/* PAGE 3: INTEGRATED BIOLOGICAL DISCOVERY HUB & DOWNSTREAM WORKBENCH */}
+                    {activeResultPage === 'discovery' && (
+                      <motion.div
+                        key="page-3"
+                        initial={{ opacity: 0, y: 15 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -15 }}
+                        className="space-y-6"
+                      >
+                        <div className="flex justify-between items-center bg-white p-5 px-7 rounded-[2rem] border border-slate-100 shadow-sm">
+                          <div>
+                            <span className="text-[10px] font-black uppercase tracking-widest text-amber-500">Page 3 of 3</span>
+                            <h3 className="text-xl font-black text-slate-800 tracking-tight">Downstream Biological Discovery Hub</h3>
+                            <p className="text-xs text-slate-400 font-mono mt-0.5">Automated Multi-Engine Pipelines for {protein1} ↔ {protein2}</p>
+                          </div>
+                          <button
+                            onClick={() => handleExportCardFigure('page-3-container', 'Downstream_Discovery_Hub')}
+                            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs flex items-center gap-2 transition-all cursor-pointer"
+                          >
+                            <Camera size={14} className="text-amber-600" /> Export Figure
+                          </button>
+                        </div>
+
+                        {!expertMode && (
+                          <div className="bg-amber-50/80 border border-amber-200/80 p-4 px-6 rounded-2xl flex items-start gap-3 text-slate-700 text-xs leading-relaxed shadow-sm">
+                            <Sparkles size={18} className="text-amber-500 shrink-0 mt-0.5" />
+                            <div>
+                              <span className="font-bold text-amber-900 block mb-0.5">Explorer Summary (What happens after predicting?):</span>
+                              Interaction prediction is only the first step. TransGraph-PPI provides an end-to-end biological workbench: inspect atomic 3D structures, mutate binding interfaces in silico, evaluate therapeutic druggability in ChEMBL, and trace topological signaling cascades.
+                            </div>
+                          </div>
+                        )}
+
+                        <div id="page-3-container" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                          
+                          {/* Card 1: 3D Structure Studio */}
+                          <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col justify-between hover:shadow-md transition-all">
+                            <div>
+                              <div className="flex items-center justify-between mb-4">
+                                <div className="p-3 bg-cyan-50 rounded-2xl text-cyan-600">
+                                  <Boxes size={22} />
+                                </div>
+                                <span className="px-3 py-1 bg-cyan-50 text-cyan-700 border border-cyan-200 text-[10px] font-black uppercase rounded-lg">AlphaFold CIF</span>
+                              </div>
+                              <h4 className="text-base font-black text-slate-800 mb-1">AlphaFold 3D Molecular Studio</h4>
+                              <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+                                Inspect full atomic 3D tertiary conformations in the interactive PDBe Mol* viewer with secondary structure highlights and residue coordinate inspection.
+                              </p>
+                              <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-[11px] text-slate-600 font-mono space-y-1 mb-4">
+                                <p><span className="text-slate-400">Target A:</span> <strong>{protein1}</strong></p>
+                                <p><span className="text-slate-400">Target B:</span> <strong>{protein2}</strong></p>
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <Link
+                                to={`/structure?protein=${protein1}`}
+                                className="flex-1 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-center text-xs font-bold transition-all shadow-sm shadow-cyan-200 flex items-center justify-center gap-1.5"
+                              >
+                                View {protein1.slice(0, 8)} <ExternalLink size={12} />
+                              </Link>
+                              <Link
+                                to={`/structure?protein=${protein2}`}
+                                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-center text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+                              >
+                                View {protein2.slice(0, 8)} <ExternalLink size={12} />
+                              </Link>
+                            </div>
+                          </div>
+
+                          {/* Card 2: In-Silico Mutagenesis */}
+                          <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col justify-between hover:shadow-md transition-all">
+                            <div>
+                              <div className="flex items-center justify-between mb-4">
+                                <div className="p-3 bg-teal-50 rounded-2xl text-teal-600">
+                                  <Dna size={22} />
+                                </div>
+                                <span className="px-3 py-1 bg-teal-50 text-teal-700 border border-teal-200 text-[10px] font-black uppercase rounded-lg">Affinity Shift</span>
+                              </div>
+                              <h4 className="text-base font-black text-slate-800 mb-1">In-Silico Mutation Scanner</h4>
+                              <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+                                Introduce single or multiple point mutations along the amino acid sequence to determine whether binding affinity is preserved, enhanced, or disrupted.
+                              </p>
+                              <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-[11px] text-slate-600 font-mono space-y-1 mb-4">
+                                <p><span className="text-slate-400">Wild-Type Prob:</span> <strong>{((result.interaction_probability || 0) * 100).toFixed(1)}%</strong></p>
+                                <p><span className="text-slate-400">Pair Mode:</span> <strong>{protein1} ↔ {protein2}</strong></p>
+                              </div>
+                            </div>
+                            <Link
+                              to={`/mutation?p1=${protein1}&p2=${protein2}`}
+                              className="w-full py-2.5 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-center text-xs font-bold transition-all shadow-sm shadow-teal-200 flex items-center justify-center gap-1.5"
+                            >
+                              Launch Mutagenesis Scanner <ArrowRight size={14} />
+                            </Link>
+                          </div>
+
+                          {/* Card 3: ChEMBL Drug Target Discovery */}
+                          <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col justify-between hover:shadow-md transition-all">
+                            <div>
+                              <div className="flex items-center justify-between mb-4">
+                                <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600">
+                                  <Pill size={22} />
+                                </div>
+                                <span className="px-3 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-black uppercase rounded-lg">ChEMBL 34</span>
+                              </div>
+                              <h4 className="text-base font-black text-slate-800 mb-1">Therapeutic Target Profiler</h4>
+                              <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+                                Cross-reference the EMBL-EBI ChEMBL database to retrieve FDA-approved drug indications, clinical phase candidates, and bioactivity assays for this target.
+                              </p>
+                              <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-[11px] text-slate-600 font-mono space-y-1 mb-4">
+                                <p><span className="text-slate-400">Priority Engine:</span> <strong>TTPS Multi-Factor</strong></p>
+                                <p><span className="text-slate-400">Search Target:</span> <strong>{protein1}</strong></p>
+                              </div>
+                            </div>
+                            <Link
+                              to={`/drug-targets?q=${protein1}`}
+                              className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-center text-xs font-bold transition-all shadow-sm shadow-indigo-200 flex items-center justify-center gap-1.5"
+                            >
+                              Explore Drug Candidates <ArrowRight size={14} />
+                            </Link>
+                          </div>
+
+                          {/* Card 4: Interactome Topology & Shortest Path */}
+                          <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col justify-between hover:shadow-md transition-all">
+                            <div>
+                              <div className="flex items-center justify-between mb-4">
+                                <div className="p-3 bg-violet-50 rounded-2xl text-violet-600">
+                                  <Share2 size={22} />
+                                </div>
+                                <span className="px-3 py-1 bg-violet-50 text-violet-700 border border-violet-200 text-[10px] font-black uppercase rounded-lg">STRING v12</span>
+                              </div>
+                              <h4 className="text-base font-black text-slate-800 mb-1">Interactome Network Topology</h4>
+                              <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+                                Trace the shortest biological pathway, identify shared hub interactors, and evaluate degree and betweenness centralities on the global interactome graph.
+                              </p>
+                              <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-[11px] text-slate-600 font-mono space-y-1 mb-4">
+                                <p><span className="text-slate-400">Route:</span> <strong>{protein1} ➔ {protein2}</strong></p>
+                                <p><span className="text-slate-400">Graph Size:</span> <strong>12,000+ Nodes</strong></p>
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <Link
+                                to={`/network?start=${protein1}&end=${protein2}`}
+                                className="flex-1 py-2.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-center text-xs font-bold transition-all shadow-sm shadow-violet-200 flex items-center justify-center gap-1"
+                              >
+                                2D Subnetwork <ArrowRight size={12} />
+                              </Link>
+                              <Link
+                                to={`/network-3d`}
+                                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-center text-xs font-bold transition-all flex items-center justify-center gap-1"
+                              >
+                                3D Globe <ArrowRight size={12} />
+                              </Link>
+                            </div>
+                          </div>
+
+                          {/* Card 5: Wildtype vs Mutant Comparison */}
+                          <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col justify-between hover:shadow-md transition-all">
+                            <div>
+                              <div className="flex items-center justify-between mb-4">
+                                <div className="p-3 bg-amber-50 rounded-2xl text-amber-600">
+                                  <GitCompare size={22} />
+                                </div>
+                                <span className="px-3 py-1 bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-black uppercase rounded-lg">Side-by-Side</span>
+                              </div>
+                              <h4 className="text-base font-black text-slate-800 mb-1">WT vs Mutant Comparator</h4>
+                              <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+                                Perform rigorous side-by-side benchmarking of the native wild-type protein complex versus mutated variants to observe exact probability delta shifts.
+                              </p>
+                              <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-[11px] text-slate-600 font-mono space-y-1 mb-4">
+                                <p><span className="text-slate-400">Baseline Prob:</span> <strong>{((result.interaction_probability || 0) * 100).toFixed(1)}%</strong></p>
+                                <p><span className="text-slate-400">Delta Mode:</span> <strong>Point Perturbation</strong></p>
+                              </div>
+                            </div>
+                            <Link
+                              to={`/compare?p1=${protein1}&p2=${protein2}`}
+                              className="w-full py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-center text-xs font-bold transition-all shadow-sm shadow-amber-200 flex items-center justify-center gap-1.5"
+                            >
+                              Open Comparative Matrix <ArrowRight size={14} />
+                            </Link>
+                          </div>
+
+                          {/* Card 6: Bio-Copilot AI Consultation */}
+                          <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col justify-between hover:shadow-md transition-all">
+                            <div>
+                              <div className="flex items-center justify-between mb-4">
+                                <div className="p-3 bg-rose-50 rounded-2xl text-rose-600">
+                                  <Bot size={22} />
+                                </div>
+                                <span className="px-3 py-1 bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-black uppercase rounded-lg">Bio-LLM</span>
+                              </div>
+                              <h4 className="text-base font-black text-slate-800 mb-1">TransGraph Bio-Copilot</h4>
+                              <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+                                Launch an AI consultation with our domain-specialized biological reasoning engine to synthesize disease etiology, clinical pathways, and functional context.
+                              </p>
+                              <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-[11px] text-slate-600 font-mono space-y-1 mb-4">
+                                <p><span className="text-slate-400">Context:</span> <strong>Predicted Interaction</strong></p>
+                                <p><span className="text-slate-400">Query Pre-Fill:</span> <strong>Molecular Mechanism</strong></p>
+                              </div>
+                            </div>
+                            <Link
+                              to={`/assistant?q=${encodeURIComponent(`Explain the molecular mechanism and biological significance of the interaction between ${protein1} and ${protein2}`)}`}
+                              className="w-full py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-center text-xs font-bold transition-all shadow-sm shadow-rose-200 flex items-center justify-center gap-1.5"
+                            >
+                              Consult AI Copilot <ArrowRight size={14} />
+                            </Link>
                           </div>
 
                         </div>

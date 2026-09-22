@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   GitCompare, Dna, ChevronRight, Loader2, AlertCircle,
@@ -17,8 +18,17 @@ import { ppiService } from '../services/api';
 //   - Mutation impact interpretation
 
 const ComparisonMode = () => {
-  const [protein1, setProtein1] = useState('');
-  const [protein2, setProtein2] = useState('');
+  const [searchParams] = useSearchParams();
+  const paramP1 = searchParams.get('p1') || searchParams.get('protein1') || '';
+  const paramP2 = searchParams.get('p2') || searchParams.get('protein2') || '';
+
+  const [protein1, setProtein1] = useState(paramP1);
+  const [protein2, setProtein2] = useState(paramP2);
+
+  useEffect(() => {
+    if (paramP1) setProtein1(paramP1);
+    if (paramP2) setProtein2(paramP2);
+  }, [paramP1, paramP2]);
   const [mutPos, setMutPos] = useState('');
   const [mutOrig, setMutOrig] = useState('');
   const [mutAlt, setMutAlt] = useState('');

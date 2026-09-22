@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Bot,
@@ -124,13 +125,21 @@ const getTopicIcon = (text) => {
 };
 
 const Assistant = () => {
+  const [searchParams] = useSearchParams();
+  const initialQuery = searchParams.get('q') || searchParams.get('prompt') || '';
   const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState(initialQuery);
   const [loading, setLoading] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
   const [predictionContext, setPredictionContext] = useState(null); // injected from Predict page
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (initialQuery) {
+      setInput(initialQuery);
+    }
+  }, [initialQuery]);
 
   // Auto-scroll to bottom
   useEffect(() => {

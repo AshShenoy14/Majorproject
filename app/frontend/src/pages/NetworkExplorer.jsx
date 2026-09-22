@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import cytoscape from 'cytoscape';
 import {
@@ -28,6 +29,11 @@ function bfs(cy, startId, endId) {
 }
 
 const NetworkExplorer = () => {
+  const [searchParams] = useSearchParams();
+  const paramStart = searchParams.get('start') || searchParams.get('p1') || '';
+  const paramEnd = searchParams.get('end') || searchParams.get('p2') || '';
+  const paramQ = searchParams.get('q') || searchParams.get('protein') || '';
+
   const containerRef = useRef(null);
   const cyRef = useRef(null);
 
@@ -37,15 +43,15 @@ const NetworkExplorer = () => {
   const [error, setError] = useState(null);
 
   // Search & filter state
-  const [searchQ, setSearchQ] = useState('');
+  const [searchQ, setSearchQ] = useState(paramQ);
   const [confidenceMin, setConfidenceMin] = useState(0);
   const [showHubsOnly, setShowHubsOnly] = useState(false);
   const [allNodes, setAllNodes] = useState([]);   // raw nodes from API
   const [allEdges, setAllEdges] = useState([]);   // raw edges from API
 
   // Shortest path state
-  const [pathStart, setPathStart] = useState('');
-  const [pathEnd, setPathEnd] = useState('');
+  const [pathStart, setPathStart] = useState(paramStart);
+  const [pathEnd, setPathEnd] = useState(paramEnd);
   const [pathResult, setPathResult] = useState([]);
 
   // Build cytoscape elements from current filter state

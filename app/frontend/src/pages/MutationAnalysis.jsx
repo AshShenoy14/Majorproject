@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Dna, 
@@ -27,8 +28,16 @@ import {
 import { ppiService } from '../services/api';
 
 const MutationAnalysis = () => {
-  const [protein1, setProtein1] = useState('ENSP00000327694');
-  const [protein2, setProtein2] = useState('ENSP00000373627');
+  const [searchParams] = useSearchParams();
+  const paramP1 = searchParams.get('p1') || searchParams.get('protein1') || '';
+  const paramP2 = searchParams.get('p2') || searchParams.get('protein2') || '';
+  const [protein1, setProtein1] = useState(paramP1 || 'ENSP00000327694');
+  const [protein2, setProtein2] = useState(paramP2 || 'ENSP00000373627');
+
+  useEffect(() => {
+    if (paramP1) setProtein1(paramP1);
+    if (paramP2) setProtein2(paramP2);
+  }, [paramP1, paramP2]);
   const [mutations, setMutations] = useState([{ protein: 1, pos: 45, orig: 'A', mut: 'T' }]);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);

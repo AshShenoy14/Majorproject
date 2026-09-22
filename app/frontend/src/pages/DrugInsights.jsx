@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ShieldAlert, 
@@ -28,11 +29,19 @@ import {
 import { ppiService } from '../services/api';
 
 const DrugInsights = () => {
+  const [searchParams] = useSearchParams();
+  const urlQuery = searchParams.get('q') || searchParams.get('query') || searchParams.get('protein') || '';
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(urlQuery);
+
+  useEffect(() => {
+    if (urlQuery) {
+      setSearchQuery(urlQuery);
+    }
+  }, [urlQuery]);
 
   useEffect(() => {
     const fetchData = async () => {

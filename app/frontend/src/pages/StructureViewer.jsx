@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Box, 
@@ -7,21 +8,24 @@ import {
   Info, 
   Download, 
   Maximize2, 
-  ChevronRight,
-  Activity,
-  MapPin,
-  Tag
+  ChevronRight, 
+  Activity, 
+  MapPin, 
+  Tag 
 } from 'lucide-react';
 import { ppiService } from '../services/api';
 
 const StructureViewer = () => {
-  const [proteinId, setProteinId] = useState('ENSP00000327694');
+  const [searchParams] = useSearchParams();
+  const queryProtein = searchParams.get('protein') || searchParams.get('p') || '';
+  const [proteinId, setProteinId] = useState(queryProtein || 'P04637');
   const [viewerLoading, setViewerLoading] = useState(true);
   const [metadata, setMetadata] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const viewerContainerRef = useRef(null);
   const pluginRef = useRef(null);
+  const autoLoadedRef = useRef(false);
 
   const loadStructure = async (uniprotId) => {
     if (!pluginRef.current || !viewerContainerRef.current) return;
@@ -56,18 +60,40 @@ const StructureViewer = () => {
     });
   };
 
+  const executeSearchForId = async (targetId) => {
+    if (!targetId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await ppiService.getBioMetadata(targetId);
+      const data = response.data?.[0];
+      if (data) setMetadata(data);
+      const uniProtId = data?.uniprot_id || (targetId.length === 6 || targetId.length === 10 ? targetId : null);
+      if (uniProtId) {
+        await loadStructure(uniProtId);
+      } else {
+        await loadStructure(targetId);
+      }
+    } catch (err) {
+      console.warn("Metadata lookup fallback:", err);
+      await loadStructure(targetId);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const initViewer = async () => {
     if (window.PDBeMolstarPlugin && viewerContainerRef.current && !pluginRef.current) {
       try {
-        // Fetch the current CIF URL from AlphaFold API for the default protein (P01112)
-        let cifUrl = 'https://alphafold.ebi.ac.uk/files/AF-P01112-F1-model_v6.cif';
+        const initialTarget = queryProtein || 'P04637';
+        let cifUrl = `https://alphafold.ebi.ac.uk/files/AF-${initialTarget}-F1-model_v6.cif`;
         try {
-          const res = await fetch('https://alphafold.ebi.ac.uk/api/prediction/P01112');
+          const res = await fetch(`https://alphafold.ebi.ac.uk/api/prediction/${initialTarget}`);
           const data = await res.json();
           if (data && data.length > 0 && data[0].cifUrl) {
             cifUrl = data[0].cifUrl;
           }
-        } catch (e) { /* fallback to v6 URL */ }
+        } catch (e) { /* fallback to default URL */ }
 
         pluginRef.current = new window.PDBeMolstarPlugin();
         pluginRef.current.render(viewerContainerRef.current, {
@@ -81,6 +107,11 @@ const StructureViewer = () => {
           bgColor: { r: 248, g: 250, b: 252 }
         });
         setViewerLoading(false);
+
+        if (initialTarget && !autoLoadedRef.current) {
+          autoLoadedRef.current = true;
+          executeSearchForId(initialTarget);
+        }
       } catch (err) {
         console.error("Molstar render error:", err);
         setError("Failed to initialize 3D viewer.");
@@ -120,32 +151,8 @@ const StructureViewer = () => {
   }, []);
 
   const handleSearch = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    try {
-      // 1. Fetch metadata from local backend
-      const response = await ppiService.getBioMetadata(proteinId);
-      const data = response.data[0];
-      setMetadata(data);
-
-      // 2. Get UniProt ID for AlphaFold
-      let uniProtId = data?.uniprot_id || (proteinId.length === 6 || proteinId.length === 10 ? proteinId : null);
-      
-      if (!uniProtId) {
-        setError("Could not map to a valid UniProt ID for AlphaFold visualization.");
-        setLoading(false);
-        return;
-      }
-      
-      // 3. Load AlphaFold structure using direct CIF URL
-      loadStructure(uniProtId);
-    } catch (err) {
-      setError("Failed to fetch structure or metadata.");
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
+    if (e) e.preventDefault();
+    executeSearchForId(proteinId);
   };
 
   return (

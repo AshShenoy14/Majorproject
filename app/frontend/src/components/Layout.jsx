@@ -13,7 +13,10 @@ import {
   Home as HomeIcon,
   Globe,
   PanelLeft,
-  Rows
+  Rows,
+  BarChart3,
+  GitCompare,
+  Network
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import FloatingGuide from './FloatingGuide';
@@ -21,25 +24,29 @@ import FloatingGuide from './FloatingGuide';
 const PAGE_META = {
   '/':            { title: 'Dashboard',              subtitle: 'System Overview & Quick Actions' },
   '/predict':     { title: 'Interaction Prediction',  subtitle: 'Predict Protein-Protein Interactions' },
+  '/structure':   { title: '3D Structure Studio',     subtitle: 'AlphaFold Mol* Visualization' },
   '/mutation':    { title: 'Mutation Analysis',        subtitle: 'In-Silico Mutation Impact Scanner' },
-  '/structure':   { title: 'Structure Viewer',         subtitle: '3D Protein Structure Visualization' },
-  '/network':     { title: 'Network Explorer',         subtitle: 'Interactome Graph Analysis' },
+  '/compare':     { title: 'WT vs Mutant Comparator',  subtitle: 'Sensitivity & Probability Delta' },
+  '/network':     { title: 'Network Explorer',         subtitle: '2D Interactome Graph Analysis' },
   '/network-3d':  { title: 'Interactome 3D',           subtitle: 'Global Interaction Topography' },
   '/drug-targets':{ title: 'Drug Insights',            subtitle: 'Drug Target Discovery & ChEMBL Data' },
+  '/benchmark':   { title: 'Empirical Benchmarks',     subtitle: 'Statistical Rigor, 95% CIs & External Sets' },
+  '/zero-shot':   { title: 'Cross-Species Exploration',subtitle: 'Exploratory, Non-Validated Inference' },
   '/assistant':   { title: 'Protein Assistant',        subtitle: 'AI-Powered Biological Query Engine' },
-  '/about':       { title: 'About',                    subtitle: 'Project Overview & Model Details' },
-  '/zero-shot':   { title: 'Cross-Species Exploration',    subtitle: 'Exploratory, Non-Validated Inference' },
+  '/about':       { title: 'About & Technical Specs',  subtitle: 'Architecture, Ablations & Pipeline' },
 };
 
 const NAV_LINKS = [
   { path: '/', label: 'Home', icon: HomeIcon },
   { path: '/predict', label: 'Predict', icon: Zap },
+  { path: '/structure', label: '3D Studio', icon: Boxes },
   { path: '/mutation', label: 'Mutation', icon: Dna },
-  { path: '/structure', label: 'Structure', icon: Boxes },
+  { path: '/network', label: '2D Graph', icon: Network },
   { path: '/network-3d', label: '3D Graph', icon: Share2 },
   { path: '/drug-targets', label: 'Drugs', icon: Pill },
-  { path: '/zero-shot', label: 'Cross-Species', icon: Globe },
-  { path: '/assistant', label: 'AI Assistant', icon: Bot },
+  { path: '/benchmark', label: 'Benchmark', icon: BarChart3, badge: 'Validation' },
+  { path: '/compare', label: 'Compare', icon: GitCompare },
+  { path: '/assistant', label: 'AI Copilot', icon: Bot },
 ];
 
 const Layout = ({ children }) => {
@@ -119,8 +126,8 @@ const Layout = ({ children }) => {
             </button>
 
             {/* Nav Links */}
-            <nav className="space-y-1">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2 mb-2">Navigation</p>
+            <nav className="space-y-1 overflow-y-auto max-h-[calc(100vh-220px)] no-scrollbar pr-1">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2 mb-2">Research Modules</p>
               {NAV_LINKS.map((link) => {
                 const isActive = location.pathname === link.path;
                 const Icon = link.icon;
@@ -128,14 +135,21 @@ const Layout = ({ children }) => {
                   <Link
                     key={link.path}
                     to={link.path}
-                    className={`px-3.5 py-2.5 rounded-2xl text-xs font-semibold transition-all flex items-center gap-3 ${
+                    className={`px-3.5 py-2 rounded-2xl text-xs font-semibold transition-all flex items-center justify-between ${
                       isActive 
                         ? 'text-emerald-700 bg-emerald-50 shadow-sm border border-emerald-200/60 font-bold' 
                         : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
                     }`}
                   >
-                    <Icon size={16} className={isActive ? 'text-emerald-600' : 'text-slate-400'} />
-                    <span>{link.label}</span>
+                    <div className="flex items-center gap-2.5">
+                      <Icon size={15} className={isActive ? 'text-emerald-600' : 'text-slate-400'} />
+                      <span>{link.label}</span>
+                    </div>
+                    {link.badge && (
+                      <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-md font-bold border border-emerald-200">
+                        {link.badge}
+                      </span>
+                    )}
                   </Link>
                 );
               })}
@@ -165,10 +179,10 @@ const Layout = ({ children }) => {
           <motion.nav 
             initial={{ y: -20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            className="pointer-events-auto flex items-center gap-1.5 md:gap-2.5 bg-white/90 backdrop-blur-xl px-3.5 py-2 rounded-full shadow-lg shadow-slate-900/5 border border-slate-200/80"
+            className="pointer-events-auto flex items-center gap-1.5 md:gap-2.5 bg-white/90 backdrop-blur-xl px-3.5 py-2 rounded-full shadow-lg shadow-slate-900/5 border border-slate-200/80 max-w-[80vw]"
           >
             {/* Logo */}
-            <Link to="/" className="flex items-center gap-2 pr-3 border-r border-slate-200/80 group">
+            <Link to="/" className="flex items-center gap-2 pr-3 border-r border-slate-200/80 group shrink-0">
               <div className="w-8 h-8 bg-gradient-to-tr from-emerald-600 to-teal-500 rounded-full flex items-center justify-center text-white shadow-md shadow-emerald-500/20 group-hover:scale-105 transition-transform">
                 <Activity size={16} className="animate-pulse" />
               </div>
@@ -178,7 +192,7 @@ const Layout = ({ children }) => {
             </Link>
 
             {/* Links */}
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
               {NAV_LINKS.map((link) => {
                 const isActive = location.pathname === link.path;
                 const Icon = link.icon;
@@ -186,14 +200,19 @@ const Layout = ({ children }) => {
                   <Link
                     key={link.path}
                     to={link.path}
-                    className={`relative px-3 py-1.5 rounded-full text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                    className={`relative px-2.5 py-1.5 rounded-full text-xs font-semibold transition-all flex items-center gap-1.5 shrink-0 ${
                       isActive 
                         ? 'text-emerald-700 bg-emerald-50 shadow-sm border border-emerald-200/60 font-bold' 
                         : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
                     }`}
                   >
                     <Icon size={14} className={isActive ? 'text-emerald-600' : 'text-slate-400'} />
-                    <span className="hidden md:inline-block">{link.label}</span>
+                    <span className="hidden xl:inline-block">{link.label}</span>
+                    {link.badge && (
+                      <span className="hidden 2xl:inline-block text-[9px] bg-emerald-600 text-white px-1.5 py-0.5 rounded-full font-bold">
+                        {link.badge}
+                      </span>
+                    )}
                   </Link>
                 );
               })}

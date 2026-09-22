@@ -8,7 +8,20 @@ import {
   ArrowRight,
   Database,
   Search,
-  Share2
+  Share2,
+  Dna,
+  Pill,
+  Boxes,
+  BarChart3,
+  GitCompare,
+  Bot,
+  Globe,
+  Sparkles,
+  ShieldCheck,
+  FlaskConical,
+  Layers,
+  ChevronRight,
+  ExternalLink
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ppiService } from '../services/api';
@@ -157,98 +170,216 @@ const Home = () => {
         />
       </div>
 
-      {/* Project Guide & Interactive Overview */}
+      {/* ── INTERACTIVE RESEARCH DISCOVERY SUITE (8 ENGINES) ── */}
       <div className="glass-card p-10 bg-white border border-slate-100 rounded-[2.5rem] shadow-xl space-y-8">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-6">
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-emerald-50 text-emerald-600 text-xs font-bold uppercase tracking-wider mb-2">
-              <Zap size={14} /> Quick Start Guide
+              <Sparkles size={14} /> Comprehensive Research Suite
             </div>
             <h2 className="text-3xl font-black text-slate-800 tracking-tight">
-              What is <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-teal-500">TransGraph-PPI</span>?
+              Multi-Engine <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-teal-500">Biological Discovery</span> Platform
             </h2>
           </div>
           <p className="text-slate-500 text-sm max-w-xl font-medium leading-relaxed">
-            Proteins are biological machines in cells. When they bind, they drive life processes—or trigger diseases like cancer.
-            <strong> TransGraph-PPI</strong> uses Transformer AI (ESM-2) + Graph Neural Networks (GraphSAGE) to predict protein binding, scan mutation impacts, and discover drug target nodes.
+            TransGraph-PPI is not just a predictor—it is a full-stack computational biology platform integrating transformer sequence models (ESM-2), topological graph neural networks (GraphSAGE), AlphaFold 3D molecular visualization, in-silico mutagenesis, and ChEMBL drug target discovery.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {/* Card 1 */}
-          <div className="p-6 rounded-2xl bg-slate-50 border border-slate-100 flex flex-col justify-between hover:shadow-md transition-all">
+        {/* 8-Engine Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+          
+          {/* Engine 1: Predictor */}
+          <div className="p-5 rounded-2xl bg-slate-50/80 border border-slate-100 flex flex-col justify-between hover:shadow-lg hover:border-emerald-200 transition-all group">
             <div>
-              <div className="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center font-bold mb-4 shadow-md shadow-emerald-200">
-                1
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center font-bold mb-3 shadow-md shadow-emerald-200">
+                <Zap size={18} />
               </div>
-              <h4 className="font-bold text-slate-800 text-base mb-1">Interaction Predictor</h4>
-              <p className="text-xs text-slate-500 mb-4 leading-relaxed">
-                Predicts binding probability between two proteins using UniProt IDs or raw amino acid sequences.
+              <h4 className="font-bold text-slate-800 text-sm mb-1 group-hover:text-emerald-700 transition-colors">Interaction Predictor</h4>
+              <p className="text-xs text-slate-500 mb-3 leading-relaxed">
+                ESM-2 + GraphSAGE stacking ensemble with Platt calibration and SHAP feature attribution.
               </p>
-              <div className="bg-white p-3 rounded-xl border border-slate-200 text-[11px] text-slate-600 font-mono">
-                <span className="font-bold text-emerald-600">What to try:</span> Test TP53 (p1) vs MDM2 (p2), or paste sequence <code className="text-teal-600">MTEYKL...</code>
-              </div>
             </div>
-            <Link to="/predict" className="mt-4 text-xs font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1">
-              Try Predict <ArrowRight size={14} />
+            <Link to="/predict" className="text-xs font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1 mt-2">
+              Launch Predictor <ArrowRight size={14} />
             </Link>
           </div>
 
-          {/* Card 2 */}
-          <div className="p-6 rounded-2xl bg-slate-50 border border-slate-100 flex flex-col justify-between hover:shadow-md transition-all">
+          {/* Engine 2: AlphaFold 3D Studio */}
+          <div className="p-5 rounded-2xl bg-slate-50/80 border border-slate-100 flex flex-col justify-between hover:shadow-lg hover:border-cyan-200 transition-all group">
             <div>
-              <div className="w-10 h-10 rounded-xl bg-teal-500 text-white flex items-center justify-center font-bold mb-4 shadow-md shadow-teal-200">
-                2
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 to-blue-500 text-white flex items-center justify-center font-bold mb-3 shadow-md shadow-cyan-200">
+                <Boxes size={18} />
               </div>
-              <h4 className="font-bold text-slate-800 text-base mb-1">Mutation Scanner</h4>
-              <p className="text-xs text-slate-500 mb-4 leading-relaxed">
-                Simulates single amino acid mutations to test if binding increases (Green) or decreases (Red).
+              <h4 className="font-bold text-slate-800 text-sm mb-1 group-hover:text-cyan-700 transition-colors">3D Molecular Studio</h4>
+              <p className="text-xs text-slate-500 mb-3 leading-relaxed">
+                Full atomic AlphaFold tertiary conformations rendered in real-time with PDBe Mol*.
               </p>
-              <div className="bg-white p-3 rounded-xl border border-slate-200 text-[11px] text-slate-600 font-mono">
-                <span className="font-bold text-teal-600">What to try:</span> Enter TP53, pick position 215, mutate Arg (R) → His (H).
-              </div>
             </div>
-            <Link to="/mutation" className="mt-4 text-xs font-bold text-teal-600 hover:text-teal-700 flex items-center gap-1">
-              Scan Mutation <ArrowRight size={14} />
+            <Link to="/structure" className="text-xs font-bold text-cyan-600 hover:text-cyan-700 flex items-center gap-1 mt-2">
+              Open 3D Studio <ArrowRight size={14} />
             </Link>
           </div>
 
-          {/* Card 3 */}
-          <div className="p-6 rounded-2xl bg-slate-50 border border-slate-100 flex flex-col justify-between hover:shadow-md transition-all">
+          {/* Engine 3: In-Silico Mutagenesis */}
+          <div className="p-5 rounded-2xl bg-slate-50/80 border border-slate-100 flex flex-col justify-between hover:shadow-lg hover:border-teal-200 transition-all group">
             <div>
-              <div className="w-10 h-10 rounded-xl bg-purple-500 text-white flex items-center justify-center font-bold mb-4 shadow-md shadow-purple-200">
-                3
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-600 to-emerald-500 text-white flex items-center justify-center font-bold mb-3 shadow-md shadow-teal-200">
+                <Dna size={18} />
               </div>
-              <h4 className="font-bold text-slate-800 text-base mb-1">3D Interactome</h4>
-              <p className="text-xs text-slate-500 mb-4 leading-relaxed">
-                Interactive 3D graph layout showing protein hubs and interaction clusters in spatial force embedding.
+              <h4 className="font-bold text-slate-800 text-sm mb-1 group-hover:text-teal-700 transition-colors">Mutation Scanner</h4>
+              <p className="text-xs text-slate-500 mb-3 leading-relaxed">
+                Simulate amino acid substitutions in silico to identify binding destabilizing hotspots.
               </p>
-              <div className="bg-white p-3 rounded-xl border border-slate-200 text-[11px] text-slate-600 font-mono">
-                <span className="font-bold text-purple-600">What to try:</span> Drag & zoom 3D nodes; click TP53 to see hub connectivity.
-              </div>
             </div>
-            <Link to="/network" className="mt-4 text-xs font-bold text-purple-600 hover:text-purple-700 flex items-center gap-1">
-              Explore 3D <ArrowRight size={14} />
+            <Link to="/mutation" className="text-xs font-bold text-teal-600 hover:text-teal-700 flex items-center gap-1 mt-2">
+              Scan Mutations <ArrowRight size={14} />
             </Link>
           </div>
 
-          {/* Card 4 */}
-          <div className="p-6 rounded-2xl bg-slate-50 border border-slate-100 flex flex-col justify-between hover:shadow-md transition-all">
+          {/* Engine 4: WT vs Mutant Comparator */}
+          <div className="p-5 rounded-2xl bg-slate-50/80 border border-slate-100 flex flex-col justify-between hover:shadow-lg hover:border-amber-200 transition-all group">
             <div>
-              <div className="w-10 h-10 rounded-xl bg-blue-500 text-white flex items-center justify-center font-bold mb-4 shadow-md shadow-blue-200">
-                4
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 text-white flex items-center justify-center font-bold mb-3 shadow-md shadow-amber-200">
+                <GitCompare size={18} />
               </div>
-              <h4 className="font-bold text-slate-800 text-base mb-1">Drug Target Insights</h4>
-              <p className="text-xs text-slate-500 mb-4 leading-relaxed">
-                Ranks high-centrality hub proteins and cross-references ChEMBL to identify potential therapeutic drug targets.
+              <h4 className="font-bold text-slate-800 text-sm mb-1 group-hover:text-amber-700 transition-colors">WT vs Mutant Comparator</h4>
+              <p className="text-xs text-slate-500 mb-3 leading-relaxed">
+                Side-by-side comparative analysis of native wildtype vs mutated variant affinity deltas.
               </p>
-              <div className="bg-white p-3 rounded-xl border border-slate-200 text-[11px] text-slate-600 font-mono">
-                <span className="font-bold text-blue-600">What to try:</span> Filter by "Drug Target" to view FDA-approved drug leads.
-              </div>
             </div>
-            <Link to="/drug-targets" className="mt-4 text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1">
+            <Link to="/compare" className="text-xs font-bold text-amber-600 hover:text-amber-700 flex items-center gap-1 mt-2">
+              Compare Variants <ArrowRight size={14} />
+            </Link>
+          </div>
+
+          {/* Engine 5: 2D Interactome Network */}
+          <div className="p-5 rounded-2xl bg-slate-50/80 border border-slate-100 flex flex-col justify-between hover:shadow-lg hover:border-violet-200 transition-all group">
+            <div>
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-500 text-white flex items-center justify-center font-bold mb-3 shadow-md shadow-violet-200">
+                <Share2 size={18} />
+              </div>
+              <h4 className="font-bold text-slate-800 text-sm mb-1 group-hover:text-violet-700 transition-colors">2D Interactome Explorer</h4>
+              <p className="text-xs text-slate-500 mb-3 leading-relaxed">
+                Trace shortest paths, compute hub centralities, and isolate functional subnetworks.
+              </p>
+            </div>
+            <Link to="/network" className="text-xs font-bold text-violet-600 hover:text-violet-700 flex items-center gap-1 mt-2">
+              Explore 2D Graph <ArrowRight size={14} />
+            </Link>
+          </div>
+
+          {/* Engine 6: 3D Force Interactome */}
+          <div className="p-5 rounded-2xl bg-slate-50/80 border border-slate-100 flex flex-col justify-between hover:shadow-lg hover:border-purple-200 transition-all group">
+            <div>
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-pink-500 text-white flex items-center justify-center font-bold mb-3 shadow-md shadow-purple-200">
+                <Globe size={18} />
+              </div>
+              <h4 className="font-bold text-slate-800 text-sm mb-1 group-hover:text-purple-700 transition-colors">3D Force Topography</h4>
+              <p className="text-xs text-slate-500 mb-3 leading-relaxed">
+                Interactive spatial force layout showing high-density protein hubs and cellular clusters.
+              </p>
+            </div>
+            <Link to="/network-3d" className="text-xs font-bold text-purple-600 hover:text-purple-700 flex items-center gap-1 mt-2">
+              Launch 3D Graph <ArrowRight size={14} />
+            </Link>
+          </div>
+
+          {/* Engine 7: ChEMBL Drug Target Insights */}
+          <div className="p-5 rounded-2xl bg-slate-50/80 border border-slate-100 flex flex-col justify-between hover:shadow-lg hover:border-blue-200 transition-all group">
+            <div>
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-cyan-500 text-white flex items-center justify-center font-bold mb-3 shadow-md shadow-blue-200">
+                <Pill size={18} />
+              </div>
+              <h4 className="font-bold text-slate-800 text-sm mb-1 group-hover:text-blue-700 transition-colors">Drug Target Insights</h4>
+              <p className="text-xs text-slate-500 mb-3 leading-relaxed">
+                Therapeutic Target Priority Scores (TTPS) and approved drug leads from ChEMBL.
+              </p>
+            </div>
+            <Link to="/drug-targets" className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 mt-2">
               View Drug Targets <ArrowRight size={14} />
             </Link>
+          </div>
+
+          {/* Engine 8: Empirical Benchmarks */}
+          <div className="p-5 rounded-2xl bg-slate-50/80 border border-slate-100 flex flex-col justify-between hover:shadow-lg hover:border-rose-200 transition-all group">
+            <div>
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-rose-500 to-amber-500 text-white flex items-center justify-center font-bold mb-3 shadow-md shadow-rose-200">
+                <BarChart3 size={18} />
+              </div>
+              <h4 className="font-bold text-slate-800 text-sm mb-1 group-hover:text-rose-700 transition-colors">Empirical Benchmarks</h4>
+              <p className="text-xs text-slate-500 mb-3 leading-relaxed">
+                2,000-sample bootstrap 95% CIs, cold-start novelty, and external SHS27k & HuRI validation.
+              </p>
+            </div>
+            <Link to="/benchmark" className="text-xs font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1 mt-2">
+              View Scientific Rigor <ArrowRight size={14} />
+            </Link>
+          </div>
+
+        </div>
+
+        {/* ── LIVE EXPERIMENT SANDBOX ── */}
+        <div className="pt-6 border-t border-slate-100">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-black text-slate-800 tracking-tight">Interactive Case Studies (1-Click Experiments)</h3>
+              <p className="text-xs text-slate-500">Launch curated biological experiments immediately without looking up IDs</p>
+            </div>
+            <Link to="/predict" className="text-xs font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1">
+              Custom Prediction <ArrowRight size={14} />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[
+              {
+                title: "TP53 ↔ MDM2",
+                badge: "Oncology",
+                color: "bg-emerald-50 text-emerald-700 border-emerald-200",
+                desc: "Tumor suppressor cell-cycle checkpoint control and apoptosis regulator.",
+                p1: "ENSP00000269305", p2: "ENSP00000258149"
+              },
+              {
+                title: "AP2A2 ↔ CLTC",
+                badge: "Neurodegenerative",
+                color: "bg-indigo-50 text-indigo-700 border-indigo-200",
+                desc: "Clathrin-mediated vesicle endocytosis linked to Alzheimer's pathology.",
+                p1: "ENSP00000300161", p2: "ENSP00000267029"
+              },
+              {
+                title: "BAX ↔ BCL2L1",
+                badge: "Apoptosis",
+                color: "bg-purple-50 text-purple-700 border-purple-200",
+                desc: "Mitochondrial outer membrane permeabilization and cell survival balance.",
+                p1: "ENSP00000293879", p2: "ENSP00000307677"
+              },
+              {
+                title: "Uncharacterized",
+                badge: "Cold-Start",
+                color: "bg-amber-50 text-amber-700 border-amber-200",
+                desc: "Zero-neighbor novelty evaluation testing sequence-driven inductive generalization.",
+                p1: "ENSP00000385802", p2: "ENSP00000361000"
+              },
+            ].map((cs, i) => (
+              <Link
+                key={i}
+                to={`/predict?p1=${cs.p1}&p2=${cs.p2}`}
+                className="p-4 rounded-2xl bg-slate-50/60 hover:bg-white border border-slate-200/80 hover:border-emerald-300 transition-all hover:shadow-md flex flex-col justify-between group"
+              >
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-black text-xs text-slate-800 group-hover:text-emerald-700 transition-colors">{cs.title}</span>
+                    <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${cs.color}`}>{cs.badge}</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-snug">{cs.desc}</p>
+                </div>
+                <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] font-bold text-emerald-600">
+                  <span>Run Experiment</span>
+                  <ArrowRight size={13} className="group-hover:translate-x-1 transition-transform" />
+                </div>
+              </Link>
+            ))}
           </div>
         </div>
       </div>
@@ -346,7 +477,7 @@ const Home = () => {
               <div className="text-slate-400 text-xs font-medium">
                 Click node to view affinity & pathway metadata
               </div>
-              <Link to="/network" className="pointer-events-auto bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs px-4 py-2 rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-1.5">
+              <Link to="/network-3d" className="pointer-events-auto bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs px-4 py-2 rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-1.5">
                 LAUNCH 3D INTERACTOME <ArrowRight size={14} />
               </Link>
             </div>
@@ -361,22 +492,25 @@ const Home = () => {
                 <Search size={120} />
               </div>
               <h4 className="text-2xl font-black mb-2 text-slate-800 relative z-10">Predict Interaction</h4>
-              <p className="text-slate-500 text-sm font-medium mb-6 relative z-10">Run hybrid ESM+GraphSAGE model to predict binding probability.</p>
+              <p className="text-slate-500 text-sm font-medium mb-6 relative z-10">Run hybrid ESM-2 + GraphSAGE stacking ensemble to predict binding affinity.</p>
               <div className="flex items-center text-xs font-black uppercase tracking-widest text-emerald-600 gap-2 relative z-10 group-hover:gap-4 transition-all">
                 Launch System <ArrowRight size={16} />
               </div>
             </div>
           </Link>
 
-          <Link to="/drug-targets" className="block outline-none group">
-            <div className="glass-card p-8 hover:bg-white transition-all h-[240px] flex flex-col justify-end relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-8 text-scientific-accent/5 group-hover:text-scientific-accent/10 transition-all duration-500">
-                <Database size={120} />
+          <Link to="/benchmark" className="block outline-none group">
+            <div className="glass-card p-8 bg-white hover:bg-rose-50/50 transition-all border-slate-100 relative overflow-hidden h-[240px] flex flex-col justify-end group">
+              <div className="absolute top-0 right-0 p-8 text-rose-500/5 group-hover:text-rose-500/10 group-hover:scale-110 transition-all duration-500">
+                <BarChart3 size={120} />
               </div>
-              <h4 className="text-2xl font-black mb-2 text-slate-800 relative z-10">Drug Insights</h4>
-              <p className="text-slate-500 text-sm font-medium mb-6 relative z-10">Identify high-centrality proteins for therapeutic targeting.</p>
-              <div className="flex items-center text-xs font-black uppercase tracking-widest text-scientific-accent gap-2 relative z-10">
-                Open Database <ArrowRight size={16} />
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-black uppercase w-fit mb-2 relative z-10">
+                Statistical Rigor
+              </div>
+              <h4 className="text-2xl font-black mb-2 text-slate-800 relative z-10">Empirical Benchmarks</h4>
+              <p className="text-slate-500 text-sm font-medium mb-6 relative z-10">2,000 Bootstrap 95% CIs, Cold-Start Novelty, and External SHS27k / HuRI Sets.</p>
+              <div className="flex items-center text-xs font-black uppercase tracking-widest text-rose-600 gap-2 relative z-10 group-hover:gap-4 transition-all">
+                View Validations <ArrowRight size={16} />
               </div>
             </div>
           </Link>
