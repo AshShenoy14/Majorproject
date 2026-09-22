@@ -173,93 +173,80 @@ const Layout = ({ children }) => {
         </motion.aside>
       ) : (
         /* HORIZONTAL FLOATING NAVBAR LAYOUT */
-        <header className="fixed top-3 left-0 right-0 z-50 px-3 md:px-6 max-w-[1440px] mx-auto flex items-center justify-between gap-3 pointer-events-none">
+        <header className="fixed top-4 left-0 right-0 z-50 px-4 md:px-8 max-w-7xl mx-auto flex items-center justify-between gap-4 pointer-events-none">
           
-          {/* PART 1: LEFT BRAND LOGO */}
-          <motion.div 
-            initial={{ y: -15, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            className="pointer-events-auto shrink-0"
-          >
-            <Link to="/" className="flex items-center gap-2.5 group">
-              <div className="w-9 h-9 bg-gradient-to-tr from-emerald-600 to-teal-700 rounded-full flex items-center justify-center text-white shadow-md shadow-emerald-700/20 group-hover:scale-105 transition-transform">
-                <Activity size={18} className="stroke-[2.5]" />
-              </div>
-              <div className="flex flex-col">
-                <div className="flex items-baseline">
-                  <span className="text-lg font-extrabold text-slate-800 tracking-tight">TransGraph-</span>
-                  <span className="text-lg font-black text-emerald-600 italic">PPI</span>
-                </div>
-                <span className="text-[11px] text-slate-500 tracking-wide -mt-1 font-semibold" style={{ fontFamily: "'Dancing Script', cursive" }}>
-                  From Proteins to Possibilities
-                </span>
-              </div>
-            </Link>
-          </motion.div>
-
-          {/* PART 2: CENTER FLOATING PILL */}
+          {/* PART 1: LEFT FLOATING PILL (Logo + Nav Links) */}
           <motion.nav 
             initial={{ y: -20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            className="pointer-events-auto flex items-center gap-1 bg-white/95 backdrop-blur-xl px-2.5 py-1.5 rounded-full shadow-lg shadow-slate-900/5 border border-slate-200/80 overflow-x-auto no-scrollbar max-w-[65vw]"
+            className="pointer-events-auto flex items-center gap-1.5 md:gap-2.5 bg-white/90 backdrop-blur-xl px-3.5 py-2 rounded-full shadow-lg shadow-slate-900/5 border border-slate-200/80 max-w-[80vw]"
           >
-            {NAV_LINKS.map((link) => {
-              const isActive = location.pathname === link.path;
-              const Icon = link.icon;
-              return (
-                <Link
-                  key={link.path}
-                  to={link.path}
-                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all flex items-center gap-1.5 shrink-0 ${
-                    isActive 
-                      ? 'text-emerald-700 bg-emerald-50 shadow-sm border border-emerald-300/80 font-bold' 
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
-                  }`}
-                >
-                  <Icon size={14} className={isActive ? 'text-emerald-600 stroke-[2.2]' : 'text-slate-400'} />
-                  <span className="hidden xl:inline-block">{link.label}</span>
-                </Link>
-              );
-            })}
+            {/* Logo */}
+            <Link to="/" className="flex items-center gap-2 pr-3 border-r border-slate-200/80 group shrink-0">
+              <div className="w-8 h-8 bg-gradient-to-tr from-emerald-600 to-teal-500 rounded-full flex items-center justify-center text-white shadow-md shadow-emerald-500/20 group-hover:scale-105 transition-transform">
+                <Activity size={16} className="animate-pulse" />
+              </div>
+              <span className="font-cursive text-lg tracking-wide hidden sm:inline-block font-bold" style={{ fontFamily: "'Dancing Script', cursive" }}>
+                Trans<span className="text-emerald-600">Graph</span>
+              </span>
+            </Link>
+
+            {/* Links */}
+            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+              {NAV_LINKS.map((link) => {
+                const isActive = location.pathname === link.path;
+                const Icon = link.icon;
+                return (
+                  <Link
+                    key={link.path}
+                    to={link.path}
+                    className={`relative px-2.5 py-1.5 rounded-full text-xs font-semibold transition-all flex items-center gap-1.5 shrink-0 ${
+                      isActive 
+                        ? 'text-emerald-700 bg-emerald-50 shadow-sm border border-emerald-200/60 font-bold' 
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
+                    }`}
+                  >
+                    <Icon size={14} className={isActive ? 'text-emerald-600' : 'text-slate-400'} />
+                    <span className="hidden xl:inline-block">{link.label}</span>
+                    {link.badge && (
+                      <span className="hidden 2xl:inline-block text-[9px] bg-emerald-600 text-white px-1.5 py-0.5 rounded-full font-bold">
+                        {link.badge}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
           </motion.nav>
 
-          {/* PART 3: RIGHT SEARCH & PROFILE */}
+          {/* PART 2: RIGHT FLOATING PILL (Search + Layout Toggle) */}
           <motion.div 
-            initial={{ y: -15, opacity: 0 }}
+            initial={{ y: -20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.1 }}
-            className="pointer-events-auto flex items-center gap-2 shrink-0"
+            className="pointer-events-auto flex items-center gap-2 bg-white/90 backdrop-blur-xl px-3 py-1.5 rounded-full shadow-lg shadow-slate-900/5 border border-slate-200/80"
           >
             {/* Quick Search Trigger */}
             <button 
               onClick={() => setIsSearchOpen(true)}
-              className="flex items-center gap-2.5 bg-white/90 hover:bg-slate-50 px-3.5 py-1.5 rounded-full text-slate-400 transition-colors text-xs font-medium border border-slate-200/80 shadow-sm"
+              className="flex items-center gap-2 bg-slate-100/80 hover:bg-slate-200/60 px-3 py-1.5 rounded-full text-slate-500 transition-colors text-xs font-medium"
               title="Search Platform (Ctrl + K)"
             >
               <Search size={14} className="text-slate-400" />
-              <span className="hidden md:inline-block text-[11px] text-slate-500 font-medium">Search proteins...</span>
-              <kbd className="hidden sm:flex items-center gap-0.5 px-1.5 py-0.5 bg-slate-100 rounded text-[9px] font-bold text-slate-500 border border-slate-200">
-                ⌘ K
+              <span className="hidden sm:inline-block text-[11px] font-semibold">Search...</span>
+              <kbd className="hidden sm:flex items-center gap-0.5 px-1.5 py-0.5 bg-white rounded text-[9px] font-black text-slate-400 border border-slate-200">
+                <Command size={10} />K
               </kbd>
             </button>
 
-            {/* Profile Avatar with Online Dot */}
-            <div className="relative group cursor-pointer" title="Computational Biology Session Active">
-              <div className="w-8 h-8 rounded-full bg-slate-200 border border-slate-300 flex items-center justify-center text-slate-600 group-hover:bg-slate-300 transition-colors">
-                <svg className="w-4 h-4 fill-slate-500" viewBox="0 0 24 24">
-                  <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                </svg>
-              </div>
-              <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full border-2 border-white absolute -top-0.5 -right-0.5 shadow-sm" />
-            </div>
-
-            {/* Layout Switcher (Compact icon button) */}
+            {/* Layout Toggle Button (Horizontal / Vertical Switcher) */}
             <button
               onClick={toggleOrientation}
-              className="p-2 rounded-full bg-white/90 hover:bg-slate-100 text-slate-500 border border-slate-200/80 shadow-sm transition-all"
-              title="Toggle Vertical / Horizontal Navigation"
+              className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200/80 px-2.5 py-1.5 rounded-full text-slate-700 text-xs font-bold transition-all"
+              title="Switch Navbar to Vertical Sidebar"
             >
-              <PanelLeft size={14} className="text-slate-600" />
+              <PanelLeft size={14} className="text-emerald-600" />
+              <span className="hidden md:inline-block text-[11px]">Vertical Nav</span>
             </button>
           </motion.div>
 
