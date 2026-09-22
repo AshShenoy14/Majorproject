@@ -14,6 +14,16 @@ def test_endpoint_evaluation_final(client):
     assert "models" in data
     assert any("Ensemble" in k for k in data["models"])
 
+def test_endpoint_all_benchmarks(client):
+    res = client.get("/evaluation/benchmarks")
+    assert res.status_code == 200
+    data = res.json()
+    # every committed artifact should be present and match the verified numbers
+    assert data["bootstrap_ci"]["accuracy"]["mean"] == pytest.approx(0.9213, abs=1e-3)
+    assert data["cold_start"]["cold_start_novel_protein_via_knn"]["accuracy"] == pytest.approx(0.833, abs=1e-2)
+    assert data["shs27k"]["overall"]["accuracy"] == pytest.approx(0.698, abs=1e-2)
+    assert data["huri"]["overall"]["roc_auc"] == pytest.approx(0.573, abs=1e-2)
+
 def test_endpoint_network_subgraph(client):
     res = client.get("/network?limit=5")
     assert res.status_code == 200
