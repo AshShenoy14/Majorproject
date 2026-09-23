@@ -1,0 +1,675 @@
+% =============================================================================
+% TransGraph-PPI: A Hybrid Ensemble Framework for Sequence-Based
+% Protein-Protein Interaction Prediction
+% IEEE conference format (IEEEtran)
+% =============================================================================
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+% ----------------------------------------------------------------------------
+% Packages
+% ----------------------------------------------------------------------------
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}   % cleaner table rules
+\usepackage{array}
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+% ----------------------------------------------------------------------------
+% Shortcuts
+% ----------------------------------------------------------------------------
+\newcommand{\pseq}{p_{\mathrm{seq}}}
+\newcommand{\pgraph}{p_{\mathrm{graph}}}
+\newcommand{\pfinal}{p_{\mathrm{final}}}
+
+\begin{document}
+
+% ----------------------------------------------------------------------------
+% Title and authors
+% ----------------------------------------------------------------------------
+\title{TransGraph-PPI: A Hybrid Ensemble Framework\\for
+Protein--Protein Interaction Prediction}
+
+\author{
+\begin{tabular}{ccc}
+\begin{tabular}{c}
+Sridevi Saralaya\\
+\textit{Dept. of CSE}\\
+\textit{St Joseph Engineering College}\\
+Vamanjoor, India\\
+sridevis@sjec.ac.in
+\end{tabular}
+&
+\begin{tabular}{c}
+Jaishma Kumari B\\
+\textit{Dept. of CSE}\\
+\textit{St Joseph Engineering College}\\
+Vamanjoor, India\\
+jaishmab@sjec.ac.in
+\end{tabular}
+&
+\begin{tabular}{c}
+Ashwini Shenoy B\\
+\textit{Dept. of CSE}\\
+\textit{St Joseph Engineering College}\\
+Vamanjoor, India\\
+23a36.ashwini@sjec.ac.in
+\end{tabular}
+\\[4em]
+\begin{tabular}{c}
+Ajay Preenal Dsouza\\
+\textit{Dept. of CSE}\\
+\textit{St Joseph Engineering College}\\
+Vamanjoor, India\\
+23a06.ajay@sjec.ac.in
+\end{tabular}
+&
+\begin{tabular}{c}
+Basil S\\
+\textit{Dept. of CSE}\\
+\textit{St Joseph Engineering College}\\
+Vamanjoor, India\\
+23a16.basil@sjec.ac.in
+\end{tabular}
+&
+\begin{tabular}{c}
+Bhavish V\\
+\textit{Dept. of CSE}\\
+\textit{St Joseph Engineering College}\\
+Vamanjoor, India\\
+23a43.bhavish@sjec.ac.in
+\end{tabular}
+\end{tabular}
+}
+
+\maketitle
+
+% ----------------------------------------------------------------------------
+% Abstract and keywords
+% ----------------------------------------------------------------------------
+\begin{abstract}
+Protein--protein interactions (PPIs) are important for understanding cellular
+processes, disease mechanisms, and the identification of potential drug
+targets. Experimental identification of PPIs can be time-consuming and costly,
+creating a need for computational methods that can predict interactions
+efficiently. This paper presents TransGraph-PPI, a hybrid ensemble framework
+for protein--protein interaction prediction. The framework combines protein
+sequence information obtained from the ESM-2 protein language model with
+graph-based information from a high-confidence STRING interaction network. A
+sequence model and a graph neural network learn complementary information from
+protein sequences and network structure, and their outputs are combined using
+an ensemble model. SHAP-based explainability is used to identify the
+contribution of different meta-features to each prediction. On the
+evaluated dataset, the proposed framework achieved a ROC-AUC of 0.9708, an
+accuracy of 92.13\%, and an F1-score of 0.9200. The evaluation used a
+pair-disjoint split, with no overlapping protein pairs between the training,
+validation, and test sets. The developed system provides an integrated
+approach for predicting PPIs, explaining model predictions, and supporting
+further analysis of proteins that may be relevant as therapeutic targets.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Protein--protein interaction, ESM-2, graph neural network, deep learning,
+ensemble learning, explainable AI, SHAP, drug target prioritization
+\end{IEEEkeywords}
+
+% =============================================================================
+\section{Introduction}
+% =============================================================================
+Protein--protein interactions (PPIs) are fundamental to biological processes
+such as signal transduction, metabolism, gene regulation, and cellular
+functions. Understanding PPIs is important for studying disease mechanisms,
+protein functions, and identifying potential therapeutic targets. However,
+experimental identification of PPIs can be expensive, time-consuming, and
+difficult to scale to a large number of protein pairs. Therefore,
+computational methods have been developed to predict PPIs using protein
+sequences and interaction information. Recent approaches use deep learning and
+protein language models (PLMs), such as ESM-2, to learn informative
+representations from protein sequences, while graph neural networks (GNNs)
+capture relationships between proteins in interaction networks. However,
+effectively combining sequence and graph information while maintaining
+interpretable predictions remains a challenge \cite{b1,b2,b3,b4}.
+
+To address this challenge, this work proposes TransGraph-PPI, a hybrid
+framework that combines ESM-2-based protein sequence representations with
+graph-based learning for PPI prediction. Sequence and graph predictions are
+integrated using an ensemble mechanism, while SHAP-based analysis provides
+interpretation of the prediction features. The framework also supports
+downstream biological analysis of predicted interactions. The main
+contributions of this work are:
+\begin{enumerate}
+    \item integration of ESM-2 sequence representations and graph-based
+          learning for PPI prediction;
+    \item an ensemble prediction mechanism that combines complementary
+          sequence and graph information; and
+    \item an explainable analysis framework using SHAP to interpret
+          predictions and support biological investigation.
+\end{enumerate}
+
+The remainder of this paper is organized as follows. Section~\ref{sec:related}
+presents related work, Section~\ref{sec:design} describes the proposed
+TransGraph-PPI architecture and methodology, Section~\ref{sec:impl} covers the
+implementation, Section~\ref{sec:results} presents the experimental results and
+discussion, and Sections~\ref{sec:future} and~\ref{sec:conclusion} discuss
+future directions and conclude the paper.
+
+% =============================================================================
+\section{Literature Review}\label{sec:related}
+% =============================================================================
+Protein--protein interaction (PPI) prediction has progressed from traditional
+machine learning with handcrafted sequence features to deep learning methods
+that learn patterns directly from protein sequences. Recent approaches
+increasingly use protein language models (PLMs) with convolutional and
+graph-based architectures. xCAPT5 uses T5-XL-UniRef50 representations with a
+multi-kernel Siamese convolutional neural network and XGBoost for binary PPI
+prediction \cite{b5}. While pretrained representations reduce dependence on
+handcrafted features, the method mainly captures sequence information and does
+not explicitly model interaction-network topology. DeepGNHV combines ProtT5
+embeddings, a Graph Attention Network (GAT), and AlphaFold2-derived structural
+information for human--virus PPI prediction \cite{b6}. However, it is
+specialized for human--virus interactions and requires predicted
+three-dimensional structures.
+
+Another direction examines how PLM representations can be combined for
+interaction-related tasks. Alsamkary et al.\ investigated PLM architectures for
+multi-chain PPI affinity prediction using ESM and ProtT5 with hierarchical
+pooling and attention-based architectures \cite{b7}. Using the PPB-Affinity
+dataset containing 8,207 entries, their study showed that representation and
+pooling strategies can significantly affect prediction performance. However,
+it focuses on binding-affinity prediction rather than binary PPI
+classification and does not incorporate an interaction-network graph model,
+although it highlights the importance of effective PLM representation
+learning.
+
+Graph neural networks (GNNs) have also become important in PPI-related
+prediction because proteins and their relationships can be naturally
+represented as graphs. ESM-GNN combines ESM-2 embeddings with a Gated Graph
+Neural Network (GGNN) to predict protein--protein interaction sites
+\cite{b8}. It uses sequential, K-nearest-neighbor, and predicted contact
+relationships to combine sequence information with local residue
+relationships. The reported results include an AUC of 0.892 and an F1-score of
+0.847. However, ESM-GNN focuses on interaction-site identification rather than
+binary prediction of whether two proteins interact.
+
+PFMBench provides a broader evaluation of protein foundation models across 38
+biological tasks using 17 models, including interaction, annotation,
+structure, mutation, and localization tasks \cite{b9}. It compares
+sequence-based and multimodal models using measures such as accuracy,
+F1-score, and AUROC. The results indicate that multimodal representations can
+provide advantages on several tasks and that larger models do not necessarily
+guarantee better performance. However, PFMBench is a benchmarking framework
+rather than an end-to-end PPI prediction architecture, providing guidance for
+model evaluation and selection.
+
+Among graph-based methods, GLTPPI is particularly relevant because it combines
+PLM representations with global and local graph information \cite{b10}. It uses
+ESM-2 embeddings and a Graph Attention Network with random-walk-based global
+topology and a Variational Graph Autoencoder (VGAE) for local graph
+structures. Evaluation on SHS27k, SHS148k, Yeast, and Arabidopsis reported
+accuracies of 0.8979 and 0.9355 on SHS27k and SHS148k, respectively. GLTPPI
+demonstrates that sequence information and interaction-network topology can
+provide complementary information for PPI prediction. However, it does not
+employ the independent sequence and graph predictors, ensemble mechanism,
+interpretability, and downstream biological analysis considered in the
+proposed framework.
+
+Review studies further describe the development of deep learning for
+sequence-based PPI prediction. Mewara and Lalwani surveyed deep-network
+approaches, highlighting the progression from handcrafted features toward
+representation learning and modern deep architectures \cite{b11}. Reim et
+al.\ investigated unbiased sequence-based PPI prediction and reported that deep
+learning performance can plateau under more stringent evaluation conditions
+\cite{b12}, emphasizing appropriate data splits, evaluation metrics, and
+generalization. Similarly, Cui et al.\ reviewed recent advances in deep
+learning for PPI prediction, covering sequence, structural, PLM-based, and
+graph-based approaches \cite{b13}. Their review highlights differences in
+information requirements and prediction objectives, including binary PPI,
+interaction-site, and binding-affinity prediction.
+
+Overall, the reviewed studies demonstrate a progression from sequence-based
+learning toward PLM-based, graph-based, and hybrid PPI prediction. PLMs such as
+ESM-2, ProtT5, and T5-based models provide informative sequence
+representations, while GNNs capture relationships and topology beyond
+individual sequence representations. xCAPT5 demonstrates PLM-based prediction,
+while DeepGNHV and ESM-GNN incorporate graph learning into protein-related
+tasks \cite{b5,b6,b8}. GLTPPI further demonstrates the value of combining
+sequence embeddings with global and local graph topology \cite{b10}. PFMBench
+and the review studies emphasize model selection, evaluation, and
+generalization \cite{b9,b11,b12,b13}.
+
+However, existing methods often focus on a single information source or
+address related tasks such as interaction-site or affinity prediction. Some
+hybrid approaches require structural information, while others focus mainly on
+sequence or graph topology. Interpretability is also not a central component
+of most existing frameworks. These observations motivate TransGraph-PPI, which
+combines ESM-2 sequence representations with graph-based learning and an
+ensemble prediction mechanism. The framework integrates complementary sequence
+and interaction-network information with SHAP-based analysis to identify
+features contributing to predictions, providing a unified approach that
+combines PLM representations, graph learning, ensemble prediction, and
+explainability for PPI prediction.
+
+% =============================================================================
+\section{System Design}\label{sec:design}
+% =============================================================================
+TransGraph-PPI is a machine learning framework designed to predict whether two
+human proteins interact with each other (protein--protein interaction, or
+PPI). The framework combines information from protein sequences and the protein
+interaction network. The system consists of three main components:
+(1)~a sequence branch, which predicts interactions from protein sequence
+information; (2)~a graph branch, which predicts interactions using the protein
+interaction network; and (3)~an ensemble branch, which combines the
+predictions using XGBoost. SHAP is then used to explain the final predictions.
+
+\subsection{Overall Architecture}\label{AA}
+Protein sequences are first processed using ESM-2
+(\texttt{facebook/esm2\_t12\_35M\_UR50D}), which produces a 480-dimensional
+embedding for each protein. These embeddings are provided to the sequence and
+graph branches. The sequence branch uses a residual multi-layer perceptron
+(MLP) to learn interaction patterns from the two protein embeddings. The graph
+branch uses GraphSAGE to capture information from neighboring proteins in the
+interaction network. The two branches produce separate interaction
+probabilities, $\pseq$ and $\pgraph$.
+
+Instead of directly averaging these probabilities, TransGraph-PPI constructs an
+8-dimensional feature vector containing the two prediction scores, their
+confidence values, their difference, their agreement, and biological
+information. An XGBoost model uses these features to produce the final
+interaction probability.
+
+\subsection{Sequence-Based Prediction}\label{sec:seq}
+Since the interaction between proteins $A$ and $B$ is the same as the
+interaction between $B$ and $A$, the model should not depend on the order of
+the proteins. Therefore, the two 480-dimensional ESM-2 embeddings, $e_A$ and
+$e_B$, are combined using four symmetric operations:
+\begin{equation}
+f_{\mathrm{sym}} =
+\bigl[
+(e_A + e_B)
+\parallel
+(e_A \odot e_B)
+\parallel
+|e_A - e_B|
+\parallel
+\max(e_A,e_B)
+\bigr]
+\label{eq:sym}
+\end{equation}
+where $\parallel$ represents concatenation and $\odot$ represents element-wise
+multiplication. The four operations produce a 1920-dimensional feature vector.
+
+This vector is passed through a residual MLP containing skip connections,
+normalization, and dropout. The model produces a probability $\pseq$ between 0
+and 1, representing the likelihood that the two proteins interact based on
+their sequence information.
+
+\subsection{Graph-Based Prediction}\label{sec:graph}
+Proteins form a complex biological network, so network information can provide
+additional evidence for PPI prediction. The graph branch represents proteins as
+nodes and known interactions from the STRING database as edges.
+
+Each protein node is represented using a 483-dimensional feature vector,
+consisting of the 480-dimensional ESM-2 embedding and three network features:
+degree centrality, clustering coefficient, and PageRank.
+
+GraphSAGE updates each protein representation by aggregating information from
+its neighboring proteins:
+\begin{equation}
+h_i^{(l)} =
+\operatorname{ReLU}\!\left(
+W_1 h_i^{(l-1)}
++
+W_2 \cdot
+\operatorname*{mean}_{j \in \mathcal{N}(i)} h_j^{(l-1)}
+\right)
+\label{eq:sage}
+\end{equation}
+where $\mathcal{N}(i)$ represents the neighboring proteins of protein $i$, and
+$W_1$ and $W_2$ are learnable weights.
+
+The learned representations of two candidate proteins are then combined using
+several pairwise operations and passed through a classifier to obtain the
+graph-based interaction probability $\pgraph$.
+
+\subsection{XGBoost Stacking Ensemble}\label{sec:stack}
+The sequence and graph models capture different types of information. The
+sequence model focuses on protein sequence patterns, while the graph model
+captures information from the interaction network. To combine these
+predictions, TransGraph-PPI uses an XGBoost stacking model.
+
+To reduce data leakage, 5-fold stratified out-of-fold (OOF) predictions are
+used to train the ensemble model. For each protein pair, eight meta-features
+are calculated:
+\begin{equation}
+\begin{split}
+X_{\mathrm{meta}} = [\,&\pseq,\ \pgraph,\ \mathrm{conf}_{\mathrm{seq}},\
+\mathrm{conf}_{\mathrm{graph}},\\
+&\mathrm{diff},\ \mathrm{max}_{\mathrm{conf}},\
+\mathrm{consensus},\ \mathrm{bio}_{\mathrm{score}}\,]
+\end{split}
+\label{eq:meta}
+\end{equation}
+The eight features are defined as follows:
+\begin{itemize}
+    \item $\pseq$: probability predicted by the sequence model.
+    \item $\pgraph$: probability predicted by the graph model.
+    \item $\mathrm{conf}_{\mathrm{seq}} = |\pseq - 0.5|$: confidence of the
+          sequence model.
+    \item $\mathrm{conf}_{\mathrm{graph}} = |\pgraph - 0.5|$: confidence of
+          the graph model.
+    \item $\mathrm{diff} = |\pseq - \pgraph|$: difference between the two
+          predictions.
+    \item $\mathrm{max}_{\mathrm{conf}} =
+          \max(\mathrm{conf}_{\mathrm{seq}},\mathrm{conf}_{\mathrm{graph}})$:
+          higher confidence of the two models.
+    \item $\mathrm{consensus} = \pseq \times \pgraph$: agreement between the
+          two predictions.
+    \item $\mathrm{bio}_{\mathrm{score}}$: biological compatibility score
+          based on subcellular co-localization.
+\end{itemize}
+The XGBoost model uses these meta-features to produce the final interaction
+probability:
+\begin{equation}
+\pfinal = \operatorname{XGBoost}(X_{\mathrm{meta}})
+\label{eq:final}
+\end{equation}
+
+\subsection{Model Explainability}\label{sec:shap}
+SHAP (SHapley Additive exPlanations) is applied to the trained XGBoost model to
+make the ensemble predictions easier to interpret. SHAP measures how much each
+of the eight meta-features contributes to increasing or decreasing the final
+prediction score. This helps identify whether a prediction is mainly supported
+by sequence information, network information, or agreement between the two
+models.
+
+% =============================================================================
+\section{Implementation}\label{sec:impl}
+% =============================================================================
+The TransGraph-PPI framework was implemented using Python and deep learning
+libraries for sequence representation, graph learning, ensemble prediction, and
+explainability. The implementation follows the architecture described in
+Section~\ref{sec:design} and includes dataset preparation, sequence
+representation, model training, graph construction, ensemble learning, and
+SHAP-based analysis.
+
+\subsection{Dataset Preparation}
+The dataset contains 201,712 human protein pairs, including 100,856 positive
+and 100,856 negative samples. Positive interactions were obtained from the
+STRING database using a minimum confidence score of 900. Negative pairs were
+sampled while excluding known positive interactions to avoid incorrect negative
+labels.
+
+The dataset was divided using a stratified 80:10:10 split, resulting in 161,369
+training pairs, 20,171 validation pairs, and 20,172 test pairs. The validation
+set was used for threshold selection, while the test set was kept separate for
+final evaluation.
+
+\subsection{Protein Sequence Representation}
+Each protein sequence was represented using the pretrained ESM-2 model
+\texttt{facebook/esm2\_t12\_35M\_UR50D}. The model contains approximately 35
+million parameters and produces a 480-dimensional mean-pooled representation
+for each protein.
+
+These embeddings were used as inputs to both the sequence and graph branches,
+allowing sequence information to be combined with interaction-network
+information without manually designing extensive sequence features.
+
+\subsection{Sequence Model Implementation}
+The sequence branch was implemented using a residual MLP. The symmetric pair
+representation described in Section~\ref{sec:seq} produces a 1920-dimensional
+input. This representation is first projected to 1024 dimensions, followed by
+two residual blocks that progressively reduce the representation to 512
+dimensions before the final classification layers.
+
+The model was trained using AdamW with a learning rate of $10^{-3}$ and weight
+decay of $10^{-3}$. A cosine annealing learning-rate scheduler was used,
+together with balanced focal loss to emphasize difficult predictions. The batch
+size was 64, with a maximum of 30 epochs and early stopping.
+
+\subsection{Graph Model Implementation}
+For the graph branch, proteins were represented as nodes and high-confidence
+interactions as edges. Each node contained the 480-dimensional ESM-2 embedding
+together with degree centrality, clustering coefficient, and PageRank,
+resulting in 483 node features.
+
+A two-layer GraphSAGE model with a hidden dimension of 256 was used for
+neighborhood aggregation. Dropout and normalization were applied to reduce
+overfitting. For candidate protein pairs, the learned node representations were
+combined using pairwise operations and a bilinear interaction layer before
+classification.
+
+The graph model was trained using AdamW with a learning rate of $10^{-3}$,
+weight decay of $10^{-4}$, and a cosine annealing scheduler. Focal loss was
+used as the training objective. Graph edges were processed in chunks during
+link prediction to efficiently handle the large interaction graph.
+
+\subsection{Ensemble Implementation}
+The outputs of the sequence and graph models were combined using an XGBoost
+classifier. To prevent target leakage, five-fold stratified OOF predictions
+were generated from the base models before training the meta-learner.
+
+For each protein pair, the two prediction probabilities and the six additional
+features described in Section~\ref{sec:stack} formed an eight-dimensional input
+vector for XGBoost.
+
+The XGBoost model used 500 estimators, a maximum tree depth of 7, a learning
+rate of 0.01, and a subsampling ratio of 0.8. Feature subsampling was also set
+to 0.8, with $L_1$ regularization applied to reduce overfitting.
+
+\subsection{Explainability}
+After training, SHAP was used to analyze the contribution of the eight
+meta-features to the final prediction. This analysis provides insight into how
+sequence predictions, graph predictions, model confidence, prediction
+agreement, and biological compatibility influence the ensemble output.
+
+% =============================================================================
+\section{Results and Discussion}\label{sec:results}
+% =============================================================================
+The performance of TransGraph-PPI was evaluated on a held-out test set of
+20,172 protein pairs, with no overlap between training and test pairs. The
+sequence model, graph model, and proposed XGBoost ensemble were compared with a
+Random Forest baseline using accuracy, precision, recall, F1-score, ROC-AUC,
+and PR-AUC.
+
+\subsection{Performance Comparison}
+
+\begin{table}[htbp]
+\caption{Performance Comparison of the Evaluated Models}
+\label{tab:performance}
+\centering
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Model} & \textbf{Accuracy} & \textbf{Precision} & \textbf{Recall} &
+\textbf{F1-Score} & \textbf{ROC-AUC} & \textbf{PR-AUC} \\
+\midrule
+Random Forest    & 82.34\%          & 81.14\%          & 84.28\% & 82.68\%          & 0.9065          & 0.9124 \\
+ESM-MLP          & 87.11\%          & 86.00\%          & 88.65\% & 87.30\%          & 0.9438          & 0.9474 \\
+GraphSAGE        & 90.42\%          & 92.01\%          & 88.52\% & 90.23\%          & 0.9487          & 0.9616 \\
+XGBoost Ensemble & \textbf{92.13\%} & \textbf{93.59\%} & 90.46\% & \textbf{92.00\%} & \textbf{0.9708} & \textbf{0.9759} \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+The Random Forest baseline achieved 82.34\% accuracy and an 82.68\% F1-score,
+while the ESM-MLP improved these values to 87.11\% and 87.30\%, respectively,
+demonstrating the usefulness of pretrained ESM-2 representations. GraphSAGE
+achieved 90.42\% accuracy and a 90.23\% F1-score, with a PR-AUC of 0.9616,
+indicating the contribution of interaction-network information.
+
+The XGBoost stacking ensemble achieved the highest performance, with 92.13\%
+accuracy, 92.00\% F1-score, 0.9708 ROC-AUC, and 0.9759 PR-AUC. Its precision of
+93.59\% indicates that most interactions classified as positive were correct.
+
+\subsection{Effect of Ensemble Learning}
+Combining the sequence and graph branches improves overall prediction
+performance. The ESM-MLP captures sequence-level information, whereas
+GraphSAGE incorporates interaction-network information, allowing the ensemble
+to exploit complementary signals.
+
+Compared with ESM-MLP, the ensemble improves accuracy from 87.11\% to 92.13\%
+and F1-score from 87.30\% to 92.00\%. Compared with GraphSAGE, accuracy
+increases from 90.42\% to 92.13\% and ROC-AUC from 0.9487 to 0.9708. These
+results support the use of stacking to combine the two prediction branches. The
+ensemble also achieves a PR-AUC of 0.9759, indicating good precision-recall
+performance across classification thresholds. Furthermore, training the XGBoost
+meta-learner using OOF predictions reduces the risk of target leakage during
+stacking.
+
+\subsection{Discussion}
+The results demonstrate that both sequence and interaction-network information
+contribute to PPI prediction. The improvement from ESM-MLP to GraphSAGE
+suggests that network topology provides information beyond individual sequence
+representations, while the further improvement from stacking indicates that the
+two branches provide complementary signals.
+
+The ensemble achieves higher precision than the individual models, which is
+relevant for PPI prediction because false-positive interactions may affect
+downstream biological analysis. By combining predictions and confidence-related
+features, the XGBoost meta-learner can make the final prediction using multiple
+sources of evidence.
+
+SHAP analysis provides an additional interpretability layer by identifying the
+contribution of individual meta-features to XGBoost predictions. Overall, the
+results demonstrate that integrating ESM-2 sequence representations,
+GraphSAGE-based network learning, and XGBoost stacking provides an effective
+framework for PPI prediction while also supporting interpretation of the
+resulting predictions.
+
+% =============================================================================
+\section{Future Work}\label{sec:future}
+% =============================================================================
+Future work will focus on improving the generalization and biological
+usefulness of TransGraph-PPI. The framework can be extended by incorporating
+additional protein sequence and structural information, larger and more diverse
+interaction datasets, and more advanced graph learning methods. Further
+experiments can also evaluate the model on unseen proteins and independent
+datasets to assess its generalization to different biological settings. The
+explainability component can be extended to provide more detailed biological
+interpretation of important interaction features. These improvements may help
+make the framework more useful for large-scale PPI analysis and downstream
+drug-target research.
+
+% =============================================================================
+\section{Conclusion}\label{sec:conclusion}
+% =============================================================================
+TransGraph-PPI presents a hybrid framework for predicting protein--protein
+interactions by combining protein sequence information with
+interaction-network information. The framework uses ESM-2 embeddings to
+represent protein sequences, a residual MLP for sequence-based prediction, and
+GraphSAGE for learning information from the protein interaction network. The
+predictions from both branches are combined using an XGBoost stacking model
+with eight meta-features, while SHAP provides an interpretable view of the
+final predictions.
+
+On the held-out test set, the proposed ensemble achieved 92.13\% accuracy,
+92.00\% F1-score, 0.9708 ROC-AUC, and 0.9759 PR-AUC, outperforming the
+individual sequence and graph branches. These results show that combining
+complementary sequence and network information can improve PPI prediction
+compared with using either source independently. The use of SHAP further
+supports interpretation of the ensemble predictions. Overall, TransGraph-PPI
+provides an integrated approach for PPI prediction and explainable analysis,
+with potential applications in studying protein interactions and supporting
+downstream biological research.
+
+% =============================================================================
+% References
+% =============================================================================
+\begin{thebibliography}{00}
+
+\bibitem{b1}
+F. Charih, J. R. Green, and K. K. Biggar,
+``Sequence-based protein--protein interaction prediction and its applications
+in drug discovery,''
+\textit{Cells}, vol.~14, no.~18, Art.~no.~1449, 2025,
+doi: 10.3390/cells14181449.
+
+\bibitem{b2}
+N. Alkhateeb and M. Awad,
+``Advances in protein--protein interaction prediction: A deep learning
+perspective,'' 2023.
+
+\bibitem{b3}
+W. Hu and M. Ohue,
+``SpatialPPIv2: Enhancing protein--protein interaction prediction through graph
+neural networks with protein language models,''
+\textit{Comput.\ Struct.\ Biotechnol.\ J.}, vol.~27, pp.~508--518, 2025,
+doi: 10.1016/j.csbj.2025.01.022.
+
+\bibitem{b4}
+F. Soleymani, E. Paquet, H. L. Viktor, W. Michalowski, and D. Spinello,
+``ProtInteract: A deep learning framework for predicting protein--protein
+interactions,''
+\textit{Comput.\ Struct.\ Biotechnol.\ J.}, vol.~21, pp.~1324--1348, 2023,
+doi: 10.1016/j.csbj.2023.01.028.
+
+\bibitem{b5}
+T. H. Dang and T. A. Vu,
+``xCAPT5: Protein--protein interaction prediction using deep and wide
+multi-kernel pooling convolutional neural networks with protein language
+model,''
+\textit{BMC Bioinformatics}, vol.~25, Art.~no.~106, 2024,
+doi: 10.1186/s12859-024-05725-6.
+
+\bibitem{b6}
+L. Jiang, X. Yang, X. Guo, D. Li, J. Li, S. Wuchty, W. Shi, and Z. Zhang,
+``Graph neural network integrated with pretrained protein language model for
+predicting human-virus protein--protein interactions,''
+\textit{Briefings in Bioinformatics}, vol.~26, no.~5, Art.~no.~bbaf461, 2025,
+doi: 10.1093/bib/bbaf461.
+
+\bibitem{b7}
+H. Alsamkary, M. Elshaffei, M. Soudy, S. Ossman, A. Amr, N. A. Abdelsalam,
+M. Elkerdawy, and A. Elnaggar,
+``Beyond simple concatenation: Fairly assessing {PLM} architectures for
+multi-chain protein-protein interactions prediction,''
+\textit{arXiv preprint arXiv:2505.20036}, 2025.
+
+\bibitem{b8}
+M. K. P. and A. Geetha,
+``Predicting human protein--protein interaction sites by integrating {ESM-2}
+sequence embeddings and a gated graph neural network,'' 2024.
+
+\bibitem{b9}
+Z. Gao, H. Wang, C. Tan, C. Xu, M. Liu, B. Hu, L. Chao, X. Zhang, and
+S. Z. Li,
+``{PFMBench}: Protein foundation model benchmark,''
+\textit{arXiv preprint arXiv:2506.14796}, 2025.
+
+\bibitem{b10}
+J. Liu and T. Zhang,
+``{ESM2}-driven protein-protein interaction prediction with global-local graph
+topology learning,''
+in \textit{Proc.\ IEEE Int.\ Joint Conf.\ Neural Networks (IJCNN)}, 2025,
+pp.~1--8, doi: 10.1109/IJCNN64981.2025.11228802.
+
+\bibitem{b11}
+B. Mewara and S. Lalwani,
+``A survey on deep networks approaches in prediction of sequence-based
+protein--protein interactions,''
+\textit{SN Comput.\ Sci.}, vol.~3, no.~4, Art.~no.~298, 2022,
+doi: 10.1007/s42979-022-01197-8.
+
+\bibitem{b12}
+T. Reim, A. Hartebrodt, D. B. Blumenthal, J. Bernett, and M. List,
+``Deep learning models for unbiased sequence-based {PPI} prediction plateau at
+an accuracy of 0.65,''
+\textit{Bioinformatics}, vol.~41, no.~1, pp.~i590--i598, 2025,
+doi: 10.1093/bioinformatics/btaf192.
+
+\bibitem{b13}
+J. Cui, S. Yang, L. Yi, Q. Xi, D. Yang, and Y. Zuo,
+``Recent advances in deep learning for protein-protein interaction: A
+review,''
+\textit{BioData Mining}, vol.~18, Art.~no.~43, 2025,
+doi: 10.1186/s13040-025-00457-6.
+
+\end{thebibliography}
+
+\end{document}

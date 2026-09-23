@@ -27,25 +27,63 @@ const StructureViewer = () => {
   const pluginRef = useRef(null);
   const autoLoadedRef = useRef(false);
 
-  const loadStructure = async (uniprotId) => {
+  const isLikelyUniProt = (id) => {
+    if (!id) return false;
+    const clean = id.trim().toUpperCase();
+    return /^[OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}$/i.test(clean);
+  };
+
+  const resolveTargetToUniProt = async (targetId) => {
+    if (!targetId) return { uniProtId: 'P04637', meta: null };
+    const raw = targetId.trim();
+    const cleanId = raw.replace(/^9606\./, '');
+
+    // 1. Try querying backend metadata service to map ENSP -> UniProt & get bio context
+    try {
+      const response = await ppiService.getBioMetadata(cleanId);
+      const data = response.data?.[0];
+      if (data) {
+        setMetadata(data);
+        if (data.uniprot_id) {
+          return { uniProtId: data.uniprot_id, meta: data };
+        }
+      }
+    } catch (err) {
+      console.warn("Bio metadata lookup failed for ID resolution:", err);
+    }
+
+    // 2. If already formatted like a UniProt ID, use it directly
+    if (isLikelyUniProt(cleanId)) {
+      return { uniProtId: cleanId, meta: null };
+    }
+
+    return { uniProtId: cleanId, meta: null };
+  };
+
+  const renderMolstar = async (targetUniProtId) => {
     if (!pluginRef.current || !viewerContainerRef.current) return;
-    
-    // Destroy existing instance and create new one
+
+    // Destroy existing plugin instance if present
     try {
       if (pluginRef.current.plugin) {
         pluginRef.current.plugin.dispose();
       }
     } catch (e) { /* ignore */ }
-    
-    // Fetch the current CIF URL from AlphaFold API to avoid version mismatches
-    let cifUrl = `https://alphafold.ebi.ac.uk/files/AF-${uniprotId}-F1-model_v6.cif`;
+
+    // Fetch the current CIF URL from AlphaFold API
+    let cifUrl = `https://alphafold.ebi.ac.uk/files/AF-${targetUniProtId}-F1-model_v6.cif`;
     try {
-      const res = await fetch(`https://alphafold.ebi.ac.uk/api/prediction/${uniprotId}`);
+      const res = await fetch(`https://alphafold.ebi.ac.uk/api/prediction/${targetUniProtId}`);
+      if (!res.ok) {
+        throw new Error(`AlphaFold API returned HTTP ${res.status}`);
+      }
       const data = await res.json();
       if (data && data.length > 0 && data[0].cifUrl) {
         cifUrl = data[0].cifUrl;
       }
-    } catch (e) { /* fallback to v6 URL */ }
+    } catch (fetchErr) {
+      console.warn(`AlphaFold API lookup warning for ${targetUniProtId}, attempting direct CIF:`, fetchErr);
+    }
 
     pluginRef.current = new window.PDBeMolstarPlugin();
     pluginRef.current.render(viewerContainerRef.current, {
@@ -65,18 +103,12 @@ const StructureViewer = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await ppiService.getBioMetadata(targetId);
-      const data = response.data?.[0];
-      if (data) setMetadata(data);
-      const uniProtId = data?.uniprot_id || (targetId.length === 6 || targetId.length === 10 ? targetId : null);
-      if (uniProtId) {
-        await loadStructure(uniProtId);
-      } else {
-        await loadStructure(targetId);
-      }
+      const { uniProtId, meta } = await resolveTargetToUniProt(targetId);
+      if (meta) setMetadata(meta);
+      await renderMolstar(uniProtId);
     } catch (err) {
-      console.warn("Metadata lookup fallback:", err);
-      await loadStructure(targetId);
+      console.error("Structure search error:", err);
+      setError(`Could not load AlphaFold 3D structure for ${targetId}. Verify that this protein has an AlphaFold prediction.`);
     } finally {
       setLoading(false);
     }
@@ -85,36 +117,20 @@ const StructureViewer = () => {
   const initViewer = async () => {
     if (window.PDBeMolstarPlugin && viewerContainerRef.current && !pluginRef.current) {
       try {
-        const initialTarget = queryProtein || 'P04637';
-        let cifUrl = `https://alphafold.ebi.ac.uk/files/AF-${initialTarget}-F1-model_v6.cif`;
-        try {
-          const res = await fetch(`https://alphafold.ebi.ac.uk/api/prediction/${initialTarget}`);
-          const data = await res.json();
-          if (data && data.length > 0 && data[0].cifUrl) {
-            cifUrl = data[0].cifUrl;
-          }
-        } catch (e) { /* fallback to default URL */ }
-
+        setViewerLoading(true);
+        const initialTarget = queryProtein || proteinId || 'P04637';
         pluginRef.current = new window.PDBeMolstarPlugin();
-        pluginRef.current.render(viewerContainerRef.current, {
-          customData: {
-            url: cifUrl,
-            format: 'cif'
-          },
-          alphafoldView: true,
-          expanded: false,
-          hideCanvasControls: ['selection', 'animation', 'geometry'],
-          bgColor: { r: 248, g: 250, b: 252 }
-        });
-        setViewerLoading(false);
+        
+        // Resolve ID first so ENSP and 9606.ENSP load correctly on first mount
+        const { uniProtId, meta } = await resolveTargetToUniProt(initialTarget);
+        if (meta) setMetadata(meta);
 
-        if (initialTarget && !autoLoadedRef.current) {
-          autoLoadedRef.current = true;
-          executeSearchForId(initialTarget);
-        }
+        await renderMolstar(uniProtId);
+        autoLoadedRef.current = true;
       } catch (err) {
-        console.error("Molstar render error:", err);
+        console.error("Molstar init error:", err);
         setError("Failed to initialize 3D viewer.");
+      } finally {
         setViewerLoading(false);
       }
     }
@@ -184,50 +200,83 @@ const StructureViewer = () => {
             </form>
           </div>
 
-          <AnimatePresence>
-            {metadata && (
-              <motion.div 
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="glass-card p-6 space-y-6"
-              >
+            {error && (
+              <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800 flex items-start gap-2.5">
+                <Info size={16} className="text-amber-600 shrink-0 mt-0.5" />
                 <div>
-                  <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-2">
-                    <Tag size={16} className="text-scientific-primary" />
-                    Annotation
-                  </h4>
-                  <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                    {metadata.function || "No functional annotation available for this sequence cluster."}
-                  </p>
+                  <p className="font-bold mb-0.5">Structure Notice</p>
+                  <p>{error}</p>
                 </div>
-
-                <div className="grid grid-cols-1 gap-4">
-                  <div className="p-3 bg-teal-50 rounded-xl border border-teal-100">
-                    <div className="flex items-center gap-2 text-scientific-primary mb-1">
-                      <MapPin size={14} />
-                      <span className="text-[10px] font-bold uppercase">Localization</span>
-                    </div>
-                    <p className="text-sm font-bold text-slate-700">{metadata.subcellular_location || "Unknown"}</p>
-                  </div>
-                  
-                  <div className="p-3 bg-purple-50 rounded-xl border border-purple-100">
-                    <div className="flex items-center gap-2 text-scientific-accent mb-1">
-                      <Activity size={14} />
-                      <span className="text-[10px] font-bold uppercase">Relevance</span>
-                    </div>
-                    <p className="text-sm font-bold text-slate-700">{metadata.biological_process || "Metabolic Process"}</p>
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t border-slate-100 flex justify-between items-center text-[10px] font-bold text-slate-400">
-                   <span>SOURCE: ALPHAFOLD DB</span>
-                   <button className="text-scientific-primary hover:underline flex items-center gap-1">
-                      FULL UNIPROT <ChevronRight size={10} />
-                   </button>
-                </div>
-              </motion.div>
+              </div>
             )}
-          </AnimatePresence>
+
+            <AnimatePresence>
+              {metadata && (
+                <motion.div 
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="glass-card p-6 space-y-6"
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                        <Tag size={16} className="text-scientific-primary" />
+                        Identified Target
+                      </h4>
+                      {metadata.uniprot_id && (
+                        <span className="text-[10px] font-mono px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded font-semibold">
+                          UniProt: {metadata.uniprot_id}
+                        </span>
+                      )}
+                    </div>
+                    {metadata.protein_id && (
+                      <p className="text-[11px] font-mono text-slate-500 mb-2">
+                        Query ID: {metadata.protein_id}
+                      </p>
+                    )}
+                    <p className="text-xs text-slate-600 leading-relaxed font-medium">
+                      {metadata.families || metadata.domains || "Protein entry resolved from Ensembl/UniProt cross-reference."}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="p-3 bg-teal-50 rounded-xl border border-teal-100">
+                      <div className="flex items-center gap-2 text-scientific-primary mb-1">
+                        <MapPin size={14} />
+                        <span className="text-[10px] font-bold uppercase">Localization</span>
+                      </div>
+                      <p className="text-xs font-semibold text-slate-700 leading-snug">
+                        {metadata.localization || metadata.subcellular_location || "Unknown"}
+                      </p>
+                    </div>
+                    
+                    <div className="p-3 bg-purple-50 rounded-xl border border-purple-100">
+                      <div className="flex items-center gap-2 text-scientific-accent mb-1">
+                        <Activity size={14} />
+                        <span className="text-[10px] font-bold uppercase">Pathways & Processes</span>
+                      </div>
+                      <p className="text-xs font-semibold text-slate-700 leading-snug">
+                        {metadata.pathways || metadata.biological_process || "Cellular Signaling / Unclassified"}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-slate-100 flex justify-between items-center text-[10px] font-bold text-slate-400">
+                     <span>SOURCE: ALPHAFOLD DB</span>
+                     {metadata.uniprot_id && (
+                       <a 
+                         href={`https://www.uniprot.org/uniprotkb/${metadata.uniprot_id}/entry`}
+                         target="_blank"
+                         rel="noreferrer"
+                         className="text-scientific-primary hover:underline flex items-center gap-1"
+                       >
+                          FULL UNIPROT <ChevronRight size={10} />
+                       </a>
+                     )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
         </div>
 
         {/* Right Side: Viewer */}

@@ -108,6 +108,7 @@ class TargetManager:
                             })
                             
             except Exception as e:
-                print(f"Error fetching Chembl chunk: {e}")
+                err_summary = str(e).split('\n')[0][:120].strip()
+                print(f"Warning: ChEMBL API request failed ({err_summary}). Proceeding with available targets.")
                 
         return pd.DataFrame(results)

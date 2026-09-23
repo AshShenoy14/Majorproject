@@ -36,24 +36,42 @@ class BiologicalManager:
         persist: if False, newly fetched metadata is returned but never written to the cache
                  (in memory or on disk). Used for display-only live lookups.
         """
-        # Identify IDs that are either truly missing OR have empty new fields
-        existing = self.cache_df[self.cache_df["protein_id"].isin(protein_ids)]
+        # Normalize IDs to handle 9606. prefix transparently
+        clean_to_orig = {pid.split(".", 1)[-1] if "." in pid else pid: pid for pid in protein_ids}
+        clean_ids = list(clean_to_orig.keys())
+
+        # Match in cache by exact requested ID or stripped ID
+        existing = self.cache_df[
+            self.cache_df["protein_id"].isin(protein_ids) | 
+            self.cache_df["protein_id"].isin(clean_ids)
+        ].copy()
         
-        # A protein needs fetching if it's not in cache OR if its new fields are empty
+        # Ensure returned rows contain the exact protein_id requested by caller
+        if not existing.empty:
+            aliased = []
+            for _, row in existing.iterrows():
+                cid = row["protein_id"]
+                if cid in clean_to_orig and clean_to_orig[cid] != cid:
+                    alias_row = row.copy()
+                    alias_row["protein_id"] = clean_to_orig[cid]
+                    aliased.append(alias_row)
+            if aliased:
+                existing = pd.concat([existing, pd.DataFrame(aliased)], ignore_index=True)
+
+        found_pids = set(existing["protein_id"].unique())
         to_fetch_ids = []
         for pid in protein_ids:
-            row = existing[existing["protein_id"] == pid]
-            if row.empty:
+            if pid not in found_pids:
                 to_fetch_ids.append(pid)
             else:
+                row = existing[existing["protein_id"] == pid]
                 # Re-fetch if family/domain info is missing (migration case)
                 if not str(row.iloc[0].get("families", "")).strip() and not str(row.iloc[0].get("domains", "")).strip():
                     to_fetch_ids.append(pid)
-                    # Remove from existing so it gets replaced
                     existing = existing[existing["protein_id"] != pid]
         
         if not to_fetch_ids or not fetch_missing:
-            return existing
+            return existing[existing["protein_id"].isin(protein_ids)]
 
         # Map ENSP -> UniProt
         mapping = self.mapper.ensp_to_uniprot(to_fetch_ids)

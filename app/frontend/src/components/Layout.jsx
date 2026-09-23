@@ -6,9 +6,8 @@ import {
   Activity, 
   Zap, 
   Dna, 
-  Boxes, 
-  Share2, 
-  Pill, 
+  Boxes,
+  Pill,
   Bot, 
   Home as HomeIcon,
   Globe,
@@ -42,10 +41,8 @@ const NAV_LINKS = [
   { path: '/structure', label: '3D Studio', icon: Boxes },
   { path: '/mutation', label: 'Mutation', icon: Dna },
   { path: '/network', label: '2D Graph', icon: Network },
-  { path: '/network-3d', label: '3D Graph', icon: Share2 },
   { path: '/drug-targets', label: 'Drugs', icon: Pill },
-  { path: '/benchmark', label: 'Benchmark', icon: BarChart3, badge: 'Validation' },
-  { path: '/compare', label: 'Compare', icon: GitCompare },
+  { path: '/benchmark', label: 'Benchmark', icon: BarChart3 },
   { path: '/assistant', label: 'AI Copilot', icon: Bot },
 ];
 
@@ -179,10 +176,10 @@ const Layout = ({ children }) => {
           <motion.nav 
             initial={{ y: -20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            className="pointer-events-auto flex items-center gap-1.5 md:gap-2.5 bg-white/90 backdrop-blur-xl px-3.5 py-2 rounded-full shadow-lg shadow-slate-900/5 border border-slate-200/80 max-w-[80vw]"
+            className="pointer-events-auto flex items-center gap-1.5 md:gap-2 bg-white/95 backdrop-blur-xl px-3 py-1.5 rounded-full shadow-lg shadow-slate-900/5 border border-slate-200/80"
           >
             {/* Logo */}
-            <Link to="/" className="flex items-center gap-2 pr-3 border-r border-slate-200/80 group shrink-0">
+            <Link to="/" className="flex items-center gap-2 pr-2.5 border-r border-slate-200/80 group shrink-0">
               <div className="w-8 h-8 bg-gradient-to-tr from-emerald-600 to-teal-500 rounded-full flex items-center justify-center text-white shadow-md shadow-emerald-500/20 group-hover:scale-105 transition-transform">
                 <Activity size={16} className="animate-pulse" />
               </div>
@@ -192,7 +189,7 @@ const Layout = ({ children }) => {
             </Link>
 
             {/* Links */}
-            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+            <div className="flex items-center gap-0.5 md:gap-1">
               {NAV_LINKS.map((link) => {
                 const isActive = location.pathname === link.path;
                 const Icon = link.icon;
@@ -200,7 +197,7 @@ const Layout = ({ children }) => {
                   <Link
                     key={link.path}
                     to={link.path}
-                    className={`relative px-2.5 py-1.5 rounded-full text-xs font-semibold transition-all flex items-center gap-1.5 shrink-0 ${
+                    className={`relative px-2.5 py-1.5 rounded-full text-xs font-semibold transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
                       isActive 
                         ? 'text-emerald-700 bg-emerald-50 shadow-sm border border-emerald-200/60 font-bold' 
                         : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
@@ -208,11 +205,6 @@ const Layout = ({ children }) => {
                   >
                     <Icon size={14} className={isActive ? 'text-emerald-600' : 'text-slate-400'} />
                     <span className="hidden xl:inline-block">{link.label}</span>
-                    {link.badge && (
-                      <span className="hidden 2xl:inline-block text-[9px] bg-emerald-600 text-white px-1.5 py-0.5 rounded-full font-bold">
-                        {link.badge}
-                      </span>
-                    )}
                   </Link>
                 );
               })}

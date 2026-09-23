@@ -40,4 +40,5 @@ scratch*.py
 *.7z
 *.gz
 CLAUDE.md
-.claudesignore
+.claudesignore
+*.log

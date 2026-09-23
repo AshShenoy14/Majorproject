@@ -1,5 +1,5 @@
 {
-  "timestamp_utc": "2026-09-21T16:44:56.358556+00:00",
+  "timestamp_utc": "2026-09-23T00:49:56.967205+00:00",
   "protocol": "thresholds (F1-max, sweep 0.1-0.9) selected on val.csv; metrics computed on test.csv only",
   "split_design": "pair-level stratified 80/10/10 split (random_state=42); pair-disjoint, NOT node-disjoint - evaluation is transductive pair prediction",
   "dataset_rows": {
@@ -19,8 +19,8 @@
       "precision": 0.8599596037318458,
       "recall": 0.8864763037874281,
       "f1": 0.8730166479519602,
-      "roc_auc": 0.9437563751263228,
-      "pr_auc": 0.9473972474015873
+      "roc_auc": 0.9437563898716134,
+      "pr_auc": 0.9473972638564474
     },
     "Graph-Only (GraphSAGE)": {
       "val_selected_threshold": 0.5899999999999997,
@@ -28,8 +28,8 @@
       "precision": 0.9201277955271565,
       "recall": 0.8851873884592505,
       "f1": 0.9023194704128557,
-      "roc_auc": 0.9487034495604312,
-      "pr_auc": 0.9615783492502691
+      "roc_auc": 0.9487034397302374,
+      "pr_auc": 0.9615782782472169
     },
     "Random Forest Baseline": {
       "val_selected_threshold": 0.46999999999999986,
@@ -46,33 +46,33 @@
       "precision": 0.9358908606010873,
       "recall": 0.9046202657148523,
       "f1": 0.9199899168137131,
-      "roc_auc": 0.970761421043354,
-      "pr_auc": 0.9758743167109687
+      "roc_auc": 0.9707615979868391,
+      "pr_auc": 0.9758744642567048
     }
   },
   "checkpoints": {
     "sequence_model": {
       "file": "sequence_model_best.pth",
       "size_bytes": 23161235,
-      "modified": "2026-09-21T15:58:49.397435+00:00",
+      "modified": "2026-09-21T16:59:49.082381+00:00",
       "sha256_16": "7ad93da5e17d757b"
     },
     "graph_model": {
       "file": "graph_model_best.pth",
       "size_bytes": 4435475,
-      "modified": "2026-09-21T16:00:37.284100+00:00",
+      "modified": "2026-09-21T16:59:48.895026+00:00",
       "sha256_16": "8d904bfd553752d1"
     },
     "ensemble": {
       "file": "ensemble_model.pkl",
       "size_bytes": 3107327,
-      "modified": "2026-09-21T16:44:02.744218+00:00",
+      "modified": "2026-09-21T16:59:48.869337+00:00",
       "sha256_16": "87bae8e32dc78d6b"
     },
     "random_forest": {
       "file": "random_forest_baseline.pkl",
       "size_bytes": 222467849,
-      "modified": "2026-09-21T16:20:40.879617+00:00",
+      "modified": "2026-09-21T16:59:49.057748+00:00",
       "sha256_16": "5bddcaeea2abe28c"
     }
   }

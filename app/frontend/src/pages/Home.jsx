@@ -25,6 +25,10 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ppiService } from '../services/api';
+import HeroProtein3D from '../components/HeroProtein3D';
+import ResearchSuiteCarousel from '../components/ResearchSuiteCarousel';
+
+
 
 const StatCard = ({ icon: Icon, label, value, subtext, color }) => (
   <motion.div
@@ -85,21 +89,26 @@ const Home = () => {
   return (
     <div className="space-y-12">
       {/* Hero Section */}
-      <div className="relative overflow-hidden rounded-[3rem] bg-white min-h-[450px] flex items-center shadow-xl border border-slate-100">
+      <div className="relative overflow-hidden rounded-[3rem] bg-white min-h-[460px] lg:min-h-[500px] flex flex-col lg:flex-row items-center justify-between shadow-xl border border-slate-100">
         {/* Background Image with Overlay */}
         <div
-          className="absolute inset-0 z-0 bg-cover bg-center opacity-[0.06]"
+          className="absolute inset-0 z-0 bg-cover bg-center opacity-[0.05] pointer-events-none"
           style={{ backgroundImage: "url('/ppi_hero_bg_1777021983794.png')" }}
         />
-        <div className="absolute inset-0 z-0 bg-gradient-to-r from-white via-white/40 to-transparent" />
+        <div className="absolute inset-0 z-0 bg-gradient-to-r from-white via-white/50 to-transparent pointer-events-none" />
 
-        <div className="relative z-10 p-16 max-w-3xl">
+        <div className="relative z-10 p-10 lg:p-16 max-w-2xl xl:max-w-3xl">
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase tracking-[0.2em] mb-8"
+            className="flex items-center gap-3 mb-6 flex-wrap"
           >
-            <Zap size={14} className="text-emerald-500" /> AI-Powered Biological Discovery System
+            <span className="font-cursive text-emerald-600 text-3xl font-bold tracking-wide" style={{ fontFamily: "'Dancing Script', cursive" }}>
+              TransGraph PPI
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase tracking-[0.18em]">
+              <Zap size={13} className="text-emerald-500" /> AI-Powered Biological Discovery System
+            </span>
           </motion.div>
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
@@ -107,7 +116,7 @@ const Home = () => {
             transition={{ delay: 0.1 }}
             className="text-6xl font-black mb-6 leading-[1.1] text-slate-800 tracking-tight"
           >
-            Decoding the Language of <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-teal-400">Proteins</span>
+            A Hybrid Ensemble <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-600 to-teal-400">Framework</span>
           </motion.h1>
           <motion.p
             initial={{ opacity: 0, y: 20 }}
@@ -115,7 +124,7 @@ const Home = () => {
             transition={{ delay: 0.2 }}
             className="text-xl text-slate-500 mb-10 leading-relaxed font-medium"
           >
-            <span className="font-cursive text-emerald-600 text-2xl">TransGraph PPI</span> is a research-grade hybrid AI framework combining protein language models (ESM-2)
+            <span className="font-cursive text-emerald-600 text-2xl">TransGraph PPI</span> is a hybrid AI framework combining protein language models (ESM-2)
             and graph neural networks (GraphSAGE) to analyze complex biological interactomes.
           </motion.p>
           <motion.div
@@ -133,9 +142,14 @@ const Home = () => {
           </motion.div>
         </div>
 
+        {/* 3D Interactive Protein Visualization (TP53 & MDM2 Complex) */}
+        <div className="relative z-10 w-full lg:w-[480px] xl:w-[540px] h-[400px] lg:h-[500px] flex items-center justify-center lg:pr-8 pointer-events-auto">
+          <HeroProtein3D />
+        </div>
+
         {/* Floating elements for visual interest */}
-        <div className="absolute top-1/4 right-20 w-48 h-48 bg-emerald-100/30 blur-[80px] rounded-full animate-pulse" />
-        <div className="absolute bottom-1/4 right-40 w-64 h-64 bg-teal-100/20 blur-[100px] rounded-full animate-pulse delay-700" />
+        <div className="absolute top-1/4 right-20 w-48 h-48 bg-emerald-100/20 blur-[80px] rounded-full pointer-events-none" />
+        <div className="absolute bottom-1/4 right-40 w-64 h-64 bg-teal-100/15 blur-[100px] rounded-full pointer-events-none" />
       </div>
 
       {/* Stats Grid */}
@@ -171,8 +185,9 @@ const Home = () => {
       </div>
 
       {/* ── INTERACTIVE RESEARCH DISCOVERY SUITE (8 ENGINES) ── */}
-      <div className="glass-card p-10 bg-white border border-slate-100 rounded-[2.5rem] shadow-xl space-y-8">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100 pb-6">
+      <div className="glass-card p-8 md:p-10 lg:p-12 bg-white/80 backdrop-blur-xl border border-slate-100 rounded-[2.5rem] shadow-xl space-y-10 relative overflow-hidden">
+        {/* Section Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-100/80 pb-6 relative z-10">
           <div>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-emerald-50 text-emerald-600 text-xs font-bold uppercase tracking-wider mb-2">
               <Sparkles size={14} /> Comprehensive Research Suite
@@ -182,203 +197,91 @@ const Home = () => {
             </h2>
           </div>
           <p className="text-slate-500 text-sm max-w-xl font-medium leading-relaxed">
-            TransGraph-PPI is not just a predictor—it is a full-stack computational biology platform integrating transformer sequence models (ESM-2), topological graph neural networks (GraphSAGE), AlphaFold 3D molecular visualization, in-silico mutagenesis, and ChEMBL drug target discovery.
+            From interaction prediction to structural, mutational, network, drug-target, and validation analysis — explore the complete TransGraph-PPI research workflow.
           </p>
         </div>
 
-        {/* 8-Engine Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-          
-          {/* Engine 1: Predictor */}
-          <div className="p-5 rounded-2xl bg-slate-50/80 border border-slate-100 flex flex-col justify-between hover:shadow-lg hover:border-emerald-200 transition-all group">
+        {/* Stacked Floating-Card Carousel */}
+        <ResearchSuiteCarousel />
+
+
+        {/* ── INTERACTIVE CASE STUDIES (1-CLICK EXPERIMENTS) ── */}
+        <div className="pt-8 border-t border-slate-100/80">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
             <div>
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center font-bold mb-3 shadow-md shadow-emerald-200">
-                <Zap size={18} />
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-emerald-50 text-emerald-600 text-[10px] font-bold uppercase tracking-wider mb-1">
+                Curated Interactome
               </div>
-              <h4 className="font-bold text-slate-800 text-sm mb-1 group-hover:text-emerald-700 transition-colors">Interaction Predictor</h4>
-              <p className="text-xs text-slate-500 mb-3 leading-relaxed">
-                ESM-2 + GraphSAGE stacking ensemble with Platt calibration and SHAP feature attribution.
-              </p>
-            </div>
-            <Link to="/predict" className="text-xs font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1 mt-2">
-              Launch Predictor <ArrowRight size={14} />
-            </Link>
-          </div>
-
-          {/* Engine 2: AlphaFold 3D Studio */}
-          <div className="p-5 rounded-2xl bg-slate-50/80 border border-slate-100 flex flex-col justify-between hover:shadow-lg hover:border-cyan-200 transition-all group">
-            <div>
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 to-blue-500 text-white flex items-center justify-center font-bold mb-3 shadow-md shadow-cyan-200">
-                <Boxes size={18} />
-              </div>
-              <h4 className="font-bold text-slate-800 text-sm mb-1 group-hover:text-cyan-700 transition-colors">3D Molecular Studio</h4>
-              <p className="text-xs text-slate-500 mb-3 leading-relaxed">
-                Full atomic AlphaFold tertiary conformations rendered in real-time with PDBe Mol*.
-              </p>
-            </div>
-            <Link to="/structure" className="text-xs font-bold text-cyan-600 hover:text-cyan-700 flex items-center gap-1 mt-2">
-              Open 3D Studio <ArrowRight size={14} />
-            </Link>
-          </div>
-
-          {/* Engine 3: In-Silico Mutagenesis */}
-          <div className="p-5 rounded-2xl bg-slate-50/80 border border-slate-100 flex flex-col justify-between hover:shadow-lg hover:border-teal-200 transition-all group">
-            <div>
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-600 to-emerald-500 text-white flex items-center justify-center font-bold mb-3 shadow-md shadow-teal-200">
-                <Dna size={18} />
-              </div>
-              <h4 className="font-bold text-slate-800 text-sm mb-1 group-hover:text-teal-700 transition-colors">Mutation Scanner</h4>
-              <p className="text-xs text-slate-500 mb-3 leading-relaxed">
-                Simulate amino acid substitutions in silico to identify binding destabilizing hotspots.
-              </p>
-            </div>
-            <Link to="/mutation" className="text-xs font-bold text-teal-600 hover:text-teal-700 flex items-center gap-1 mt-2">
-              Scan Mutations <ArrowRight size={14} />
-            </Link>
-          </div>
-
-          {/* Engine 4: WT vs Mutant Comparator */}
-          <div className="p-5 rounded-2xl bg-slate-50/80 border border-slate-100 flex flex-col justify-between hover:shadow-lg hover:border-amber-200 transition-all group">
-            <div>
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 text-white flex items-center justify-center font-bold mb-3 shadow-md shadow-amber-200">
-                <GitCompare size={18} />
-              </div>
-              <h4 className="font-bold text-slate-800 text-sm mb-1 group-hover:text-amber-700 transition-colors">WT vs Mutant Comparator</h4>
-              <p className="text-xs text-slate-500 mb-3 leading-relaxed">
-                Side-by-side comparative analysis of native wildtype vs mutated variant affinity deltas.
-              </p>
-            </div>
-            <Link to="/compare" className="text-xs font-bold text-amber-600 hover:text-amber-700 flex items-center gap-1 mt-2">
-              Compare Variants <ArrowRight size={14} />
-            </Link>
-          </div>
-
-          {/* Engine 5: 2D Interactome Network */}
-          <div className="p-5 rounded-2xl bg-slate-50/80 border border-slate-100 flex flex-col justify-between hover:shadow-lg hover:border-violet-200 transition-all group">
-            <div>
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-violet-600 to-indigo-500 text-white flex items-center justify-center font-bold mb-3 shadow-md shadow-violet-200">
-                <Share2 size={18} />
-              </div>
-              <h4 className="font-bold text-slate-800 text-sm mb-1 group-hover:text-violet-700 transition-colors">2D Interactome Explorer</h4>
-              <p className="text-xs text-slate-500 mb-3 leading-relaxed">
-                Trace shortest paths, compute hub centralities, and isolate functional subnetworks.
-              </p>
-            </div>
-            <Link to="/network" className="text-xs font-bold text-violet-600 hover:text-violet-700 flex items-center gap-1 mt-2">
-              Explore 2D Graph <ArrowRight size={14} />
-            </Link>
-          </div>
-
-          {/* Engine 6: 3D Force Interactome */}
-          <div className="p-5 rounded-2xl bg-slate-50/80 border border-slate-100 flex flex-col justify-between hover:shadow-lg hover:border-purple-200 transition-all group">
-            <div>
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-pink-500 text-white flex items-center justify-center font-bold mb-3 shadow-md shadow-purple-200">
-                <Globe size={18} />
-              </div>
-              <h4 className="font-bold text-slate-800 text-sm mb-1 group-hover:text-purple-700 transition-colors">3D Force Topography</h4>
-              <p className="text-xs text-slate-500 mb-3 leading-relaxed">
-                Interactive spatial force layout showing high-density protein hubs and cellular clusters.
-              </p>
-            </div>
-            <Link to="/network-3d" className="text-xs font-bold text-purple-600 hover:text-purple-700 flex items-center gap-1 mt-2">
-              Launch 3D Graph <ArrowRight size={14} />
-            </Link>
-          </div>
-
-          {/* Engine 7: ChEMBL Drug Target Insights */}
-          <div className="p-5 rounded-2xl bg-slate-50/80 border border-slate-100 flex flex-col justify-between hover:shadow-lg hover:border-blue-200 transition-all group">
-            <div>
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-cyan-500 text-white flex items-center justify-center font-bold mb-3 shadow-md shadow-blue-200">
-                <Pill size={18} />
-              </div>
-              <h4 className="font-bold text-slate-800 text-sm mb-1 group-hover:text-blue-700 transition-colors">Drug Target Insights</h4>
-              <p className="text-xs text-slate-500 mb-3 leading-relaxed">
-                Therapeutic Target Priority Scores (TTPS) and approved drug leads from ChEMBL.
-              </p>
-            </div>
-            <Link to="/drug-targets" className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1 mt-2">
-              View Drug Targets <ArrowRight size={14} />
-            </Link>
-          </div>
-
-          {/* Engine 8: Empirical Benchmarks */}
-          <div className="p-5 rounded-2xl bg-slate-50/80 border border-slate-100 flex flex-col justify-between hover:shadow-lg hover:border-rose-200 transition-all group">
-            <div>
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-rose-500 to-amber-500 text-white flex items-center justify-center font-bold mb-3 shadow-md shadow-rose-200">
-                <BarChart3 size={18} />
-              </div>
-              <h4 className="font-bold text-slate-800 text-sm mb-1 group-hover:text-rose-700 transition-colors">Empirical Benchmarks</h4>
-              <p className="text-xs text-slate-500 mb-3 leading-relaxed">
-                2,000-sample bootstrap 95% CIs, cold-start novelty, and external SHS27k & HuRI validation.
-              </p>
-            </div>
-            <Link to="/benchmark" className="text-xs font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1 mt-2">
-              View Scientific Rigor <ArrowRight size={14} />
-            </Link>
-          </div>
-
-        </div>
-
-        {/* ── LIVE EXPERIMENT SANDBOX ── */}
-        <div className="pt-6 border-t border-slate-100">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-lg font-black text-slate-800 tracking-tight">Interactive Case Studies (1-Click Experiments)</h3>
+              <h3 className="text-xl font-black text-slate-800 tracking-tight">Interactive Case Studies (1-Click Experiments)</h3>
               <p className="text-xs text-slate-500">Launch curated biological experiments immediately without looking up IDs</p>
             </div>
-            <Link to="/predict" className="text-xs font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1">
+            <Link to="/predict" className="text-xs font-bold text-emerald-600 hover:text-emerald-700 flex items-center gap-1 shrink-0">
               Custom Prediction <ArrowRight size={14} />
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Staggered Floating Case Study Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
             {[
               {
                 title: "TP53 ↔ MDM2",
                 badge: "Oncology",
                 color: "bg-emerald-50 text-emerald-700 border-emerald-200",
-                desc: "Tumor suppressor cell-cycle checkpoint control and apoptosis regulator.",
-                p1: "ENSP00000269305", p2: "ENSP00000258149"
+                badgeGlow: "group-hover:bg-emerald-100 group-hover:border-emerald-300",
+                desc: "Tumor suppressor cell-cycle checkpoint control and apoptosis regulation.",
+                p1: "ENSP00000269305", p2: "ENSP00000258149",
+                offset: "lg:translate-y-0"
               },
               {
                 title: "AP2A2 ↔ CLTC",
                 badge: "Neurodegenerative",
                 color: "bg-indigo-50 text-indigo-700 border-indigo-200",
-                desc: "Clathrin-mediated vesicle endocytosis linked to Alzheimer's pathology.",
-                p1: "ENSP00000300161", p2: "ENSP00000267029"
+                badgeGlow: "group-hover:bg-indigo-100 group-hover:border-indigo-300",
+                desc: "Clathrin-mediated vesicle endocytosis linked to Alzheimer's pathway.",
+                p1: "ENSP00000300161", p2: "ENSP00000267029",
+                offset: "lg:translate-y-3"
               },
               {
                 title: "BAX ↔ BCL2L1",
                 badge: "Apoptosis",
                 color: "bg-purple-50 text-purple-700 border-purple-200",
+                badgeGlow: "group-hover:bg-purple-100 group-hover:border-purple-300",
                 desc: "Mitochondrial outer membrane permeabilization and cell survival balance.",
-                p1: "ENSP00000293879", p2: "ENSP00000307677"
+                p1: "ENSP00000293879", p2: "ENSP00000307677",
+                offset: "lg:-translate-y-2"
               },
               {
                 title: "Uncharacterized",
                 badge: "Cold-Start",
                 color: "bg-amber-50 text-amber-700 border-amber-200",
+                badgeGlow: "group-hover:bg-amber-100 group-hover:border-amber-300",
                 desc: "Zero-neighbor novelty evaluation testing sequence-driven inductive generalization.",
-                p1: "ENSP00000385802", p2: "ENSP00000361000"
+                p1: "ENSP00000385802", p2: "ENSP00000361000",
+                offset: "lg:translate-y-3"
               },
             ].map((cs, i) => (
-              <Link
+              <motion.div
                 key={i}
-                to={`/predict?p1=${cs.p1}&p2=${cs.p2}`}
-                className="p-4 rounded-2xl bg-slate-50/60 hover:bg-white border border-slate-200/80 hover:border-emerald-300 transition-all hover:shadow-md flex flex-col justify-between group"
+                whileHover={{ y: -6, transition: { duration: 0.2, ease: 'easeOut' } }}
+                className={`${cs.offset} transition-transform duration-300`}
               >
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-black text-xs text-slate-800 group-hover:text-emerald-700 transition-colors">{cs.title}</span>
-                    <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${cs.color}`}>{cs.badge}</span>
+                <Link
+                  to={`/predict?p1=${cs.p1}&p2=${cs.p2}`}
+                  className="p-5 rounded-2xl bg-white/90 backdrop-blur-md border border-slate-100 shadow-sm hover:shadow-xl hover:border-emerald-300 transition-all duration-300 flex flex-col justify-between group h-full"
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-2.5">
+                      <span className="font-black text-xs text-slate-800 group-hover:text-emerald-700 transition-colors">{cs.title}</span>
+                      <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full border ${cs.color} ${cs.badgeGlow} transition-colors`}>{cs.badge}</span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 leading-relaxed">{cs.desc}</p>
                   </div>
-                  <p className="text-[11px] text-slate-500 leading-snug">{cs.desc}</p>
-                </div>
-                <div className="mt-3 pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] font-bold text-emerald-600">
-                  <span>Run Experiment</span>
-                  <ArrowRight size={13} className="group-hover:translate-x-1 transition-transform" />
-                </div>
-              </Link>
+                  <div className="mt-4 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] font-bold text-emerald-600">
+                    <span>Run Experiment</span>
+                    <ArrowRight size={13} className="group-hover:translate-x-1.5 transition-transform" />
+                  </div>
+                </Link>
+              </motion.div>
             ))}
           </div>
         </div>

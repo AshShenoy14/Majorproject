@@ -22,16 +22,24 @@ class IDMapper:
     def ensp_to_uniprot(self, ensp_ids: list) -> dict:
         """
         Returns a dictionary {ensp_id: uniprot_id} for found mappings.
+        Handles both raw ENSP IDs and prefixed IDs (e.g. '9606.ENSP...').
         """
         if self.map_df.empty:
             return {}
             
-        # Filter where 'From' (ENSP) is in input list
-        # 'From' column likely contains ENSP IDs
-        subset = self.map_df[self.map_df['From'].isin(ensp_ids)]
+        id_clean_map = {orig: orig.split(".", 1)[-1] if "." in orig else orig for orig in ensp_ids}
+        clean_ids = list(set(id_clean_map.values()))
         
-        # Create dict
-        return dict(zip(subset['From'], subset['Entry']))
+        subset = self.map_df[self.map_df['From'].isin(clean_ids)]
+        found_map = dict(zip(subset['From'], subset['Entry']))
+        
+        result = {}
+        for orig, clean in id_clean_map.items():
+            if clean in found_map:
+                result[orig] = found_map[clean]
+            elif orig in found_map:
+                result[orig] = found_map[orig]
+        return result
 
     def uniprot_to_ensp(self, uniprot_ids: list) -> dict:
         """
