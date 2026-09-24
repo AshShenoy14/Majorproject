@@ -176,7 +176,7 @@ def get_model_predictions(df, seq_model, graph_model, ensemble_model, rf_model, 
     else:
         print(f"WARNING: {cal_path} not found - GraphSAGE probabilities are UNCALIBRATED.")
 
-    # Predict Random Forest Baseline (1941 features)
+    # Predict Random Forest Baseline (4 x ESM dim + 21 features)
     rf_preds = None
     if rf_model is not None:
         X_rf, _, _ = build_rf_features_for_df(

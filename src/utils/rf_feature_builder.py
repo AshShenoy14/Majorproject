@@ -4,6 +4,10 @@ import numpy as np
 from tqdm import tqdm
 from typing import Tuple, Dict, Any
 
+from src.utils.esm_config import ESM_EMBED_DIM
+
+RF_N_FEATURES = 4 * ESM_EMBED_DIM + 10 + 10 + 1  # 2581 for the 640-d ESM-2 150M
+
 def build_rf_features_for_df(
     df: pd.DataFrame,
     embeddings: Dict[str, torch.Tensor],
@@ -14,10 +18,10 @@ def build_rf_features_for_df(
     """
     Constructs deterministic pair features for Random Forest:
     [e1, e2, abs(e1 - e2), e1 * e2, b1, b2, BioScore]
-    Dimension: 480 + 480 + 480 + 480 + 10 + 10 + 1 = 1941 features.
+    Dimension: 4 * ESM_EMBED_DIM + 10 + 10 + 1 = RF_N_FEATURES (2581 for 640-d embeddings).
     
     Returns:
-        X: numpy array of shape (N, 1941)
+        X: numpy array of shape (N, RF_N_FEATURES)
         y: numpy array of shape (N,)
         valid_df: filtered dataframe with valid samples
     """
@@ -38,16 +42,16 @@ def build_rf_features_for_df(
         p1, p2 = row["protein1"], row["protein2"]
         label = row["label"]
         
-        # 1 & 2. ESM embeddings (480-dim each)
+        # 1 & 2. ESM embeddings (ESM_EMBED_DIM each)
         e1_t = embeddings[p1].float()
         e2_t = embeddings[p2].float()
         e1 = e1_t.mean(dim=0).cpu().numpy() if e1_t.dim() > 1 else e1_t.cpu().numpy()
         e2 = e2_t.mean(dim=0).cpu().numpy() if e2_t.dim() > 1 else e2_t.cpu().numpy()
         
-        # 3. Absolute difference |e1 - e2| (480-dim)
+        # 3. Absolute difference |e1 - e2| (ESM_EMBED_DIM)
         diff = np.abs(e1 - e2)
         
-        # 4. Element-wise product e1 * e2 (480-dim)
+        # 4. Element-wise product e1 * e2 (ESM_EMBED_DIM)
         prod = e1 * e2
         
         # 5 & 6. Bio localization multi-hot encodings (10-dim each)
@@ -68,7 +72,7 @@ def build_rf_features_for_df(
     X = np.array(X_list, dtype=np.float32)
     y = np.array(y_list, dtype=np.int64)
     
-    assert X.shape[1] == 1941, f"Expected 1941 features, but constructed {X.shape[1]}"
+    assert X.shape[1] == RF_N_FEATURES, f"Expected {RF_N_FEATURES} features, but constructed {X.shape[1]}"
     assert not np.isnan(X).any(), "NaN values found in feature matrix X!"
     assert not np.isinf(X).any(), "Inf values found in feature matrix X!"
     

@@ -14,6 +14,7 @@ import numpy as np
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
 from src.utils.paths import PROCESSED_DATA_DIR, STRING_SEQUENCES_FILE
+from src.utils.esm_config import ESM_MODEL_NAME, ESM_EMBED_DIM
 
 
 def configure_runtime(force_cpu: bool = False, cpu_threads: int = None) -> str:
@@ -38,7 +39,7 @@ def configure_runtime(force_cpu: bool = False, cpu_threads: int = None) -> str:
 
 _quantized_model_cache = {}
 
-def get_quantized_esm_embedding(sequence: str, model_name: str = "facebook/esm2_t12_35M_UR50D") -> torch.Tensor:
+def get_quantized_esm_embedding(sequence: str, model_name: str = ESM_MODEL_NAME) -> torch.Tensor:
     """
     Retrieves the mean-pooled ESM embedding for a single sequence using dynamic INT8 quantization on CPU.
     """
@@ -68,7 +69,7 @@ def get_quantized_esm_embedding(sequence: str, model_name: str = "facebook/esm2_
 
 
 class ESMFeatureExtractor:
-    def __init__(self, model_name: str = "facebook/esm2_t12_35M_UR50D", device: str = "cpu", quantize: bool = False):
+    def __init__(self, model_name: str = ESM_MODEL_NAME, device: str = "cpu", quantize: bool = False):
         self.device = device
         self.quantize = quantize
         print(f"Loading ESM-2 model: {model_name} on {device} (quantize={quantize})...")
@@ -100,7 +101,14 @@ class ESMFeatureExtractor:
         if save_path and os.path.exists(save_path):
             try:
                 embeddings = torch.load(save_path)
-                print(f"Found existing embeddings. Resuming from {len(embeddings)} proteins.")
+                dim = self.model.config.hidden_size if hasattr(self.model, "config") else ESM_EMBED_DIM
+                stale = [pid for pid, e in embeddings.items() if e.shape[-1] != dim]
+                if stale:
+                    # e.g. a 480-d embeddings.pt left over from esm2_t12_35M: never mix embedding models
+                    print(f"Existing embeddings have dim {embeddings[stale[0]].shape[-1]}, expected {dim}. Starting fresh.")
+                    embeddings = {}
+                else:
+                    print(f"Found existing embeddings. Resuming from {len(embeddings)} proteins.")
             except Exception as e:
                 print(f"Error loading existing embeddings: {e}. Starting fresh.")
                 embeddings = {}
@@ -128,7 +136,10 @@ class ESMFeatureExtractor:
             try:
                 with torch.no_grad():
                     outputs = self.model(**inputs)
-                    batch_embeddings = outputs.last_hidden_state.mean(dim=1)
+                    # Masked mean: padding tokens must not enter the average, so a protein's embedding does not
+                    # depend on its batch-mates and matches single-sequence inference in the backend.
+                    mask = inputs["attention_mask"].unsqueeze(-1).to(outputs.last_hidden_state.dtype)
+                    batch_embeddings = (outputs.last_hidden_state * mask).sum(dim=1) / mask.sum(dim=1)
                     
                 for pid, emb in zip(batch_ids, batch_embeddings):
                     embeddings[pid] = emb.cpu().half()
@@ -188,7 +199,7 @@ if __name__ == "__main__":
                         help="Maximum PyTorch CPU threads (default: half logical cores)")
     parser.add_argument("--cpu-friendly", action="store_true",
                         help="Enable low-heat CPU preset")
-    parser.add_argument("--model-name", type=str, default="facebook/esm2_t12_35M_UR50D",
+    parser.add_argument("--model-name", type=str, default=ESM_MODEL_NAME,
                         help="Hugging Face ESM model name")
     args = parser.parse_args()
 

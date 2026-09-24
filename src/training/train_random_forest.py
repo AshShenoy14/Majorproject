@@ -150,7 +150,7 @@ def train_random_forest(
     
     print("\n[SUMMARY & LEAKAGE ASSERTION]")
     print(f"  1. Model fit: ONLY on train.csv ({len(X_train)} samples)")
-    print(f"  2. Feature vector: 1941 deterministic biophysical & biological features")
+    print(f"  2. Feature vector: 4 x ESM dim + 21 deterministic biophysical & biological features")
     print(f"  3. Threshold selected: {val_thresh:.4f} strictly on val.csv")
     print(f"  4. test.csv status: UNTOUCHED during this training run")
     print("=" * 70)

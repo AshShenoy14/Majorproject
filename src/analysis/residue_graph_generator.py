@@ -3,8 +3,10 @@ import numpy as np
 from typing import Dict, List, Any
 from transformers import AutoTokenizer, AutoModel
 
+from src.utils.esm_config import ESM_MODEL_NAME
+
 class ResidueGraphGenerator:
-    def __init__(self, model_name: str = "facebook/esm2_t12_35M_UR50D", device: str = "cpu"):
+    def __init__(self, model_name: str = ESM_MODEL_NAME, device: str = "cpu"):
         self.device = device
         print(f"Loading ESM-2 model: {model_name} on {device}...")
         try:

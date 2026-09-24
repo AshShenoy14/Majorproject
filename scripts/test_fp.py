@@ -9,6 +9,7 @@ from src.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT
 from src.data.sequence_manager import SequenceManager
 from src.analysis.biological_managers import BiologicalManager
 from src.models.sequence_model import SequencePPIModel
+from src.utils.esm_config import ESM_EMBED_DIM
 from src.models.graph_model import GINLinkPredictor, SAGELinkPredictor
 from src.models.ensemble_model import PPIEnsemble
 from src.data.feature_extraction import ESMFeatureExtractor
@@ -32,7 +33,7 @@ def main():
     e1 = embs[p1].unsqueeze(0).to(device).float()
     e2 = embs[p2].unsqueeze(0).to(device).float()
 
-    seq_model = SequencePPIModel(input_dim=480).to(device)
+    seq_model = SequencePPIModel(input_dim=ESM_EMBED_DIM).to(device)
     seq_path = PROJECT_ROOT / "models" / "sequence_model_best.pth"
     seq_model.load_state_dict(torch.load(seq_path, map_location=device))
     seq_model.eval()

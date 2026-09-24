@@ -5,6 +5,7 @@ from src.utils.calibration import PlattScaler, ece_score, calibration_report, cr
 from src.utils.topo_features import node_topology_columns
 from src.training.base_trainers import build_embedding_table, fit_sequence, SEQ_CFG
 from src.models.sequence_model import SequencePPIModel
+from src.utils.esm_config import ESM_EMBED_DIM
 
 
 def test_platt_scaling_reduces_ece_on_overconfident_scores():
@@ -39,7 +40,7 @@ def test_fold_topology_uses_only_fold_edges():
 
 def test_fit_sequence_early_stops_and_resumes(tmp_path):
     torch.manual_seed(0)
-    emb = {f"p{i}": torch.randn(480) for i in range(40)}
+    emb = {f"p{i}": torch.randn(ESM_EMBED_DIM) for i in range(40)}
     names = sorted(emb)
     table, row = build_embedding_table(emb, names, torch.device("cpu"))
     rng = np.random.RandomState(0)
@@ -47,7 +48,7 @@ def test_fit_sequence_early_stops_and_resumes(tmp_path):
     y = rng.randint(0, 2, 300)                              # pure noise -> validation loss cannot keep improving
     cfg = dict(SEQ_CFG, max_epochs=30, patience=2, batch_size=64)
     ck = str(tmp_path / "ck.pt")
-    m = SequencePPIModel(input_dim=480)
+    m = SequencePPIModel(input_dim=ESM_EMBED_DIM)
     fit_sequence(m, table, a[:240], b[:240], y[:240], a[240:], b[240:], y[240:], torch.device("cpu"),
                  cfg=cfg, ckpt_path=ck, ckpt_every=1, tag="t")
     assert (tmp_path / "ck.pt").exists()

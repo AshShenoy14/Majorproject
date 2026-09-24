@@ -2,13 +2,16 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from src.utils.esm_config import ESM_EMBED_DIM
+
 class SequencePPIModel(nn.Module):
-    def __init__(self, input_dim=480, hidden_dim=1024, dropout=0.3):
+    def __init__(self, input_dim=ESM_EMBED_DIM, hidden_dim=1024, dropout=0.3):
         """
         Ultra-High Capacity Symmetric MLP for Sequence-Based PPI Prediction.
         Designed to reach 92%+ base accuracy.
         """
         super().__init__()
+        self.input_dim = input_dim
         self.feature_dim = input_dim * 4
         
         # Input layer
@@ -50,9 +53,9 @@ class SequencePPIModel(nn.Module):
         )
 
     def forward(self, emb1, emb2):
-        # ESM-2 embeddings (480 dims)
-        emb1 = emb1[:, :480]
-        emb2 = emb2[:, :480]
+        # ESM-2 embeddings (input_dim dims; any appended extra columns are dropped)
+        emb1 = emb1[:, :self.input_dim]
+        emb2 = emb2[:, :self.input_dim]
 
         # Symmetric operators for orientation-invariance
         f_sum = emb1 + emb2

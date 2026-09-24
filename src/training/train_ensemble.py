@@ -166,6 +166,8 @@ def generate_oof_predictions(
     num_nodes = base_x.shape[0]
     in_channels = base_x.shape[1]
     input_dim = table.shape[1]
+    # the cache key must change with the embedding model too, or folds computed on old embeddings would be reused
+    fp = f"{fp}-esm{input_dim}-x{in_channels}"
 
     skf = StratifiedKFold(n_splits=k_folds, shuffle=True, random_state=seed)
     fold_times = []

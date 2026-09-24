@@ -12,6 +12,7 @@ import pandas as pd
 
 from src.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT
 from src.models.sequence_model import SequencePPIModel
+from src.utils.esm_config import ESM_EMBED_DIM
 from src.models.ensemble_model import PPIEnsemble
 from src.data.feature_extraction import ESMFeatureExtractor
 from src.data.sequence_manager import SequenceManager
@@ -75,7 +76,7 @@ async def load_system():
         if not seq_path.exists():
             raise RuntimeError(f"CRITICAL SAFETY ERROR: Sequence model checkpoint missing at {seq_path}. Fallback to random weights is strictly prohibited.")
         try:
-            models["seq_model"] = SequencePPIModel(input_dim=480).to(device)
+            models["seq_model"] = SequencePPIModel(input_dim=ESM_EMBED_DIM).to(device)
             models["seq_model"].load_state_dict(torch.load(seq_path, map_location=device))
             models["seq_model"].eval()
             print("Sequence Model loaded successfully from checkpoint.")

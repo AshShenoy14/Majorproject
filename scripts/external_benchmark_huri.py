@@ -167,6 +167,10 @@ def main():
 
     novel_seqs = {gene_to_id[g]: seq_cache[g] for g in genes if seq_cache[g] not in rev}
     emb_cache = torch.load(EMB_CACHE_PATH, weights_only=False) if EMB_CACHE_PATH.exists() else {}
+    esm_dim = next(iter(emb.values())).shape[-1]
+    if any(v.shape[-1] != esm_dim for v in emb_cache.values()):
+        print(f"Novel-embedding cache was built with a different ESM model (dim != {esm_dim}); rebuilding it.")
+        emb_cache = {}
     still_missing = {k_: v for k_, v in novel_seqs.items() if k_ not in emb_cache}
     if still_missing:
         print(f"Extracting ESM-2 embeddings for {len(still_missing)} novel sequences on {dev}...")

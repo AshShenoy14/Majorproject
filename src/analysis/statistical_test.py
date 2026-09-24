@@ -14,6 +14,7 @@ from tabulate import tabulate
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
 from src.models.sequence_model import SequencePPIModel
+from src.utils.esm_config import ESM_EMBED_DIM
 from src.models.graph_model import SAGELinkPredictor
 from src.utils.paths import PROCESSED_DATA_DIR, PROJECT_ROOT
 
@@ -81,7 +82,7 @@ def run_p_test(n_iterations=10):
     seq_path = PROJECT_ROOT / "models" / "sequence_model_best.pth"
     graph_model_path = PROJECT_ROOT / "models" / "graph_model_best.pth"
 
-    seq_model = SequencePPIModel(input_dim=480).to(device)
+    seq_model = SequencePPIModel(input_dim=ESM_EMBED_DIM).to(device)
     if seq_path.exists():
         seq_model.load_state_dict(torch.load(seq_path, map_location=device))
     seq_model.eval()

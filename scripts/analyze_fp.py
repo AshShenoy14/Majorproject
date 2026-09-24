@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 from src.utils.paths import PROCESSED_DATA_DIR, MODELS_DIR
 from src.models.sequence_model import SequencePPIModel
+from src.utils.esm_config import ESM_EMBED_DIM
 from src.models.graph_model import GINLinkPredictor, SAGELinkPredictor
 from src.models.ensemble_model import PPIEnsemble
 from src.data.feature_extraction import ESMFeatureExtractor
@@ -36,7 +37,7 @@ def analyze_case(p1, p2):
     b1 = bio_enc.encode_protein(loc1).unsqueeze(0).to(device)
     b2 = bio_enc.encode_protein(loc2).unsqueeze(0).to(device)
     
-    seq_model = SequencePPIModel(input_dim=480).to(device)
+    seq_model = SequencePPIModel(input_dim=ESM_EMBED_DIM).to(device)
     seq_model.load_state_dict(torch.load(MODELS_DIR / "sequence_model_best.pth", map_location=device))
     seq_model.eval()
     

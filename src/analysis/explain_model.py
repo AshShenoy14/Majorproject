@@ -11,6 +11,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'
 
 from src.models.graph_model import SAGELinkPredictor, GINLinkPredictor
 from src.utils.paths import PROCESSED_DATA_DIR, MODELS_DIR
+from src.utils.esm_config import ESM_EMBED_DIM
 
 def get_topological_neighbors(protein1_id: str, protein2_id: str, data=None, node_mapping=None, top_k: int = 5):
     """
@@ -46,9 +47,9 @@ def get_topological_neighbors(protein1_id: str, protein2_id: str, data=None, nod
     inv_mapping = {v: k for k, v in node_mapping.items()}
     results = {
         "top_features": [
-            {"index": 480, "name": "Degree Centrality", "importance": 0.35},
-            {"index": 482, "name": "PageRank Centrality", "importance": 0.28},
-            {"index": 481, "name": "Clustering Coefficient", "importance": 0.22}
+            {"index": ESM_EMBED_DIM, "name": "Degree Centrality", "importance": 0.35},
+            {"index": ESM_EMBED_DIM + 2, "name": "PageRank Centrality", "importance": 0.28},
+            {"index": ESM_EMBED_DIM + 1, "name": "Clustering Coefficient", "importance": 0.22}
         ],
         "top_neighbors": []
     }
@@ -157,9 +158,9 @@ def explain_prediction(protein1_id: str, protein2_id: str, model=None, data=None
     
     # Feature Importance with descriptive names
     feature_labels = {
-        480: "Degree Centrality",
-        481: "Clustering Coefficient",
-        482: "PageRank Centrality"
+        ESM_EMBED_DIM: "Degree Centrality",
+        ESM_EMBED_DIM + 1: "Clustering Coefficient",
+        ESM_EMBED_DIM + 2: "PageRank Centrality"
     }
     if 'node_mask' in explanation:
         node_feat_importance = explanation.node_mask.mean(dim=0).cpu().numpy()
