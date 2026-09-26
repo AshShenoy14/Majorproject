@@ -24,7 +24,7 @@ Protein–Protein Interactions govern fundamental cellular processes. TransGraph
 
 | Component | Architecture / Method | Role |
 | :--- | :--- | :--- |
-| **Sequence Model** | ESM-2 (`esm2_t12_35M_UR50D`, 35M parameters, 480 dims) + MLP | Deep protein sequence feature extraction & binary interaction scoring |
+| **Sequence Model** | ESM-2 (`esm2_t30_150M_UR50D`, 150M parameters, 640 dims) + MLP | Deep protein sequence feature extraction & binary interaction scoring |
 | **Graph Model** | GraphSAGE (`SAGEConv`) over the training PPI graph | Neighborhood aggregation for link prediction. It has no attention mechanism; the original proposal specified a GAT, but the implemented and evaluated model is GraphSAGE |
 | **Biological Context** | UniProt subcellular localization (cache-only score) | One of the 8 ensemble input features; the trained XGBoost model never splits on it, so it has no measurable effect on the reported metrics |
 | **Ensemble Meta-Learner** | XGBoost (OOF Stacking) | Stacks the two base-model probabilities plus derived confidence/disagreement features (7 meta-features: `p_seq`, `p_graph`, `conf_seq`, `conf_graph`, `diff`, `max_conf`, `consensus`; `p_graph` is the Platt-calibrated GraphSAGE probability) |
@@ -66,16 +66,16 @@ All 20,172 test rows were evaluated (none filtered).
 
 | Model | Val-selected threshold | Accuracy | Precision | Recall | F1 | ROC-AUC | PR-AUC |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Random Forest baseline** | 0.4700 | 0.8234 | 0.8114 | 0.8428 | 0.8268 | 0.9065 | 0.9124 |
-| **ESM-MLP (sequence only)** | 0.4900 | 0.8711 | 0.8600 | 0.8865 | 0.8730 | 0.9438 | 0.9474 |
-| **GraphSAGE (graph only, calibrated)** | 0.5900 | 0.9042 | 0.9201 | 0.8852 | 0.9023 | 0.9487 | 0.9616 |
-| **XGBoost Ensemble (OOF stacking)** | **0.5000** | **0.9213** | **0.9359** | **0.9046** | **0.9200** | **0.9708** | **0.9759** |
+| **Random Forest baseline** | 0.4800 | 0.8374 | 0.8380 | 0.8365 | 0.8373 | 0.9163 | 0.9222 |
+| **ESM-MLP (sequence only)** | 0.4500 | 0.8842 | 0.8667 | 0.9082 | 0.8870 | 0.9530 | 0.9569 |
+| **GraphSAGE (graph only, calibrated)** | 0.6100 | 0.9162 | 0.9355 | 0.8940 | 0.9143 | 0.9562 | 0.9681 |
+| **XGBoost Ensemble (OOF stacking)** | **0.4500** | **0.9310** | **0.9448** | **0.9155** | **0.9300** | **0.9753** | **0.9801** |
 
 > **Status: Verified Clean Benchmark.** Evaluated end-to-end on clean, contamination-free negatives (0 STRING pairs at any score) and strictly disjoint 5-fold OOF training graphs with zero edge leakage. All predictions use the 7-feature meta-learner with Platt-calibrated GraphSAGE probabilities.
 
 Notes:
 - 5-fold pair-level stratified OOF predictions are used to train the XGBoost meta-learner (`src/training/train_ensemble.py`).
-- The ensemble achieves the highest accuracy (**92.13%**), precision (**93.59%**), recall (**90.46%**), F1 (**0.9200**), ROC-AUC (**0.9708**) and PR-AUC (**0.9759**) among all evaluated configurations on this held-out test split.
+- The ensemble achieves the highest accuracy (**93.10%**), precision (**94.48%**), recall (**91.55%**), F1 (**0.9300**), ROC-AUC (**0.9753**) and PR-AUC (**0.9801**) among all evaluated configurations on this held-out test split.
 - The evaluation is **transductive pair prediction** (see below).
 
 ---
@@ -90,7 +90,7 @@ Notes:
 
 - **Unique human proteins**: 12,323.
 - **Split**: stratified 80/10/10 at the *pair* level (`random_state=42`, `src/data/preprocess_data.py`). The splits are **pair-disjoint but not node-disjoint**: every protein in the test set also occurs in the training set. Pair overlap between splits is zero (`scripts/verify_splits.py`).
-- **Graph**: built from the 80,685 positive training pairs only; no validation or test positive appears among its edges. Node features are the 480-d ESM-2 embedding plus degree centrality, clustering coefficient and PageRank.
+- **Graph**: built from the 80,685 positive training pairs only; no validation or test positive appears among its edges. Node features are the 640-d ESM-2 embedding plus degree centrality, clustering coefficient and PageRank (643 dimensions total).
 - **Positives**: STRING v12 human interactions filtered by `combined_score` (script default `--min_score 900`).
 - **Negatives**: a mix of random pairs (subject to a UniProt co-localization constraint) and common-neighbor "hard" negatives (`--hard_ratio`, default 0.5). A candidate is rejected if it appears in STRING at **any** confidence (score > 0), and `preprocess_data.py` raises if any final negative is a STRING pair. `--seed` (default 42) makes the split reproducible.
 - **Thresholds**: chosen on the validation set only.
@@ -99,7 +99,7 @@ Notes:
 
 ## ⚙️ Model Notes
 
-- Sequence embeddings use ESM-2 `esm2_t12_35M_UR50D` (35M parameters, 480 dimensions); larger ESM-2 variants are untested.
+- Sequence embeddings use ESM-2 `esm2_t30_150M_UR50D` (150M parameters, 640 dimensions).
 - `config.yaml` holds device and training defaults. No latency or hardware benchmarks are reported here.
 
 ---

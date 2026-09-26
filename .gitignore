@@ -41,4 +41,23 @@ scratch*.py
 *.gz
 CLAUDE.md
 .claudesignore
-*.log
+*.log
+esm150m_results/*
+
+# LaTeX build artifacts
+*.tex
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.out
+*.synctex.gz
+*.toc
+
+# PDF files
+*.pdf
+assets/
+.claude
+.pytest_cache
+.vscode

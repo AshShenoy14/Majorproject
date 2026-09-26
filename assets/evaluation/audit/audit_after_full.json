@@ -43,35 +43,35 @@
   "model_metrics": {
     "calibration_val": {
       "sequence": {
-        "ECE": 0.1018,
-        "Brier": 0.1026
+        "ECE": 0.1144,
+        "Brier": 0.0979
       },
       "graph_calibrated": {
-        "ECE": 0.0502,
-        "Brier": 0.0745
+        "ECE": 0.051,
+        "Brier": 0.0662
       },
       "ensemble": {
-        "ECE": 0.0099,
-        "Brier": 0.0567
+        "ECE": 0.0055,
+        "Brier": 0.0497
       }
     },
     "meta_feature_mean_abs_shap": {
-      "p_seq": 0.5692,
-      "p_graph": 0.72759,
-      "conf_seq": 0.05602,
-      "conf_graph": 0.13853,
-      "diff": 0.09161,
-      "max_conf": 0.22571,
-      "consensus": 2.07402
+      "p_seq": 0.66407,
+      "p_graph": 0.85386,
+      "conf_seq": 0.07119,
+      "conf_graph": 0.16743,
+      "diff": 0.09252,
+      "max_conf": 0.15657,
+      "consensus": 1.97574
     },
     "meta_feature_xgb_gain": {
-      "p_seq": 0.0768,
-      "p_graph": 0.23075,
-      "conf_seq": 0.0089,
-      "conf_graph": 0.01147,
-      "diff": 0.02035,
-      "max_conf": 0.02943,
-      "consensus": 0.6223
+      "p_seq": 0.07849,
+      "p_graph": 0.25179,
+      "conf_seq": 0.00812,
+      "conf_graph": 0.01057,
+      "diff": 0.02086,
+      "max_conf": 0.0188,
+      "consensus": 0.61136
     }
   }
 }

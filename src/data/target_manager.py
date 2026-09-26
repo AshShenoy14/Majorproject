@@ -31,6 +31,17 @@ class TargetManager:
     def _save_cache(self):
         self.targets_df.to_csv(self.cache_path, index=False)
 
+    def get_targets_cached_only(self, protein_ids: List[str]) -> pd.DataFrame:
+        """
+        Cache-only lookup: returns whatever ChEMBL target rows are already cached
+        for these proteins, without ever calling the remote ChEMBL API. Use this
+        for request-time scoring (e.g. therapeutic priority ranking) where a live
+        API round-trip per uncached protein would make the endpoint unusably slow
+        or dependent on ChEMBL's uptime; use get_targets() for offline/background
+        cache-population instead.
+        """
+        return self.targets_df[self.targets_df["protein_id"].isin(protein_ids)]
+
     def get_targets(self, protein_ids: List[str]) -> pd.DataFrame:
         """
         Get drug targets for a list of Proteins (ENSP IDs).

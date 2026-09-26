@@ -29,6 +29,9 @@ def test_calculate_therapeutic_priority_score():
                     })
             return pd.DataFrame(data)
 
+        def get_targets_cached_only(self, protein_ids):
+            return self.get_targets(protein_ids)
+
     analyzer.target_manager = DummyTargetManager()
 
     df = analyzer.calculate_therapeutic_priority_score(

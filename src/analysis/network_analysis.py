@@ -169,7 +169,7 @@ class NetworkAnalyzer:
         if tm is not None:
             try:
                 proteins_to_query = df['protein_id'].tolist()
-                drug_targets_df = tm.get_targets(proteins_to_query)
+                drug_targets_df = tm.get_targets_cached_only(proteins_to_query)
                 if not drug_targets_df.empty:
                     # Create lookup map
                     target_map = {}

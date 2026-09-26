@@ -22,7 +22,7 @@ def test_endpoint_all_benchmarks(client):
     assert data["bootstrap_ci"]["accuracy"]["mean"] == pytest.approx(0.9213, abs=1e-3)
     assert data["cold_start"]["cold_start_novel_protein_via_knn"]["accuracy"] == pytest.approx(0.833, abs=1e-2)
     assert data["shs27k"]["overall"]["accuracy"] == pytest.approx(0.698, abs=1e-2)
-    assert data["huri"]["overall"]["roc_auc"] == pytest.approx(0.573, abs=1e-2)
+    assert data["huri"]["overall"]["roc_auc"] == pytest.approx(0.585, abs=1e-2)
 
 def test_endpoint_network_subgraph(client):
     res = client.get("/network?limit=5")

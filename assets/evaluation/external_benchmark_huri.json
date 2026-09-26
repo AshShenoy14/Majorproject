@@ -1,53 +1,53 @@
 {
   "description": "HuRI / HI-union (Luck et al. 2020, yeast-two-hybrid) -- a genuinely independent-source benchmark (not derived from STRING). Subsampled and scored with the existing checkpoints via the exact production inference path; no retraining. See this script's module docstring for full caveats.",
   "n_pairs_sampled_from_full_huri": 700,
-  "n_total_pairs_scored": 1394,
-  "n_unique_genes": 1028,
-  "n_proteins_byte_identical_to_training": 381,
-  "n_proteins_novel": 647,
+  "n_total_pairs_scored": 684,
+  "n_unique_genes": 728,
+  "n_proteins_byte_identical_to_training": 263,
+  "n_proteins_novel": 465,
   "overall": {
-    "n": 1394,
-    "accuracy": 0.5229555236728838,
-    "roc_auc": 0.5725737892875595,
-    "f1": 0.14414414414414414,
+    "n": 684,
+    "accuracy": 0.5190058479532164,
+    "roc_auc": 0.5848679935706713,
+    "f1": 0.11796246648793565,
     "positive_rate": 0.5,
-    "predicted_positive_rate": 0.05738880918220947,
-    "mean_predicted_prob": 0.13590401411056519,
+    "predicted_positive_rate": 0.04532163742690058,
+    "mean_predicted_prob": 0.10777489840984344,
     "confusion_matrix": {
-      "tn": 673,
-      "fp": 24,
-      "fn": 641,
-      "tp": 56
+      "tn": 333,
+      "fp": 9,
+      "fn": 320,
+      "tp": 22
     }
   },
   "both_proteins_seen_in_training_subset": {
-    "n": 166,
-    "accuracy": 0.6204819277108434,
-    "roc_auc": 0.6358079245838857,
-    "f1": 0.3368421052631579,
-    "positive_rate": 0.4397590361445783,
-    "predicted_positive_rate": 0.13253012048192772,
-    "mean_predicted_prob": 0.20672032237052917,
+    "n": 70,
+    "accuracy": 0.6142857142857143,
+    "roc_auc": 0.4909539473684211,
+    "f1": 0.3076923076923077,
+    "positive_rate": 0.45714285714285713,
+    "predicted_positive_rate": 0.1,
+    "mean_predicted_prob": 0.1669478565454483,
     "confusion_matrix": {
-      "tn": 87,
-      "fp": 6,
-      "fn": 57,
-      "tp": 16
+      "tn": 37,
+      "fp": 1,
+      "fn": 26,
+      "tp": 6
     }
   },
   "at_least_one_novel_protein_subset": {
-    "n": 1228,
-    "accuracy": 0.509771986970684,
-    "roc_auc": 0.5665024303786721,
-    "f1": 0.11730205278592376,
-    "positive_rate": 0.50814332247557,
-    "predicted_positive_rate": 0.04723127035830619,
-    "mean_predicted_prob": 0.1263311207294464,
+    "n": 614,
+    "accuracy": 0.50814332247557,
+    "roc_auc": 0.5970553904923599,
+    "f1": 0.09580838323353294,
+    "positive_rate": 0.504885993485342,
+    "predicted_positive_rate": 0.03908794788273615,
+    "mean_predicted_prob": 0.10102880001068115,
     "confusion_matrix": {
-      "tn": 586,
-      "fp": 18,
-      "fn": 584,
-      "tp": 40
+      "tn": 296,
+      "fp": 8,
+      "fn": 294,
+      "tp": 16
     }
   }
 }

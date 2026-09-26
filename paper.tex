@@ -16,6 +16,19 @@
 \usepackage{xcolor}
 \usepackage{booktabs}   % cleaner table rules
 \usepackage{array}
+\usepackage{tikz}
+\usepackage{subcaption}
+\usetikzlibrary{positioning,arrows.meta,calc}
+
+% Define color palette for architecture diagram
+\definecolor{clrinput}{RGB}{51, 65, 85}       % Slate
+\definecolor{clresm}{RGB}{29, 78, 216}        % Royal Blue
+\definecolor{clrseq}{RGB}{2, 132, 199}        % Cyan/Sky
+\definecolor{clrgraph}{RGB}{13, 148, 136}     % Deep Teal
+\definecolor{clrmeta}{RGB}{124, 58, 237}      % Violet
+\definecolor{clrxgb}{RGB}{217, 119, 6}        % Amber
+\definecolor{clrout}{RGB}{16, 185, 129}       % Emerald
+\definecolor{clrshap}{RGB}{225, 29, 72}       % Rose
 
 \def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
     T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
@@ -105,8 +118,8 @@ sequence model and a graph neural network learn complementary information from
 protein sequences and network structure, and their outputs are combined using
 an ensemble model. SHAP-based explainability is used to identify the
 contribution of different meta-features to each prediction. On the
-evaluated dataset, the proposed framework achieved a ROC-AUC of 0.9708, an
-accuracy of 92.13\%, and an F1-score of 0.9200. The evaluation used a
+evaluated dataset, the proposed framework achieved a ROC-AUC of 0.9753, an
+accuracy of 93.10\%, and an F1-score of 0.9300. The evaluation used a
 pair-disjoint split, with no overlapping protein pairs between the training,
 validation, and test sets. The developed system provides an integrated
 approach for predicting PPIs, explaining model predictions, and supporting
@@ -265,10 +278,86 @@ interaction network. The system consists of three main components:
 information; (2)~a graph branch, which predicts interactions using the protein
 interaction network; and (3)~an ensemble branch, which combines the
 predictions using XGBoost. SHAP is then used to explain the final predictions.
+Fig.~\ref{fig:arch} shows the overall architecture.
+
+\begin{figure*}[!t]
+\centering
+\resizebox{0.96\textwidth}{!}{%
+\begin{tikzpicture}[
+  >=Stealth,
+  card/.style={draw=#1, fill=#1!7, rounded corners=5pt, align=center,
+              inner sep=6pt, font=\sffamily\footnotesize, line width=0.85pt},
+  card/.default=clrinput,
+  arr/.style={->, line width=0.9pt, draw=gray!70!black},
+  lbl/.style={font=\sffamily\bfseries\small}
+]
+  % 1. Inputs
+  \node[card=clrinput, minimum width=2.4cm] (pA) {\textbf{Protein $A$}\\Raw Sequence};
+  \node[card=clrinput, minimum width=2.4cm, below=16mm of pA] (pB) {\textbf{Protein $B$}\\Raw Sequence};
+
+  % 2. ESM-2 Encoders
+  \node[card=clresm, right=10mm of pA, minimum width=2.8cm] (esmA) {\textbf{ESM-2 Encoder}\\\small($e_A \in \mathbb{R}^{640}$)\\\scriptsize 150M Parameters};
+  \node[card=clresm, right=10mm of pB, minimum width=2.8cm] (esmB) {\textbf{ESM-2 Encoder}\\\small($e_B \in \mathbb{R}^{640}$)\\\scriptsize 150M Parameters};
+
+  % 3. Pairwise Formulation
+  \coordinate (midESM) at ($(esmA.east)!0.5!(esmB.east)$);
+  \node[card=clrmeta, right=12mm of midESM, anchor=west, minimum width=2.6cm] (pair) {\textbf{Pair Formulation}\\\small $(e_A, e_B)$\\\scriptsize Pairwise Embeddings};
+
+  % 4. Dual Branches
+  \coordinate (midPair) at (pair.east);
+  \node[card=clrseq, right=16mm of midPair, yshift=20mm, anchor=west, minimum width=3.4cm] (seq) {\textbf{Sequence Branch}\\\footnotesize Symmetric Ops (2560-d)\\+ Residual MLP};
+  \node[card=clrgraph, right=16mm of midPair, yshift=-20mm, anchor=west, minimum width=3.4cm] (graph) {\textbf{Graph Branch}\\\footnotesize GraphSAGE (2-layer)\\on STRING PPI Graph};
+
+  % Graph info input
+  \node[card=clrgraph, below=7mm of graph, minimum width=3.4cm, fill=clrgraph!4, font=\sffamily\scriptsize] (topo) {\textbf{STRING PPI Topology}\\ESM-2 (640-d) + Degree,\\Clustering, PageRank (643-d)};
+
+  % 5. Meta-features
+  \coordinate (midBranch) at ($(seq.east)!0.5!(graph.east)$);
+  \node[card=clrmeta, right=22mm of midBranch, anchor=west, minimum width=3.8cm] (meta) {\textbf{Meta-Feature Vector} (7-d)\\[3pt]\footnotesize $[p_{\mathrm{seq}}, p_{\mathrm{graph}}, \mathrm{conf}_{\mathrm{seq}}, \mathrm{conf}_{\mathrm{graph}}$,\\[1.5pt]\footnotesize $\mathrm{diff}, \mathrm{max}_{\mathrm{conf}}, \mathrm{consensus}]$};
+
+  % 6. XGBoost Meta-Learner
+  \node[card=clrxgb, right=12mm of meta, anchor=west, minimum width=2.5cm] (xgb) {\textbf{XGBoost}\\Meta-Learner\\\scriptsize 5-Fold Stratified OOF};
+
+  % 7. Final output
+  \node[card=clrout, right=12mm of xgb, anchor=west, minimum width=2.0cm, fill=clrout!14, line width=1.1pt] (out) {\textbf{Prediction}\\[3pt]\large $\boldsymbol{p_{\mathrm{final}}}$};
+
+  % 8. SHAP
+  \node[card=clrshap, below=12mm of xgb, minimum width=2.5cm] (shap) {\textbf{SHAP Explainer}\\\scriptsize Feature Attribution\\\& Importance};
+
+  % Connections
+  \draw[arr] (pA) -- (esmA);
+  \draw[arr] (pB) -- (esmB);
+  \draw[arr] (esmA.east) -- ++(5mm,0) |- ([yshift=3mm]pair.west);
+  \draw[arr] (esmB.east) -- ++(5mm,0) |- ([yshift=-3mm]pair.west);
+
+  \draw[arr] (pair.east) -- ++(6mm,0) |- (seq.west);
+  \draw[arr] (pair.east) -- ++(6mm,0) |- (graph.west);
+  \draw[arr] (topo) -- (graph);
+
+  % Branch outputs into Meta (clear routing with distinct labels)
+  \draw[arr] (seq.east) -- ++(10mm,0) node[midway, above=2pt, lbl, text=clrseq] {$p_{\mathrm{seq}}$} |- ([yshift=5mm]meta.west);
+  \draw[arr] (graph.east) -- ++(10mm,0) node[midway, below=2pt, lbl, text=clrgraph] {$p_{\mathrm{graph}}$} |- ([yshift=-5mm]meta.west);
+
+  \draw[arr] (meta) -- (xgb);
+  \draw[arr] (xgb) -- (out);
+  \draw[arr] (xgb) -- (shap);
+
+\end{tikzpicture}%
+}
+\caption{Overview of the TransGraph-PPI architecture. Protein sequences are encoded
+by ESM-2 ($e_A, e_B \in \mathbb{R}^{640}$), formulated into pairwise representations,
+and processed concurrently by the Sequence branch (symmetric operations + residual MLP,
+outputting $p_{\mathrm{seq}}$) and the Graph branch (GraphSAGE with STRING PPI topology,
+outputting $p_{\mathrm{graph}}$). The two base predictions and five confidence- and
+agreement-based features form a 7-dimensional meta-feature vector for the XGBoost
+stacking classifier to yield the final interaction probability $p_{\mathrm{final}}$,
+with predictions explained via SHAP feature attribution.}
+\label{fig:arch}
+\end{figure*}
 
 \subsection{Overall Architecture}\label{AA}
 Protein sequences are first processed using ESM-2
-(\texttt{facebook/esm2\_t12\_35M\_UR50D}), which produces a 480-dimensional
+(\texttt{facebook/esm2\_t30\_150M\_UR50D}), which produces a 640-dimensional
 embedding for each protein. These embeddings are provided to the sequence and
 graph branches. The sequence branch uses a residual multi-layer perceptron
 (MLP) to learn interaction patterns from the two protein embeddings. The graph
@@ -276,16 +365,17 @@ branch uses GraphSAGE to capture information from neighboring proteins in the
 interaction network. The two branches produce separate interaction
 probabilities, $\pseq$ and $\pgraph$.
 
-Instead of directly averaging these probabilities, TransGraph-PPI constructs an
-8-dimensional feature vector containing the two prediction scores, their
-confidence values, their difference, their agreement, and biological
-information. An XGBoost model uses these features to produce the final
-interaction probability.
+Instead of directly averaging these probabilities, TransGraph-PPI constructs a
+7-dimensional feature vector containing the two prediction scores, their
+confidence values, their difference, and their agreement. An XGBoost model
+uses these features to produce the final interaction probability. A separate,
+display-only biological co-localization check is also computed for each pair
+but is not part of this feature vector.
 
 \subsection{Sequence-Based Prediction}\label{sec:seq}
 Since the interaction between proteins $A$ and $B$ is the same as the
 interaction between $B$ and $A$, the model should not depend on the order of
-the proteins. Therefore, the two 480-dimensional ESM-2 embeddings, $e_A$ and
+the proteins. Therefore, the two 640-dimensional ESM-2 embeddings, $e_A$ and
 $e_B$, are combined using four symmetric operations:
 \begin{equation}
 f_{\mathrm{sym}} =
@@ -301,7 +391,7 @@ f_{\mathrm{sym}} =
 \label{eq:sym}
 \end{equation}
 where $\parallel$ represents concatenation and $\odot$ represents element-wise
-multiplication. The four operations produce a 1920-dimensional feature vector.
+multiplication. The four operations produce a 2560-dimensional feature vector.
 
 This vector is passed through a residual MLP containing skip connections,
 normalization, and dropout. The model produces a probability $\pseq$ between 0
@@ -313,8 +403,8 @@ Proteins form a complex biological network, so network information can provide
 additional evidence for PPI prediction. The graph branch represents proteins as
 nodes and known interactions from the STRING database as edges.
 
-Each protein node is represented using a 483-dimensional feature vector,
-consisting of the 480-dimensional ESM-2 embedding and three network features:
+Each protein node is represented using a 643-dimensional feature vector,
+consisting of the 640-dimensional ESM-2 embedding and three network features:
 degree centrality, clustering coefficient, and PageRank.
 
 GraphSAGE updates each protein representation by aggregating information from
@@ -343,18 +433,18 @@ captures information from the interaction network. To combine these
 predictions, TransGraph-PPI uses an XGBoost stacking model.
 
 To reduce data leakage, 5-fold stratified out-of-fold (OOF) predictions are
-used to train the ensemble model. For each protein pair, eight meta-features
+used to train the ensemble model. For each protein pair, seven meta-features
 are calculated:
 \begin{equation}
 \begin{split}
 X_{\mathrm{meta}} = [\,&\pseq,\ \pgraph,\ \mathrm{conf}_{\mathrm{seq}},\
 \mathrm{conf}_{\mathrm{graph}},\\
 &\mathrm{diff},\ \mathrm{max}_{\mathrm{conf}},\
-\mathrm{consensus},\ \mathrm{bio}_{\mathrm{score}}\,]
+\mathrm{consensus}\,]
 \end{split}
 \label{eq:meta}
 \end{equation}
-The eight features are defined as follows:
+The seven features are defined as follows:
 \begin{itemize}
     \item $\pseq$: probability predicted by the sequence model.
     \item $\pgraph$: probability predicted by the graph model.
@@ -369,8 +459,6 @@ The eight features are defined as follows:
           higher confidence of the two models.
     \item $\mathrm{consensus} = \pseq \times \pgraph$: agreement between the
           two predictions.
-    \item $\mathrm{bio}_{\mathrm{score}}$: biological compatibility score
-          based on subcellular co-localization.
 \end{itemize}
 The XGBoost model uses these meta-features to produce the final interaction
 probability:
@@ -382,7 +470,7 @@ probability:
 \subsection{Model Explainability}\label{sec:shap}
 SHAP (SHapley Additive exPlanations) is applied to the trained XGBoost model to
 make the ensemble predictions easier to interpret. SHAP measures how much each
-of the eight meta-features contributes to increasing or decreasing the final
+of the seven meta-features contributes to increasing or decreasing the final
 prediction score. This helps identify whether a prediction is mainly supported
 by sequence information, network information, or agreement between the two
 models.
@@ -411,8 +499,8 @@ final evaluation.
 
 \subsection{Protein Sequence Representation}
 Each protein sequence was represented using the pretrained ESM-2 model
-\texttt{facebook/esm2\_t12\_35M\_UR50D}. The model contains approximately 35
-million parameters and produces a 480-dimensional mean-pooled representation
+\texttt{facebook/esm2\_t30\_150M\_UR50D}. The model contains approximately 150
+million parameters and produces a 640-dimensional mean-pooled representation
 for each protein.
 
 These embeddings were used as inputs to both the sequence and graph branches,
@@ -421,7 +509,7 @@ information without manually designing extensive sequence features.
 
 \subsection{Sequence Model Implementation}
 The sequence branch was implemented using a residual MLP. The symmetric pair
-representation described in Section~\ref{sec:seq} produces a 1920-dimensional
+representation described in Section~\ref{sec:seq} produces a 2560-dimensional
 input. This representation is first projected to 1024 dimensions, followed by
 two residual blocks that progressively reduce the representation to 512
 dimensions before the final classification layers.
@@ -429,13 +517,14 @@ dimensions before the final classification layers.
 The model was trained using AdamW with a learning rate of $10^{-3}$ and weight
 decay of $10^{-3}$. A cosine annealing learning-rate scheduler was used,
 together with balanced focal loss to emphasize difficult predictions. The batch
-size was 64, with a maximum of 30 epochs and early stopping.
+size was 128, with a maximum of 30 epochs and early stopping (patience of 10
+epochs).
 
 \subsection{Graph Model Implementation}
 For the graph branch, proteins were represented as nodes and high-confidence
-interactions as edges. Each node contained the 480-dimensional ESM-2 embedding
+interactions as edges. Each node contained the 640-dimensional ESM-2 embedding
 together with degree centrality, clustering coefficient, and PageRank,
-resulting in 483 node features.
+resulting in 643 node features.
 
 A two-layer GraphSAGE model with a hidden dimension of 256 was used for
 neighborhood aggregation. Dropout and normalization were applied to reduce
@@ -453,8 +542,8 @@ The outputs of the sequence and graph models were combined using an XGBoost
 classifier. To prevent target leakage, five-fold stratified OOF predictions
 were generated from the base models before training the meta-learner.
 
-For each protein pair, the two prediction probabilities and the six additional
-features described in Section~\ref{sec:stack} formed an eight-dimensional input
+For each protein pair, the two prediction probabilities and the five additional
+features described in Section~\ref{sec:stack} formed a seven-dimensional input
 vector for XGBoost.
 
 The XGBoost model used 500 estimators, a maximum tree depth of 7, a learning
@@ -462,10 +551,10 @@ rate of 0.01, and a subsampling ratio of 0.8. Feature subsampling was also set
 to 0.8, with $L_1$ regularization applied to reduce overfitting.
 
 \subsection{Explainability}
-After training, SHAP was used to analyze the contribution of the eight
+After training, SHAP was used to analyze the contribution of the seven
 meta-features to the final prediction. This analysis provides insight into how
-sequence predictions, graph predictions, model confidence, prediction
-agreement, and biological compatibility influence the ensemble output.
+sequence predictions, graph predictions, model confidence, and prediction
+agreement influence the ensemble output.
 
 % =============================================================================
 \section{Results and Discussion}\label{sec:results}
@@ -488,24 +577,44 @@ and PR-AUC.
 \textbf{Model} & \textbf{Accuracy} & \textbf{Precision} & \textbf{Recall} &
 \textbf{F1-Score} & \textbf{ROC-AUC} & \textbf{PR-AUC} \\
 \midrule
-Random Forest    & 82.34\%          & 81.14\%          & 84.28\% & 82.68\%          & 0.9065          & 0.9124 \\
-ESM-MLP          & 87.11\%          & 86.00\%          & 88.65\% & 87.30\%          & 0.9438          & 0.9474 \\
-GraphSAGE        & 90.42\%          & 92.01\%          & 88.52\% & 90.23\%          & 0.9487          & 0.9616 \\
-XGBoost Ensemble & \textbf{92.13\%} & \textbf{93.59\%} & 90.46\% & \textbf{92.00\%} & \textbf{0.9708} & \textbf{0.9759} \\
+Random Forest    & 83.74\%          & 83.80\%          & 83.65\% & 83.73\%          & 0.9163          & 0.9222 \\
+ESM-MLP          & 88.42\%          & 86.67\%          & 90.82\% & 88.70\%          & 0.9530          & 0.9569 \\
+GraphSAGE        & 91.62\%          & 93.55\%          & 89.40\% & 91.43\%          & 0.9562          & 0.9681 \\
+XGBoost Ensemble & \textbf{93.10\%} & \textbf{94.48\%} & 91.55\% & \textbf{93.00\%} & \textbf{0.9753} & \textbf{0.9801} \\
 \bottomrule
 \end{tabular}%
 }
 \end{table}
 
-The Random Forest baseline achieved 82.34\% accuracy and an 82.68\% F1-score,
-while the ESM-MLP improved these values to 87.11\% and 87.30\%, respectively,
+The Random Forest baseline achieved 83.74\% accuracy and an 83.73\% F1-score,
+while the ESM-MLP improved these values to 88.42\% and 88.70\%, respectively,
 demonstrating the usefulness of pretrained ESM-2 representations. GraphSAGE
-achieved 90.42\% accuracy and a 90.23\% F1-score, with a PR-AUC of 0.9616,
+achieved 91.62\% accuracy and a 91.43\% F1-score, with a PR-AUC of 0.9681,
 indicating the contribution of interaction-network information.
 
-The XGBoost stacking ensemble achieved the highest performance, with 92.13\%
-accuracy, 92.00\% F1-score, 0.9708 ROC-AUC, and 0.9759 PR-AUC. Its precision of
-93.59\% indicates that most interactions classified as positive were correct.
+The XGBoost stacking ensemble achieved the highest performance, with 93.10\%
+accuracy, 93.00\% F1-score, 0.9753 ROC-AUC, and 0.9801 PR-AUC. Its precision of
+94.48\% indicates that most interactions classified as positive were correct.
+Fig.~\ref{fig:results} shows the performance comparison between standalone models and TransGraph-PPI on the held-out test set alongside the corresponding SHAP meta-feature attribution summary.
+
+\begin{figure}[!t]
+\centering
+\begin{subfigure}[b]{\columnwidth}
+\centering
+\includegraphics[width=\linewidth]{assets/evaluation/model_comparison.png}
+\caption{Standalone models vs.\ TransGraph-PPI}
+\label{fig:comparison}
+\end{subfigure}
+\vspace{2mm}
+\begin{subfigure}[b]{\columnwidth}
+\centering
+\includegraphics[width=\linewidth]{assets/evaluation/shap_summary.png}
+\caption{SHAP meta-feature attribution summary}
+\label{fig:shap}
+\end{subfigure}
+\caption{(a) Performance comparison of standalone baseline models (Random Forest, sequence-only ESM-MLP, and graph-only GraphSAGE) versus TransGraph-PPI across six evaluation metrics on the 20{,}172-pair test set. (b) SHAP summary plot displaying the distribution and direction of attribution for the seven meta-features across test set predictions.}
+\label{fig:results}
+\end{figure}
 
 \subsection{Effect of Ensemble Learning}
 Combining the sequence and graph branches improves overall prediction
@@ -513,11 +622,11 @@ performance. The ESM-MLP captures sequence-level information, whereas
 GraphSAGE incorporates interaction-network information, allowing the ensemble
 to exploit complementary signals.
 
-Compared with ESM-MLP, the ensemble improves accuracy from 87.11\% to 92.13\%
-and F1-score from 87.30\% to 92.00\%. Compared with GraphSAGE, accuracy
-increases from 90.42\% to 92.13\% and ROC-AUC from 0.9487 to 0.9708. These
+Compared with ESM-MLP, the ensemble improves accuracy from 88.42\% to 93.10\%
+and F1-score from 88.70\% to 93.00\%. Compared with GraphSAGE, accuracy
+increases from 91.62\% to 93.10\% and ROC-AUC from 0.9562 to 0.9753. These
 results support the use of stacking to combine the two prediction branches. The
-ensemble also achieves a PR-AUC of 0.9759, indicating good precision-recall
+ensemble also achieves a PR-AUC of 0.9801, indicating good precision-recall
 performance across classification thresholds. Furthermore, training the XGBoost
 meta-learner using OOF predictions reduces the risk of target leakage during
 stacking.
@@ -542,6 +651,14 @@ GraphSAGE-based network learning, and XGBoost stacking provides an effective
 framework for PPI prediction while also supporting interpretation of the
 resulting predictions.
 
+A limitation of this evaluation is that the train/validation/test split is
+pair-disjoint but not protein-disjoint: no protein pair is repeated across
+splits, but individual proteins can appear in both the training set and the
+test set. The reported 93.10\% accuracy therefore reflects transductive
+performance on already-seen proteins in new combinations, and should not be
+read as a measure of generalization to entirely unseen proteins; evaluating
+on a protein-disjoint split is left for future work.
+
 % =============================================================================
 \section{Future Work}\label{sec:future}
 % =============================================================================
@@ -565,11 +682,11 @@ interaction-network information. The framework uses ESM-2 embeddings to
 represent protein sequences, a residual MLP for sequence-based prediction, and
 GraphSAGE for learning information from the protein interaction network. The
 predictions from both branches are combined using an XGBoost stacking model
-with eight meta-features, while SHAP provides an interpretable view of the
+with seven meta-features, while SHAP provides an interpretable view of the
 final predictions.
 
-On the held-out test set, the proposed ensemble achieved 92.13\% accuracy,
-92.00\% F1-score, 0.9708 ROC-AUC, and 0.9759 PR-AUC, outperforming the
+On the held-out test set, the proposed ensemble achieved 93.10\% accuracy,
+93.00\% F1-score, 0.9753 ROC-AUC, and 0.9801 PR-AUC, outperforming the
 individual sequence and graph branches. These results show that combining
 complementary sequence and network information can improve PPI prediction
 compared with using either source independently. The use of SHAP further
