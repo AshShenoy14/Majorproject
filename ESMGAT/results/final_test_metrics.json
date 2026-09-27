@@ -1,0 +1,173 @@
+{
+  "test_dataset": "data/processed/test.csv",
+  "test_sample_count": 20172,
+  "evaluation_timestamp": "2026-09-27T11:27:39.529718+00:00",
+  "git_commit": "a77fafa10496c1e4614abda77826d18bcd8e5eb9",
+  "models": {
+    "ESM-MLP": {
+      "validation_derived_metrics": {
+        "threshold": 0.45,
+        "accuracy": 0.8842454887963513,
+        "precision": 0.8666855899328224,
+        "recall": 0.9081895697005751,
+        "f1": 0.8869523117889131,
+        "roc_auc": 0.9529747522486469,
+        "pr_auc": 0.9569200938809644,
+        "tp": 9160,
+        "tn": 8677,
+        "fp": 1409,
+        "fn": 926
+      },
+      "default_0_5_metrics": {
+        "threshold": 0.5,
+        "accuracy": 0.8872199087844537,
+        "precision": 0.9039197435101872,
+        "recall": 0.8665476898671426,
+        "f1": 0.8848392811946343,
+        "roc_auc": 0.9529747522486469,
+        "pr_auc": 0.9569200938809644,
+        "tp": 8740,
+        "tn": 9157,
+        "fp": 929,
+        "fn": 1346
+      },
+      "threshold": 0.45,
+      "threshold_source": "Validation F1-max sweep on val.csv (esm150m_results/assets/evaluation/final_test_metrics.json)",
+      "calibrator_used": "None (direct sigmoid probabilities)",
+      "model_artifact": "models/sequence_model_best.pth",
+      "input_feature_dimensions": 2560
+    },
+    "GraphSAGE": {
+      "validation_derived_metrics": {
+        "threshold": 0.61,
+        "accuracy": 0.9161709300019829,
+        "precision": 0.9354704844900923,
+        "recall": 0.8940115010906207,
+        "f1": 0.9142712294043093,
+        "roc_auc": 0.9562069788948496,
+        "pr_auc": 0.968137383134209,
+        "tp": 9017,
+        "tn": 9464,
+        "fp": 622,
+        "fn": 1069
+      },
+      "default_0_5_metrics": {
+        "threshold": 0.5,
+        "accuracy": 0.9114118580210192,
+        "precision": 0.9103134579254425,
+        "recall": 0.9127503470156653,
+        "f1": 0.9115302737759295,
+        "roc_auc": 0.9562069788948496,
+        "pr_auc": 0.968137383134209,
+        "tp": 9206,
+        "tn": 9179,
+        "fp": 907,
+        "fn": 880
+      },
+      "threshold": 0.61,
+      "threshold_source": "Validation F1-max sweep on val.csv (esm150m_results/assets/evaluation/final_test_metrics.json)",
+      "calibrator_used": "models/graph_calibrator.json (PlattScaler)",
+      "model_artifact": "models/graph_model_best.pth",
+      "input_feature_dimensions": 643
+    },
+    "GAT": {
+      "validation_derived_metrics": {
+        "threshold": 0.5,
+        "accuracy": 0.7630378742811819,
+        "precision": 0.7678174843529174,
+        "recall": 0.7541146143168749,
+        "f1": 0.7609043617446979,
+        "roc_auc": 0.8486795779182237,
+        "pr_auc": 0.8665224906465074,
+        "tp": 7606,
+        "tn": 7786,
+        "fp": 2300,
+        "fn": 2480
+      },
+      "default_0_5_metrics": {
+        "threshold": 0.5,
+        "accuracy": 0.7630378742811819,
+        "precision": 0.7678174843529174,
+        "recall": 0.7541146143168749,
+        "f1": 0.7609043617446979,
+        "roc_auc": 0.8486795779182237,
+        "pr_auc": 0.8665224906465074,
+        "tp": 7606,
+        "tn": 7786,
+        "fp": 2300,
+        "fn": 2480
+      },
+      "threshold": 0.5,
+      "threshold_source": "Validation & OOF standard evaluation threshold (ESMGAT/training/train_gat_colab.py, ESMGAT/results/gat_val_metrics.json)",
+      "calibrator_used": "ESMGAT/weights/gat_calibrator.json (PlattScaler)",
+      "model_artifact": "ESMGAT/weights/gat_model_best.pth",
+      "input_feature_dimensions": 643
+    },
+    "ESM + GraphSAGE + XGBoost": {
+      "validation_derived_metrics": {
+        "threshold": 0.45,
+        "accuracy": 0.9310430299424945,
+        "precision": 0.944848050752072,
+        "recall": 0.9155264723378941,
+        "f1": 0.9299561911475905,
+        "roc_auc": 0.9753121420703623,
+        "pr_auc": 0.9800731329397747,
+        "tp": 9234,
+        "tn": 9547,
+        "fp": 539,
+        "fn": 852
+      },
+      "default_0_5_metrics": {
+        "threshold": 0.5,
+        "accuracy": 0.9302002776125322,
+        "precision": 0.9516968561315844,
+        "recall": 0.9064049177077137,
+        "f1": 0.9284988827950437,
+        "roc_auc": 0.9753121420703623,
+        "pr_auc": 0.9800731329397747,
+        "tp": 9142,
+        "tn": 9622,
+        "fp": 464,
+        "fn": 944
+      },
+      "threshold": 0.45,
+      "threshold_source": "Validation F1-max sweep on val.csv (esm150m_results/assets/evaluation/final_test_metrics.json)",
+      "calibrator_used": "models/graph_calibrator.json on graph branch",
+      "model_artifact": "models/ensemble_model.pkl",
+      "input_feature_dimensions": 7
+    },
+    "ESM + GAT + XGBoost": {
+      "validation_derived_metrics": {
+        "threshold": 0.5,
+        "accuracy": 0.8978782470751536,
+        "precision": 0.9204735959765298,
+        "recall": 0.8710093198492961,
+        "f1": 0.8950585838003057,
+        "roc_auc": 0.9582016185689055,
+        "pr_auc": 0.9627185267254683,
+        "tp": 8785,
+        "tn": 9327,
+        "fp": 759,
+        "fn": 1301
+      },
+      "default_0_5_metrics": {
+        "threshold": 0.5,
+        "accuracy": 0.8978782470751536,
+        "precision": 0.9204735959765298,
+        "recall": 0.8710093198492961,
+        "f1": 0.8950585838003057,
+        "roc_auc": 0.9582016185689055,
+        "pr_auc": 0.9627185267254683,
+        "tp": 8785,
+        "tn": 9327,
+        "fp": 759,
+        "fn": 1301
+      },
+      "threshold": 0.5,
+      "threshold_source": "OOF stacking meta-learner evaluation threshold (ESMGAT/training/train_gat_ensemble.py, ESMGAT/results/gat_oof_metrics.json)",
+      "calibrator_used": "ESMGAT/weights/gat_calibrator.json on graph branch",
+      "model_artifact": "ESMGAT/weights/gat_ensemble_model.pkl",
+      "input_feature_dimensions": 7
+    }
+  }
+}

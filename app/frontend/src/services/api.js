@@ -10,6 +10,16 @@ const api = axios.create({
   },
 });
 
+const GAT_API_BASE_URL = import.meta.env.VITE_GAT_API_BASE_URL || 'http://127.0.0.1:8001';
+
+const gatApi = axios.create({
+  baseURL: GAT_API_BASE_URL,
+  timeout: 30000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
 export const ppiService = {
   predict: (protein1_id, protein2_id, p1_seq = null, p2_seq = null) => 
     api.post('/predict', { 
@@ -18,6 +28,16 @@ export const ppiService = {
       protein1_seq: p1_seq, 
       protein2_seq: p2_seq 
     }),
+
+  predictGAT: (protein1_id, protein2_id, p1_seq = null, p2_seq = null) => 
+    gatApi.post('/predict', { 
+      protein1_id, 
+      protein2_id, 
+      protein1_seq: p1_seq, 
+      protein2_seq: p2_seq 
+    }),
+
+  checkGATHealth: () => gatApi.get('/health'),
 
   explainGNN: (protein1_id, protein2_id) =>
     api.post('/analysis/explain-gnn', { protein1_id, protein2_id }),

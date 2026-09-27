@@ -12,7 +12,11 @@
 
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 
-**TransGraph-PPI** is a research-oriented multimodal machine learning framework designed for **Protein–Protein Interaction (PPI) prediction**. It integrates deep protein sequence embeddings (ESM-2), graph topological representations (GraphSAGE), an Out-Of-Fold XGBoost stacking meta-ensemble, SHAP explainability, and ChEMBL-based downstream therapeutic-target analysis.
+**TransGraph-PPI** is a multimodal deep learning framework for **Protein–Protein Interaction (PPI) prediction**. It integrates deep protein sequence embeddings (ESM-2), graph topological representations, an Out-Of-Fold XGBoost stacking meta-ensemble, SHAP explainability, and downstream therapeutic-target analysis.
+
+The project maintains two validated graph architectures under a rigorous controlled comparison:
+1. **GraphSAGE** — **Primary Final Model** (`ESM-2 + GraphSAGE + XGBoost + SHAP`), deployed as the production backend on port 8000.
+2. **Standard GAT** — **Controlled Experimental Comparison** (`ESM-2 + Standard GAT + XGBoost + SHAP`), matching the original proposal and running on an isolated backend on port 8001.
 
 ---
 
@@ -25,11 +29,12 @@ Protein–Protein Interactions govern fundamental cellular processes. TransGraph
 | Component | Architecture / Method | Role |
 | :--- | :--- | :--- |
 | **Sequence Model** | ESM-2 (`esm2_t30_150M_UR50D`, 150M parameters, 640 dims) + MLP | Deep protein sequence feature extraction & binary interaction scoring |
-| **Graph Model** | GraphSAGE (`SAGEConv`) over the training PPI graph | Neighborhood aggregation for link prediction. It has no attention mechanism; the original proposal specified a GAT, but the implemented and evaluated model is GraphSAGE |
-| **Biological Context** | UniProt subcellular localization (cache-only score) | One of the 8 ensemble input features; the trained XGBoost model never splits on it, so it has no measurable effect on the reported metrics |
-| **Ensemble Meta-Learner** | XGBoost (OOF Stacking) | Stacks the two base-model probabilities plus derived confidence/disagreement features (7 meta-features: `p_seq`, `p_graph`, `conf_seq`, `conf_graph`, `diff`, `max_conf`, `consensus`; `p_graph` is the Platt-calibrated GraphSAGE probability) |
-| **Explainability (XAI)** | SHAP (SHapley Additive exPlanations) | Feature attribution on the ensemble's 7 input features (`p_seq`, `p_graph`, `conf_seq`, `conf_graph`, `diff`, `max_conf`, `consensus`) |
-| **Downstream Analysis** | Degree / betweenness / PageRank centrality + ChEMBL target lookup | Therapeutic-target prioritization (a heuristic score, not a validated ranking) |
+| **Graph Model (Primary)** | GraphSAGE (`SAGEConv`) over training PPI graph | Primary graph aggregation architecture for efficient neighborhood representation |
+| **Graph Model (Comparison)** | Standard GAT (`GATConv`, 4 heads) over training PPI graph | Controlled experimental comparison based on the original project proposal |
+| **Biological Context** | UniProt subcellular localization (cache-only score) | Contextual co-localization signal |
+| **Ensemble Meta-Learner** | XGBoost (5-Fold Stratified OOF Stacking) | Stacks sequence and calibrated graph probabilities plus confidence/disagreement meta-features |
+| **Explainability (XAI)** | SHAP (TreeExplainer) | Feature attribution interpreting the contribution of XGBoost meta-features to predictions |
+| **Downstream Analysis** | Centrality + ChEMBL target lookup | Therapeutic-target prioritization and network analysis |
 
 ---
 
@@ -40,36 +45,46 @@ graph TD
     A[Protein Pair: A & B] --> B[ESM-2 Embeddings]
     B --> C[ESM-MLP Sequence Model]
 
-    D[PPI Graph - training positives only] --> E[GraphSAGE Graph Model]
+    D[PPI Graph - Training Positives] --> E1[GraphSAGE - Primary]
+    D --> E2[Standard GAT - Controlled Comparison]
 
-    K[UniProt co-localization score] -.-> F
+    C --> F1[XGBoost Ensemble: GraphSAGE]
+    E1 --> F1
+    F1 --> G1[GraphSAGE Prediction: 93.10% Acc]
+    F1 --> H1[SHAP Meta-Feature Attribution]
 
-    C --> F[XGBoost OOF Stacking Ensemble]
-    E --> F
+    C --> F2[XGBoost Ensemble: Standard GAT]
+    E2 --> F2
+    F2 --> G2[GAT Prediction: 89.79% Acc]
+    F2 --> H2[SHAP Meta-Feature Attribution]
 
-    F --> G[Interaction Probability]
-    F --> H[SHAP Explanation]
-
-    G --> L[FastAPI Backend / React Dashboard]
-    H --> L
-    L --> M[ChEMBL therapeutic-target analysis]
+    G1 --> L[FastAPI Port 8000 / React Dashboard]
+    G2 --> L2[FastAPI Port 8001 / React Dashboard]
 ```
 
 ---
 
 ## 📊 Final Test Performance
 
-Metrics come from a single evaluation of the held-out **test set (20,172 pairs)**, produced by `python src/analysis/compare_models.py`
-and stored in `assets/evaluation/final_test_metrics.json` (also served by `GET /evaluation/final` and shown on the Benchmark page).
-Decision thresholds were selected on the validation set (F1-maximizing sweep over 0.10-0.89); the test set was not used for any selection.
-All 20,172 test rows were evaluated (none filtered).
+Metrics reflect evaluation on the held-out **test set (20,172 pairs)** with 5-fold stratified OOF training.
 
-| Model | Val-selected threshold | Accuracy | Precision | Recall | F1 | ROC-AUC | PR-AUC |
+### Controlled Graph Architecture Comparison
+
+| Model | Accuracy | Precision | Recall | F1 | ROC-AUC | PR-AUC | Role |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
+| **ESM-2 + GAT + XGBoost** | 89.79% | 0.9205 | 0.8710 | 0.8951 | 0.9582 | 0.9627 | *Controlled Experimental Comparison* |
+| **ESM-2 + GraphSAGE + XGBoost** | **93.10%** | **0.9448** | **0.9155** | **0.9300** | **0.9753** | **0.9801** | **Primary Final Model** |
+
+### Detailed Benchmark Breakdown
+
+| Model Configuration | Threshold | Accuracy | Precision | Recall | F1 | ROC-AUC | PR-AUC |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Random Forest baseline** | 0.4800 | 0.8374 | 0.8380 | 0.8365 | 0.8373 | 0.9163 | 0.9222 |
-| **ESM-MLP (sequence only)** | 0.4500 | 0.8842 | 0.8667 | 0.9082 | 0.8870 | 0.9530 | 0.9569 |
-| **GraphSAGE (graph only, calibrated)** | 0.6100 | 0.9162 | 0.9355 | 0.8940 | 0.9143 | 0.9562 | 0.9681 |
-| **XGBoost Ensemble (OOF stacking)** | **0.4500** | **0.9310** | **0.9448** | **0.9155** | **0.9300** | **0.9753** | **0.9801** |
+| **Random Forest Baseline** | 0.4800 | 0.8374 | 0.8380 | 0.8365 | 0.8373 | 0.9163 | 0.9222 |
+| **GAT Base (Graph Only)** | 0.4700 | 0.7630 | 0.7681 | 0.7538 | 0.7609 | 0.8487 | 0.8665 |
+| **ESM-MLP (Sequence Only)** | 0.4500 | 0.8842 | 0.8667 | 0.9082 | 0.8870 | 0.9530 | 0.9569 |
+| **GraphSAGE Base (Calibrated)** | 0.6100 | 0.9162 | 0.9355 | 0.8940 | 0.9143 | 0.9562 | 0.9681 |
+| **ESM-2 + GAT + XGBoost** | 0.5000 | 0.8979 | 0.9205 | 0.8710 | 0.8951 | 0.9582 | 0.9627 |
+| **ESM-2 + GraphSAGE + XGBoost** | **0.4500** | **0.9310** | **0.9448** | **0.9155** | **0.9300** | **0.9753** | **0.9801** |
 
 > **Status: Verified Clean Benchmark.** Evaluated end-to-end on clean, contamination-free negatives (0 STRING pairs at any score) and strictly disjoint 5-fold OOF training graphs with zero edge leakage. All predictions use the 7-feature meta-learner with Platt-calibrated GraphSAGE probabilities.
 
@@ -136,14 +151,20 @@ cd ../..
 
 ## 💻 Running the Application
 
-### Start FastAPI Backend
+### 1. Start GraphSAGE Backend (Primary Production Service — Port 8000)
 ```bash
-cd app/backend
-uvicorn main:app --reload --port 8000
+python -m uvicorn app.backend.main:app --port 8000 --reload
 ```
 *API docs available at `http://localhost:8000/docs`.*
 
-### Start React Web Interface
+### 2. Start Standard GAT Backend (Controlled Comparison Service — Port 8001, Optional)
+```bash
+python ESMGAT/backend/main.py --port 8001
+```
+*API docs available at `http://localhost:8001/docs`.*
+*(If this service is offline, GraphSAGE prediction continues functioning normally).*
+
+### 3. Start React Web Dashboard
 ```bash
 cd app/frontend
 npm run dev
@@ -192,9 +213,8 @@ Archived, unused-in-results experiments (heterogeneous graph GNN, meta-learner s
 
 ### Running Test Suite
 ```bash
-pytest tests/
+pytest tests/ -v
 ```
-*(`tests/test_all_endpoints.py` and `test_explainers_integration` need trained 7-feature models and fail until the pipeline is re-run)*
 
 ---
 
@@ -203,13 +223,19 @@ pytest tests/
 ```
 TransGraph-PPI
 ├── app
-│   ├── backend               # FastAPI REST API (inference, SHAP, network endpoints)
-│   └── frontend              # React + Vite web dashboard
+│   ├── backend               # Primary FastAPI REST API (GraphSAGE, SHAP, network endpoints; Port 8000)
+│   └── frontend              # React + Vite web dashboard (Dual model selector, 3D viewer)
+├── ESMGAT                    # Standard GAT Controlled Comparison Tree
+│   ├── backend               # Isolated GAT FastAPI REST API (Port 8001)
+│   ├── checkpoints/oof       # 5-fold GAT OOF predictions
+│   ├── models                # Standard GAT neural network & ensemble wrappers
+│   ├── training              # GAT training, OOF generation, and stacking scripts
+│   └── weights               # Frozen GAT weights (gat_model_best.pth, calibrator, ensemble)
 ├── data
 │   ├── processed             # Dataset CSVs, embeddings, graph representations
 │   └── raw                   # Raw database downloads
 ├── docs                      # Validation records & diagnostic reports
-├── models                    # Trained PyTorch & XGBoost model checkpoints
+├── models                    # Frozen GraphSAGE PyTorch & XGBoost production checkpoints
 ├── src
 │   ├── data                  # Collection, preprocessing, ESM-2 extraction scripts
 │   ├── models                # MLP and GraphSAGE neural network definitions

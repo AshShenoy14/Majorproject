@@ -1,0 +1,47 @@
+{
+  "architecture": "GAT",
+  "input_feature_dim": 643,
+  "hidden_dim": 256,
+  "num_heads": 4,
+  "number_of_folds": 5,
+  "fold_sizes": [
+    32274,
+    32274,
+    32274,
+    32274,
+    32273
+  ],
+  "oof_sample_count": 161369,
+  "meta_features": [
+    "p_seq",
+    "p_gat",
+    "conf_seq",
+    "conf_gat",
+    "diff",
+    "max_conf",
+    "consensus"
+  ],
+  "xgboost_hyperparameters": {
+    "n_estimators": 500,
+    "max_depth": 7,
+    "learning_rate": 0.01,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "gamma": 1,
+    "reg_alpha": 0.1,
+    "random_state": 42
+  },
+  "calibration": {
+    "method": "Platt Scaling (Logistic Regression on fold validation logits)",
+    "calibrator_attached": "E:\\majorproject\\ESMGAT\\weights\\gat_calibrator.json"
+  },
+  "data_split": {
+    "method": "StratifiedKFold(n_splits=5, shuffle=True, random_state=42)",
+    "inner_validation_fraction": 0.1,
+    "source_data": "data/processed/train.csv",
+    "test_data_used": false
+  },
+  "git_commit": "a77fafa10496c1e4614abda77826d18bcd8e5eb9",
+  "timestamp": "2026-09-27T06:22:18.752335+00:00",
+  "total_elapsed_seconds": 681.8335964679718
+}

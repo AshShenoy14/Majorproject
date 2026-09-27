@@ -32,6 +32,7 @@ const Predict = () => {
   const [protein2, setProtein2] = useState('ENSP00000373627');
   const [seq1, setSeq1] = useState('');
   const [seq2, setSeq2] = useState('');
+  const [selectedModel, setSelectedModel] = useState('graphsage'); // 'graphsage' | 'gat'
   const [selectedCase, setSelectedCase] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
@@ -43,7 +44,7 @@ const Predict = () => {
   const logEndRef = useRef(null);
   
   // ── UI PAGE & EXPORT STATE ──────────────────────────────────
-  const [activeResultPage, setActiveResultPage] = useState('probability'); // 'probability' | 'evidence'
+  const [activeResultPage, setActiveResultPage] = useState('probability'); // 'probability' | 'evidence' | 'discovery'
   const [exportingPdf, setExportingPdf] = useState(false);
   const [expertMode, setExpertMode] = useState(false);  // false = Beginner, true = Research
   const [batchResults, setBatchResults] = useState([]);   // batch CSV results
@@ -87,37 +88,66 @@ const Predict = () => {
     setLoading(true);
     setError(null);
     setLogs([]);
-    addLog("Sending interaction query to TransGraph-PPI backend...", "process");
 
+    const p1 = protein1.trim();
+    const p2 = protein2.trim();
+    if (!p1 || !p2) {
+      setError("Both Protein 1 and Protein 2 identifiers are required.");
+      setLoading(false);
+      return;
+    }
+    const s1 = inputMode === 'sequence' ? seq1.trim() : null;
+    const s2 = inputMode === 'sequence' ? seq2.trim() : null;
+
+    const modelLabel = selectedModel === 'graphsage' 
+      ? 'GraphSAGE Ensemble (Primary Final Model)' 
+      : 'GAT Ensemble (Controlled Comparison)';
+    addLog(`Dispatching prediction query to ${modelLabel}...`, "process");
+
+    const startTime = performance.now();
     try {
-      const p1 = protein1.trim();
-      const p2 = protein2.trim();
-      if (!p1 || !p2) {
-        throw new Error("Both Protein 1 and Protein 2 identifiers are required.");
+      let response;
+      if (selectedModel === 'gat') {
+        try {
+          response = await ppiService.predictGAT(p1, p2, s1, s2);
+        } catch (gatErr) {
+          if (!gatErr.response || gatErr.code === 'ERR_NETWORK') {
+            throw new Error("Controlled Comparison GAT backend (Port 8001) is offline. Start it with 'python ESMGAT/backend/main.py' or switch to the Primary Final Model (GraphSAGE on Port 8000).");
+          }
+          throw gatErr;
+        }
+      } else {
+        response = await ppiService.predict(p1, p2, s1, s2);
       }
-      const s1 = inputMode === 'sequence' ? seq1.trim() : null;
-      const s2 = inputMode === 'sequence' ? seq2.trim() : null;
 
-      const startTime = performance.now();
-      const response = await ppiService.predict(p1, p2, s1, s2);
       const elapsed = Math.round(performance.now() - startTime);
       setLatency(elapsed);
-      addLog(`Ensemble Meta-Learner completed in ${elapsed}ms.`, "success");
-      setResult(response.data);
-      setActiveResultPage('probability'); // Default to Page 1 on new result
+      addLog(`${modelLabel} completed in ${elapsed}ms.`, "success");
+
+      const resData = {
+        ...response.data,
+        active_model: selectedModel,
+        model_title: selectedModel === 'graphsage' ? 'ESM-2 + GraphSAGE + XGBoost' : 'ESM-2 + Standard GAT + XGBoost',
+        model_role: selectedModel === 'graphsage' ? 'Primary Final Model' : 'Controlled Experimental Comparison',
+        threshold: response.data.threshold ?? (selectedModel === 'graphsage' ? 0.45 : 0.50),
+      };
+      setResult(resData);
+      setActiveResultPage('probability');
 
       try {
         localStorage.setItem('transgraph_last_prediction', JSON.stringify({
           p1: p1, p2: p2,
-          prob: response.data.interaction_probability,
-          esm: response.data.esm_probability,
-          gat: response.data.gat_probability,
-          conf: response.data.confidence_score
+          model: selectedModel,
+          prob: resData.interaction_probability,
+          esm: resData.esm_probability,
+          gat: resData.gat_probability,
+          conf: resData.confidence_score
         }));
       } catch (_) {}
     } catch (err) {
-      addLog("Execution Fault: " + (err.response?.data?.detail || "Unknown"), "error");
-      setError(err.response?.data?.detail || "Prediction failed.");
+      const msg = err.response?.data?.detail || err.message || "Prediction failed.";
+      addLog("Execution Fault: " + msg, "error");
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -256,7 +286,11 @@ const Predict = () => {
           <div className="w-3 h-3 rounded-full bg-emerald-400 animate-ping" />
           <span className="text-xs font-black uppercase tracking-widest text-emerald-400">Live Model Telemetry</span>
           <span className="text-slate-500">|</span>
-          <span className="text-xs font-semibold text-slate-300">ESM-2 + GraphSAGE Ensemble</span>
+          <span className="text-xs font-semibold text-slate-300">
+            {selectedModel === 'graphsage' 
+              ? 'ESM-2 + GraphSAGE Ensemble (Primary Final Model)' 
+              : 'ESM-2 + Standard GAT Ensemble (Controlled Comparison)'}
+          </span>
         </div>
         <div className="flex items-center gap-6 text-xs font-mono text-slate-300">
           <div className="flex items-center gap-1.5">
@@ -265,7 +299,7 @@ const Predict = () => {
           </div>
           <div className="flex items-center gap-1.5">
             <Gauge size={14} className="text-indigo-400" />
-            <span>ROC-AUC: <strong className="text-white">0.9626</strong></span>
+            <span>ROC-AUC: <strong className="text-white">{selectedModel === 'graphsage' ? '0.9753' : '0.9582'}</strong></span>
           </div>
           <div className="flex items-center gap-1.5">
             <Server size={14} className="text-amber-400" />
@@ -289,7 +323,9 @@ const Predict = () => {
               </div>
               <div>
                 <h2 className="text-lg font-black text-slate-800 tracking-tight">Analysis Portal</h2>
-                <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">Model: ESM2-GraphSAGE-XGBoost</p>
+                <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600">
+                  {selectedModel === 'graphsage' ? 'Primary: GraphSAGE' : 'Comparison: Standard GAT'}
+                </p>
               </div>
             </div>
 
@@ -317,6 +353,41 @@ const Predict = () => {
                     <span className="text-[9px] text-slate-400 font-mono mt-0.5 truncate">{c.p1.slice(0, 11)}... & {c.p2.slice(0, 11)}...</span>
                   </button>
                 ))}
+              </div>
+            </div>
+
+            {/* Model Architecture Selector (PART 10) */}
+            <div className="mb-4 space-y-1.5 bg-slate-50/80 border border-slate-200/80 rounded-2xl p-3">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-black text-slate-600 uppercase tracking-[0.15em] flex items-center gap-1.5">
+                  <Cpu size={12} className="text-emerald-500" /> Model Architecture
+                </label>
+                <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                  selectedModel === 'graphsage' 
+                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' 
+                    : 'bg-amber-100 text-amber-800 border border-amber-300'
+                }`}>
+                  {selectedModel === 'graphsage' ? 'Primary' : 'Comparison'}
+                </span>
+              </div>
+              <select
+                value={selectedModel}
+                onChange={(e) => {
+                  const m = e.target.value;
+                  setSelectedModel(m);
+                  addLog(`Architecture selected: ${m === 'graphsage' ? 'GraphSAGE Ensemble (Primary Final Model)' : 'GAT Ensemble (Controlled Comparison)'}`, 'info');
+                }}
+                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 font-bold focus:border-emerald-500 outline-none cursor-pointer shadow-xs transition-all"
+              >
+                <option value="graphsage">GraphSAGE Ensemble (Primary Final Model)</option>
+                <option value="gat">GAT Ensemble (Controlled Comparison)</option>
+              </select>
+              <div className="text-[10px] text-slate-500 font-medium leading-relaxed pt-0.5">
+                {selectedModel === 'graphsage' ? (
+                  <span>⭐ <strong>Primary Final Model:</strong> ESM-2 + GraphSAGE + XGBoost (Acc: 93.10%, ROC-AUC: 0.9753). Port 8000.</span>
+                ) : (
+                  <span>🔬 <strong>Controlled Comparison:</strong> ESM-2 + Standard GAT + XGBoost (Acc: 89.79%, ROC-AUC: 0.9582). Port 8001.</span>
+                )}
               </div>
             </div>
 
@@ -651,9 +722,22 @@ const Predict = () => {
                       >
                         <div className="flex justify-between items-center bg-white p-5 px-7 rounded-[2rem] border border-slate-100 shadow-sm">
                           <div>
-                            <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500">Page 1 of 3</span>
-                            <h3 className="text-xl font-black text-slate-800 tracking-tight">Interaction Probability & 3D Structural View</h3>
-                            <p className="text-xs text-slate-400 font-mono mt-0.5">Pair: {protein1} ↔ {protein2} | Latency: {latency}ms</p>
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500">Page 1 of 3</span>
+                              <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                                (result.active_model ?? selectedModel) === 'graphsage'
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                  : 'bg-amber-50 text-amber-700 border border-amber-200'
+                              }`}>
+                                {(result.active_model ?? selectedModel) === 'graphsage' ? '⭐ Primary Final Model' : '🔬 Controlled Experimental Comparison'}
+                              </span>
+                            </div>
+                            <h3 className="text-xl font-black text-slate-800 tracking-tight">
+                              Interaction Probability & 3D Structural View
+                            </h3>
+                            <p className="text-xs text-slate-500 font-mono mt-0.5">
+                              Model: <strong className="text-slate-700">{(result.active_model ?? selectedModel) === 'graphsage' ? 'ESM-2 + GraphSAGE + XGBoost' : 'ESM-2 + Standard GAT + XGBoost'}</strong> | Pair: <strong className="text-slate-800">{protein1}</strong> ↔ <strong className="text-slate-800">{protein2}</strong>
+                            </p>
                           </div>
                           <button
                             onClick={() => handleExportCardFigure('page-1-container', 'Probability_and_Structure')}
@@ -667,8 +751,8 @@ const Predict = () => {
                           <div className="bg-emerald-50/80 border border-emerald-200/80 p-4 px-6 rounded-2xl flex items-start gap-3 text-slate-700 text-xs leading-relaxed shadow-sm">
                             <Sparkles size={18} className="text-emerald-500 shrink-0 mt-0.5" />
                             <div>
-                              <span className="font-bold text-emerald-900 block mb-0.5">Explorer Summary (General Audience):</span>
-                              Our AI predicted a <strong className="text-emerald-700">{((result.interaction_probability ?? result.consensus_probability ?? 0) * 100).toFixed(1)}% chance</strong> that <span className="font-semibold">{protein1}</span> and <span className="font-semibold">{protein2}</span> interact in the cell. Below, you can inspect their individual 3D shapes. The <strong className="text-emerald-700">highlighted amber/emerald region</strong> marks where the two proteins dock together.
+                              <span className="font-bold text-emerald-900 block mb-0.5">Summary:</span>
+                              Predicted interaction probability between <span className="font-bold text-slate-900">{protein1}</span> and <span className="font-bold text-slate-900">{protein2}</span> is <strong className="text-emerald-700">{((result.interaction_probability ?? 0) * 100).toFixed(1)}%</strong> using the <strong>{(result.active_model ?? selectedModel) === 'graphsage' ? 'GraphSAGE Ensemble (Primary Final Model)' : 'Standard GAT Ensemble (Controlled Comparison)'}</strong>.
                             </div>
                           </div>
                         )}
@@ -678,7 +762,7 @@ const Predict = () => {
                           {/* Consensus Gauge Card */}
                           <div id="card-probability-gauge" className="bg-white p-6 rounded-[2.5rem] border border-slate-100 flex flex-col items-center justify-between relative shadow-sm">
                             <div className="w-full flex items-center justify-between">
-                              <span className="px-3 py-1 bg-emerald-50 text-emerald-600 text-[9px] font-black rounded-lg uppercase tracking-widest">Consensus Signal</span>
+                              <span className="px-3 py-1 bg-emerald-50 text-emerald-600 text-[9px] font-black rounded-lg uppercase tracking-widest">Prediction Output</span>
                               <button
                                 onClick={() => handleExportCardFigure('card-probability-gauge', 'Probability_Gauge')}
                                 className="text-slate-400 hover:text-emerald-600 transition-colors p-1"
@@ -692,32 +776,44 @@ const Predict = () => {
                               <ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
                                   <Pie data={[{v: result.interaction_probability*100}, {v: 100 - result.interaction_probability*100}]} innerRadius={60} outerRadius={76} startAngle={90} endAngle={-270} dataKey="v" paddingAngle={2}>
-                                    <Cell fill={result.interaction_probability > 0.7 ? "#10b981" : result.interaction_probability > 0.5 ? "#f59e0b" : "#f43f5e"} />
+                                    <Cell fill={result.interaction_probability >= (result.threshold ?? (selectedModel === 'gat' ? 0.50 : 0.45)) ? "#10b981" : "#f43f5e"} />
                                     <Cell fill="#f1f5f9" />
                                   </Pie>
                                 </PieChart>
                               </ResponsiveContainer>
                               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                <span className="text-4xl font-black text-slate-800 tracking-tighter">{(result.interaction_probability*100).toFixed(0)}%</span>
+                                <span className="text-4xl font-black text-slate-800 tracking-tighter">{(result.interaction_probability*100).toFixed(1)}%</span>
                                 <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Probability</span>
                               </div>
                             </div>
 
-                            <div className={`w-full text-center py-2 rounded-full text-[10px] font-black uppercase tracking-widest shadow-sm ${
-                              result.interaction_probability > 0.7 ? 'bg-emerald-500 text-white' :
-                              result.interaction_probability > 0.5 ? 'bg-amber-500 text-white' :
-                              'bg-rose-500 text-white'
-                            }`}>
-                              {result.interaction_probability > 0.7 ? '⚡ Strong Interaction' : result.interaction_probability > 0.5 ? '◑ Moderate Interaction' : '✕ Weak Interaction'}
-                            </div>
+                            {/* Prediction Label using exact backend threshold */}
+                            {(() => {
+                              const threshold = result.threshold ?? (selectedModel === 'gat' ? 0.50 : 0.45);
+                              const isLikely = result.interaction_probability >= threshold;
+                              return (
+                                <div className={`w-full text-center py-2.5 px-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-sm flex items-center justify-center gap-2 ${
+                                  isLikely ? 'bg-emerald-500 text-white shadow-emerald-200' : 'bg-slate-700 text-white shadow-slate-200'
+                                }`}>
+                                  {isLikely ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
+                                  <span>{isLikely ? 'Likely Interaction' : 'Unlikely Interaction'}</span>
+                                  <span className="text-[10px] font-normal opacity-75 font-mono">(Thresh: {threshold.toFixed(2)})</span>
+                                </div>
+                              );
+                            })()}
 
                             <div className="mt-4 w-full space-y-2">
                               {[
-                                { label: 'Interaction Strength', value: result.interaction_probability > 0.7 ? 'Strong' : result.interaction_probability > 0.5 ? 'Moderate' : 'Weak', color: result.interaction_probability > 0.7 ? 'text-emerald-600 bg-emerald-50 border-emerald-200' : result.interaction_probability > 0.5 ? 'text-amber-600 bg-amber-50 border-amber-200' : 'text-rose-600 bg-rose-50 border-rose-200' },
-                                { label: 'Prediction Confidence', value: `${(result.confidence_score * 100).toFixed(1)}%`, color: 'text-indigo-600 bg-indigo-50 border-indigo-200' },
+                                { 
+                                  label: 'Classification', 
+                                  value: result.interaction_probability >= (result.threshold ?? (selectedModel === 'gat' ? 0.50 : 0.45)) ? 'Likely Interaction' : 'Unlikely Interaction', 
+                                  color: result.interaction_probability >= (result.threshold ?? (selectedModel === 'gat' ? 0.50 : 0.45)) ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-slate-700 bg-slate-50 border-slate-200' 
+                                },
+                                { label: 'Model', value: (result.active_model ?? selectedModel) === 'graphsage' ? 'GraphSAGE Ensemble' : 'Standard GAT Ensemble', color: 'text-slate-700 bg-slate-50 border-slate-200' },
+                                { label: 'Role', value: (result.active_model ?? selectedModel) === 'graphsage' ? 'Primary Final Model' : 'Controlled Comparison', color: (result.active_model ?? selectedModel) === 'graphsage' ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-amber-700 bg-amber-50 border-amber-200' },
+                                { label: 'Confidence Score', value: `${(result.confidence_score * 100).toFixed(1)}%`, color: 'text-indigo-600 bg-indigo-50 border-indigo-200' },
                                 { label: 'ESM Sequence Signal', value: `${(result.esm_probability * 100).toFixed(1)}%`, color: 'text-teal-600 bg-teal-50 border-teal-200' },
-                                { label: 'GraphSAGE Graph Signal', value: `${(result.gat_probability * 100).toFixed(1)}%`, color: 'text-violet-600 bg-violet-50 border-violet-200' },
-                                { label: 'Confidence Band', value: result.interaction_probability > 0.75 ? 'High Confidence' : result.interaction_probability > 0.5 ? 'Moderate Confidence' : 'Low Confidence', color: 'text-slate-600 bg-slate-50 border-slate-200' },
+                                { label: (result.active_model ?? selectedModel) === 'graphsage' ? 'GraphSAGE Graph Signal' : 'Standard GAT Graph Signal', value: `${(result.gat_probability * 100).toFixed(1)}%`, color: 'text-violet-600 bg-violet-50 border-violet-200' },
                               ].map((m, i) => (
                                 <div key={i} className={`flex items-center justify-between px-3 py-1.5 rounded-xl border text-[10px] font-bold ${m.color}`}>
                                   <span>{m.label}</span>
@@ -1016,8 +1112,8 @@ const Predict = () => {
                                 >
                                   <Camera size={14} />
                                 </button>
-                                <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${result.interaction_probability > 0.5 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'}`}>
-                                  {result.interaction_probability > 0.5 ? 'Positive Binding' : 'Non-Interacting'}
+                                <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${result.interaction_probability >= (result.threshold ?? (selectedModel === 'gat' ? 0.50 : 0.45)) ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'}`}>
+                                  {result.interaction_probability >= (result.threshold ?? (selectedModel === 'gat' ? 0.50 : 0.45)) ? 'Likely Interaction' : 'Unlikely Interaction'}
                                 </span>
                               </div>
                             </div>
@@ -1037,7 +1133,7 @@ const Predict = () => {
                                   <Database size={14} className="text-indigo-400" /> Graph Network Topology
                                 </p>
                                 <p className="text-slate-300 opacity-90 text-[11px]">
-                                  The GraphSAGE graph model scored interaction-graph neighborhood proximity at <strong className="text-indigo-400">{(result.gat_probability * 100).toFixed(1)}%</strong>, indicating shared functional sub-graphs in STRING DB topology.
+                                  The {(result.active_model ?? selectedModel) === 'graphsage' ? 'GraphSAGE' : 'Standard GAT'} graph model scored interaction-graph neighborhood proximity at <strong className="text-indigo-400">{(result.gat_probability * 100).toFixed(1)}%</strong>, capturing functional sub-graphs in STRING DB topology.
                                 </p>
                               </div>
                             </div>
@@ -1053,6 +1149,122 @@ const Predict = () => {
                             </div>
                           </div>
 
+                        </div>
+
+                        {/* SHAP Explanation Section (PART 8) */}
+                        <div className="bg-white p-7 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-4">
+                          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                            <div className="flex items-center gap-2.5">
+                              <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
+                                <BarChart3 size={18} />
+                              </div>
+                              <div>
+                                <h4 className="text-sm font-black text-slate-800 tracking-tight">SHAP Meta-Feature Attribution</h4>
+                                <p className="text-[10px] text-slate-400 font-medium">SHAP is used to interpret the contribution of the XGBoost meta-features to the final prediction.</p>
+                              </div>
+                            </div>
+                            <span className="text-[10px] font-bold text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100">
+                              7 Meta-Features
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                            {[
+                              { name: 'p_seq (ESM-2)', desc: 'Sequence prediction', idx: 0 },
+                              { name: 'p_graph (' + ((result.active_model ?? selectedModel) === 'graphsage' ? 'GraphSAGE' : 'Standard GAT') + ')', desc: 'Calibrated graph prediction', idx: 1 },
+                              { name: 'conf_seq', desc: '|p_seq - 0.5|', idx: 2 },
+                              { name: 'conf_graph', desc: '|p_graph - 0.5|', idx: 3 },
+                              { name: 'diff', desc: '|p_seq - p_graph|', idx: 4 },
+                              { name: 'max_conf', desc: 'max(conf_seq, conf_graph)', idx: 5 },
+                              { name: 'consensus', desc: 'p_seq × p_graph', idx: 6 },
+                            ].map((f, i) => {
+                              const val = (result.shap_explanations && result.shap_explanations[f.idx]) ?? 0.0;
+                              const isPositive = val >= 0;
+                              return (
+                                <div key={i} className="p-3 bg-slate-50/80 rounded-2xl border border-slate-100 space-y-1">
+                                  <div className="flex items-center justify-between text-[11px] font-bold">
+                                    <span className="text-slate-700 truncate font-mono">{f.name}</span>
+                                    <span className={`font-mono text-xs font-black ${isPositive ? 'text-emerald-600' : 'text-rose-600'}`}>
+                                      {val > 0 ? `+${val.toFixed(4)}` : val.toFixed(4)}
+                                    </span>
+                                  </div>
+                                  <p className="text-[10px] text-slate-400 truncate">{f.desc}</p>
+                                  <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
+                                    <div 
+                                      className={`h-full rounded-full ${isPositive ? 'bg-emerald-500' : 'bg-rose-500'}`}
+                                      style={{ width: `${Math.min(Math.abs(val) * 200, 100)}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <p className="text-[10px] text-slate-400 italic">
+                            * Note: SHAP values interpret the attribution of XGBoost meta-features within the decision ensemble and do not claim to prove direct biological causation.
+                          </p>
+                        </div>
+
+                        {/* MODEL COMPARISON TABLE (PART 15) */}
+                        <div className="bg-white p-7 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-4">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                            <div>
+                              <h4 className="text-sm font-black text-slate-800 tracking-tight">System Architecture Comparison: GraphSAGE vs Standard GAT</h4>
+                              <p className="text-[10px] text-slate-400 font-medium">Evaluated under identical ESM-2 sequence embeddings and XGBoost stacking on the untouched 20,172-pair test set</p>
+                            </div>
+                            <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-[10px] font-bold self-start sm:self-auto border border-indigo-100">
+                              Untouched Test Set (20,172 pairs)
+                            </span>
+                          </div>
+
+                          <div className="overflow-x-auto rounded-2xl border border-slate-100">
+                            <table className="w-full text-xs text-left">
+                              <thead>
+                                <tr className="bg-slate-50 text-slate-500 font-black uppercase text-[10px] tracking-wider border-b border-slate-100">
+                                  <th className="py-3 px-5">Evaluation Metric</th>
+                                  <th className="py-3 px-5 text-emerald-800 bg-emerald-50/70">
+                                    GraphSAGE Ensemble<br />
+                                    <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest">Primary Final Model</span>
+                                  </th>
+                                  <th className="py-3 px-5 text-amber-800 bg-amber-50/70">
+                                    Standard GAT Ensemble<br />
+                                    <span className="text-[9px] font-bold text-amber-600 uppercase tracking-widest">Controlled Experimental Comparison</span>
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100 font-mono text-slate-700">
+                                <tr className="hover:bg-slate-50/50">
+                                  <td className="py-3 px-5 font-sans font-bold text-slate-800">Accuracy</td>
+                                  <td className="py-3 px-5 font-black text-emerald-700 bg-emerald-50/30">93.10%</td>
+                                  <td className="py-3 px-5 text-slate-700 bg-amber-50/20">89.79%</td>
+                                </tr>
+                                <tr className="hover:bg-slate-50/50">
+                                  <td className="py-3 px-5 font-sans font-bold text-slate-800">Precision</td>
+                                  <td className="py-3 px-5 font-black text-emerald-700 bg-emerald-50/30">0.9448</td>
+                                  <td className="py-3 px-5 text-slate-700 bg-amber-50/20">0.9205</td>
+                                </tr>
+                                <tr className="hover:bg-slate-50/50">
+                                  <td className="py-3 px-5 font-sans font-bold text-slate-800">Recall</td>
+                                  <td className="py-3 px-5 font-black text-emerald-700 bg-emerald-50/30">0.9155</td>
+                                  <td className="py-3 px-5 text-slate-700 bg-amber-50/20">0.8710</td>
+                                </tr>
+                                <tr className="hover:bg-slate-50/50">
+                                  <td className="py-3 px-5 font-sans font-bold text-slate-800">F1-Score</td>
+                                  <td className="py-3 px-5 font-black text-emerald-700 bg-emerald-50/30">0.9300</td>
+                                  <td className="py-3 px-5 text-slate-700 bg-amber-50/20">0.8951</td>
+                                </tr>
+                                <tr className="hover:bg-slate-50/50">
+                                  <td className="py-3 px-5 font-sans font-bold text-slate-800">ROC-AUC</td>
+                                  <td className="py-3 px-5 font-black text-emerald-700 bg-emerald-50/30">0.9753</td>
+                                  <td className="py-3 px-5 text-slate-700 bg-amber-50/20">0.9582</td>
+                                </tr>
+                                <tr className="hover:bg-slate-50/50">
+                                  <td className="py-3 px-5 font-sans font-bold text-slate-800">PR-AUC</td>
+                                  <td className="py-3 px-5 font-black text-emerald-700 bg-emerald-50/30">0.9801</td>
+                                  <td className="py-3 px-5 text-slate-700 bg-amber-50/20">0.9627</td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
                         </div>
                       </motion.div>
                     )}

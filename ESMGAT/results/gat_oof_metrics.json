@@ -1,0 +1,87 @@
+{
+  "architecture": "GAT",
+  "sample_count": 161369,
+  "positive_count": 80685,
+  "negative_count": 80684,
+  "folds": [
+    {
+      "fold": 1,
+      "n_train": 129095,
+      "n_held_out": 32274,
+      "cached": false,
+      "best_epoch": 4,
+      "best_val_loss": 0.6915426254272461,
+      "raw_auc": 0.7726571467448566,
+      "cal_auc": 0.7726571947474185,
+      "time_s": 168.01747870445251
+    },
+    {
+      "fold": 2,
+      "n_train": 129095,
+      "n_held_out": 32274,
+      "cached": false,
+      "best_epoch": 4,
+      "best_val_loss": 0.6919033527374268,
+      "raw_auc": 0.8444948601909836,
+      "cal_auc": 0.844494898593033,
+      "time_s": 86.33614611625671
+    },
+    {
+      "fold": 3,
+      "n_train": 129095,
+      "n_held_out": 32274,
+      "cached": false,
+      "best_epoch": 2,
+      "best_val_loss": 0.6932486295700073,
+      "raw_auc": 0.568261539876329,
+      "cal_auc": 0.5682617261262686,
+      "time_s": 122.32882761955261
+    },
+    {
+      "fold": 4,
+      "n_train": 129095,
+      "n_held_out": 32274,
+      "cached": false,
+      "best_epoch": 2,
+      "best_val_loss": 0.6921907067298889,
+      "raw_auc": 0.8356214138414173,
+      "cal_auc": 0.8356214100012125,
+      "time_s": 127.52628374099731
+    },
+    {
+      "fold": 5,
+      "n_train": 129096,
+      "n_held_out": 32273,
+      "cached": false,
+      "best_epoch": 4,
+      "best_val_loss": 0.690381646156311,
+      "raw_auc": 0.8063765520036374,
+      "cal_auc": 0.8063764943969935,
+      "time_s": 161.96423888206482
+    }
+  ],
+  "sequence_oof": {
+    "roc_auc": 0.9331341758398856,
+    "pr_auc": 0.9377684145941875,
+    "accuracy": 0.8591674980944295,
+    "f1": 0.8587464571627468
+  },
+  "gat_oof_raw": {
+    "roc_auc": 0.5941326445100009,
+    "pr_auc": 0.6118605175217786
+  },
+  "gat_oof_calibrated": {
+    "roc_auc": 0.7828021661156412,
+    "pr_auc": 0.7939740129194806,
+    "accuracy": 0.707787741139872,
+    "f1": 0.71091738394762,
+    "brier_score": 0.19037869096741383,
+    "ece": 0.03186788821974428
+  },
+  "ensemble_oof_fit": {
+    "train_accuracy": 0.8718279223394828,
+    "train_f1": 0.8694609417897919,
+    "train_roc_auc": 0.9431115826511117,
+    "train_pr_auc": 0.9486641348763551
+  }
+}

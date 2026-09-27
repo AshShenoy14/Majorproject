@@ -200,7 +200,8 @@ def fit_gat(
         print(
             f"  [{tag}] Epoch {epoch + 1:03d}/{cfg['max_epochs']} | Train Loss: {tot_loss:.4f} | "
             f"Val Loss: {val_loss:.4f} {'*' if improved else ' '} | LR: {sched.get_last_lr()[0]:.2e} | "
-            f"{elapsed:.1f}s{mem_info}"
+            f"{elapsed:.1f}s{mem_info}",
+            flush=True
         )
 
         history.append({

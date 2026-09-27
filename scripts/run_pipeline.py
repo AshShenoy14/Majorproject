@@ -92,7 +92,7 @@ def run_pipeline(limit_data: int = None):
             torch.save(embeddings, emb_path)
             print("Embeddings saved.")
     
-    # 4. Build Graph (GATv2 Ready)
+    # 4. Build PPI Graph
     print("--- Building PPI Graph ---")
     valid_proteins = sorted(list(embeddings.keys()))
     node_mapping = {p: i for i, p in enumerate(valid_proteins)}

@@ -7,7 +7,7 @@ from torch_geometric.nn import GATConv, BatchNorm as GNNBatchNorm
 class GATLinkPredictor(nn.Module):
     def __init__(
         self,
-        in_channels: int = 483,
+        in_channels: int = 643,
         hidden_channels: int = 256,
         heads: int = 4,
         dropout: float = 0.4,
