@@ -1,6 +1,8 @@
+from typing import Literal
+
 from fastapi import APIRouter, HTTPException
 
-from app.backend import state
+from app.backend import jobs, state
 from app.backend.schemas import MutationRequest, MutationAnalysisResponse, ProteinPair, ResidueGraphRequest
 
 router = APIRouter(tags=["Analysis"])
@@ -52,43 +54,47 @@ def scan_mutations(request: MutationRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/analysis/hotspots",
-             summary="Identify Interaction Hotspots",
-             description="Detects critical residues (hotspots) for the interaction using gradient-based importance.")
-def get_hotspots(request: ProteinPair):
-    """
-    Identifies specific amino acids that contribute most significantly to the interaction.
-    """
-
-    if "hotspot" not in state.analyzers:
-        raise HTTPException(status_code=503, detail="Hotspot Analyzer not initialized")
-
+def _resolve_pair(request: ProteinPair):
+    """Returns (p1, p2, sequences) for a request, fetching missing sequences; 400/404 on bad input."""
     p1 = request.protein1_id.strip() if request.protein1_id else None
     p2 = request.protein2_id.strip() if request.protein2_id else None
     if not p1 or not p2:
         raise HTTPException(status_code=400, detail="Both protein1_id and protein2_id are required.")
 
+    sequences, to_fetch = {}, []
+    for pid, seq in ((p1, request.protein1_seq), (p2, request.protein2_seq)):
+        if seq:
+            sequences[pid] = seq
+        else:
+            to_fetch.append(pid)
+    if to_fetch:
+        sequences.update(state.managers["sequence"].get_sequences(to_fetch))
+
+    missing = [pid for pid in (p1, p2) if pid not in sequences]
+    if missing:
+        raise HTTPException(status_code=404, detail=f"Could not find a sequence for: {', '.join(missing)}. "
+                                                    "Use a known Ensembl protein ID or provide the sequence.")
+    return p1, p2, sequences
+
+
+def _require(analyzer: str, label: str):
+    if analyzer not in state.analyzers:
+        raise HTTPException(status_code=503, detail=f"{label} not initialized")
+
+
+@router.post("/analysis/hotspots",
+             summary="Identify Interaction Hotspots",
+             description="Occlusion scan: masks windows of 5 residues, re-embeds each protein with ESM-2 and measures the "
+                         "drop in the sequence model's interaction score. Takes 1-2 minutes on CPU for typical proteins; "
+                         "use POST /analysis/jobs/hotspots to run it in the background with progress.")
+def get_hotspots(request: ProteinPair):
+    """
+    Identifies specific amino acids that contribute most significantly to the interaction.
+    """
+    _require("hotspot", "Hotspot Analyzer")
+    p1, p2, sequences = _resolve_pair(request)
     try:
-        # Get sequences if missing
-        sequences = {}
-        to_fetch = []
-        if not request.protein1_seq: to_fetch.append(p1)
-        else: sequences[p1] = request.protein1_seq
-        if not request.protein2_seq: to_fetch.append(p2)
-        else: sequences[p2] = request.protein2_seq
-
-        if to_fetch:
-            sequences.update(state.managers["sequence"].get_sequences(to_fetch))
-
-        if p1 not in sequences or p2 not in sequences:
-            raise HTTPException(status_code=404, detail="Could not find sequences for one or both proteins.")
-
-        return state.analyzers["hotspot"].identify_hotspots(
-            p1, sequences[p1],
-            p2, sequences[p2]
-        )
-    except HTTPException as he:
-        raise he
+        return state.analyzers["hotspot"].identify_hotspots(p1, sequences[p1], p2, sequences[p2])
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -159,33 +165,49 @@ def get_residue_graph(request: ResidueGraphRequest):
 
 @router.post("/analysis/optimize",
              summary="Optimize Interaction",
-             description="Suggests mutations to either disrupt or enhance a protein-protein interaction.")
-def get_optimization(request: ProteinPair, mode: str = "disrupt"):
+             description="Suggests mutations to either disrupt or stabilize a protein-protein interaction. Takes 1-2 minutes "
+                         "on CPU; use POST /analysis/jobs/optimize to run it in the background with progress.")
+def get_optimization(request: ProteinPair, mode: Literal["disrupt", "stabilize"] = "disrupt"):
     """
     In-silico optimization or disruption of a PPI.
     """
-
-    if "mutation" not in state.analyzers:
-        raise HTTPException(status_code=503, detail="Mutation Analyzer not initialized")
-
+    _require("mutation", "Mutation Analyzer")
+    p1, p2, sequences = _resolve_pair(request)
     try:
-        # Get sequences
-        sequences = {}
-        to_fetch = []
-        if not request.protein1_seq: to_fetch.append(request.protein1_id)
-        else: sequences[request.protein1_id] = request.protein1_seq
-        if not request.protein2_seq: to_fetch.append(request.protein2_id)
-        else: sequences[request.protein2_id] = request.protein2_seq
-
-        if to_fetch:
-            sequences.update(state.managers["sequence"].get_sequences(to_fetch))
-
-        return state.analyzers["mutation"].suggest_optimal_mutations(
-            request.protein1_id, sequences[request.protein1_id],
-            request.protein2_id, sequences[request.protein2_id],
-            mode=mode
-        )
-    except HTTPException as he:
-        raise he
+        return state.analyzers["mutation"].suggest_optimal_mutations(p1, sequences[p1], p2, sequences[p2], mode=mode)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/analysis/jobs/hotspots",
+             summary="Start a Background Hotspot Scan",
+             description="Starts /analysis/hotspots as a background job and returns its job_id; poll GET /analysis/jobs/{job_id}.")
+def start_hotspot_job(request: ProteinPair):
+    _require("hotspot", "Hotspot Analyzer")
+    p1, p2, sequences = _resolve_pair(request)
+    analyzer = state.analyzers["hotspot"]
+    job_id = jobs.submit("hotspots", lambda progress: analyzer.identify_hotspots(
+        p1, sequences[p1], p2, sequences[p2], progress=progress))
+    return jobs.get(job_id)
+
+
+@router.post("/analysis/jobs/optimize",
+             summary="Start a Background Mutation Design",
+             description="Starts /analysis/optimize as a background job and returns its job_id; poll GET /analysis/jobs/{job_id}.")
+def start_optimize_job(request: ProteinPair, mode: Literal["disrupt", "stabilize"] = "disrupt"):
+    _require("mutation", "Mutation Analyzer")
+    p1, p2, sequences = _resolve_pair(request)
+    analyzer = state.analyzers["mutation"]
+    job_id = jobs.submit("optimize", lambda progress: analyzer.suggest_optimal_mutations(
+        p1, sequences[p1], p2, sequences[p2], mode=mode, progress=progress))
+    return jobs.get(job_id)
+
+
+@router.get("/analysis/jobs/{job_id}",
+            summary="Background Job Status",
+            description="Status (queued/running/done/error), progress {done, total, stage} and, when done, the result.")
+def get_job(job_id: str):
+    job = jobs.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Unknown or expired job id.")
+    return job

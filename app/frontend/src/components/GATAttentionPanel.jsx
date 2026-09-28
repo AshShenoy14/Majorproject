@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Eye, Info } from 'lucide-react';
 
 // Attention-based explanation from the GAT comparison model (ESMGAT backend, `attention_explanation`).

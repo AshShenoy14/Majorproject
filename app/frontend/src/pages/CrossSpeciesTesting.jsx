@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   Box,
   Typography,
@@ -8,7 +8,6 @@ import {
   Button,
   CircularProgress,
   Chip,
-  useTheme,
   Stack,
   Alert
 } from '@mui/material';
@@ -47,8 +46,6 @@ const SPECIES_TESTS = [
 ];
 
 const CrossSpeciesTesting = () => {
-    const theme = useTheme();
-    const isDark = theme.palette.mode === 'dark';
     
     const [loadingMap, setLoadingMap] = useState({});
     const [resultMap, setResultMap] = useState({});

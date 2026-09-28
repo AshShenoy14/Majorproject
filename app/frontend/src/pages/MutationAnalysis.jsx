@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { 
   Dna, 
   ArrowRight, 
@@ -13,19 +13,18 @@ import {
   TrendingUp,
   Minus
 } from 'lucide-react';
-import { 
-  LineChart, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer, 
+import {
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
   ReferenceLine,
   AreaChart,
   Area
 } from 'recharts';
 import { ppiService } from '../services/api';
+import HotspotDesignPanel from '../components/HotspotDesignPanel';
 
 const MutationAnalysis = () => {
   const [searchParams] = useSearchParams();
@@ -38,7 +37,7 @@ const MutationAnalysis = () => {
     if (paramP1) setProtein1(paramP1);
     if (paramP2) setProtein2(paramP2);
   }, [paramP1, paramP2]);
-  const [mutations, setMutations] = useState([{ protein: 1, pos: 45, orig: 'A', mut: 'T' }]);
+  const [mutations, setMutations] = useState([{ protein: 1, pos: 45, orig: 'K', mut: 'A' }]);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
@@ -85,7 +84,7 @@ const MutationAnalysis = () => {
 
   const getImpactData = () => {
     if (!result || !result.mutation_results) return [];
-    return result.mutation_results.map(res => ({
+    return result.mutation_results.filter(res => !res.error).map(res => ({
       pos: res.pos,
       impact: res.impact_delta,
       orig: res.orig,
@@ -203,6 +202,12 @@ const MutationAnalysis = () => {
         </form>
       </div>
 
+      <HotspotDesignPanel
+        protein1={protein1}
+        protein2={protein2}
+        onLoadMutations={(muts) => { setMutations(muts); setResult(null); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+      />
+
       {result && result.mutation_results && result.mutation_results.length > 0 && (
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
@@ -213,8 +218,21 @@ const MutationAnalysis = () => {
           <div className="lg:col-span-1 space-y-6">
             <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest text-center">Batch Mutation Results</h3>
             {result.mutation_results.map((res, idx) => {
-              const isIncrease = res.impact_delta > 0;
-              const isDecrease = res.impact_delta < 0;
+              if (res.error) {
+                return (
+                  <div key={idx} className="glass-card p-6 space-y-2 border border-amber-200">
+                    <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                      Protein {res.protein === 2 ? 'B' : 'A'} (P{res.pos} {res.orig}→{res.mut})
+                    </span>
+                    <p className="text-xs text-amber-700 flex items-start gap-2">
+                      <AlertTriangle size={14} className="shrink-0 mt-0.5" /> Not evaluated: {res.error}
+                    </p>
+                  </div>
+                );
+              }
+              // same thresholds as the backend's interpretation (|Δ| > 0.05 = Enhancing / Disruptive)
+              const isIncrease = res.interpretation === 'Enhancing';
+              const isDecrease = res.interpretation === 'Disruptive';
               return (
                 <div key={idx} className="glass-card p-6 flex flex-col items-center space-y-4">
                   <div className="flex items-center justify-between w-full gap-2">
@@ -247,7 +265,7 @@ const MutationAnalysis = () => {
                          <Minus size={18} className="text-slate-500" />
                        )}
                         <span className="text-xs font-extrabold">
-                          {isIncrease ? '+' : ''}
+                          {res.impact_delta > 0 ? '+' : ''}
                           {(Number(res.impact_delta || 0) * 100).toFixed(1)}% Δ
                         </span>
                     </div>

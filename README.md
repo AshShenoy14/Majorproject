@@ -33,8 +33,8 @@ Protein–Protein Interactions govern fundamental cellular processes. TransGraph
 | **Graph Model (Comparison)** | Standard GAT (`GATConv`, 4 heads) over training PPI graph | Controlled experimental comparison based on the original project proposal |
 | **Biological Context** | UniProt subcellular localization (cache-only score) | Contextual co-localization signal |
 | **Ensemble Meta-Learner** | XGBoost (5-Fold Stratified OOF Stacking) | Stacks sequence and calibrated graph probabilities plus confidence/disagreement meta-features |
-| **Explainability (XAI)** | SHAP (TreeExplainer) | Feature attribution interpreting the contribution of XGBoost meta-features to predictions |
-| **Downstream Analysis** | Centrality + ChEMBL target lookup | Therapeutic-target prioritization and network analysis |
+| **Explainability (XAI)** | SHAP (TreeExplainer) + GAT attention | SHAP attributes each prediction to the XGBoost meta-features (both models); for the GAT model, the per-layer attention coefficients show which graph neighbours each protein's encoding attended to (Predict page, Evidence tab) |
+| **Downstream Analysis** | Centrality + ChEMBL target lookup on the predicted network | Therapeutic-target prioritization on the known interactions plus the interactions the ensemble predicts on held-out pairs (switchable to the known network) |
 
 ---
 
@@ -202,6 +202,13 @@ python src/training/train_ensemble.py
 # 6. Final held-out test evaluation + SHAP (writes assets/evaluation/final_test_metrics.json)
 python src/evaluation/compare_models.py
 
+# 7. Predicted interaction network for the target analysis (known train positives + held-out pairs the
+#    ensemble predicts as interacting; checks it reproduces the committed test predictions)
+python scripts/build_predicted_network.py
+
+# Optional: 95% bootstrap CIs from the committed test predictions
+python scripts/evaluation/bootstrap_ci.py
+
 # Optional: dataset / calibration audit
 python scripts/evaluation/audit_measurements.py --out assets/evaluation/audit/audit_current.json
 ```
@@ -259,18 +266,18 @@ TransGraph-PPI
 
 ## ⚠️ Explicit Limitations
 
-1. **Transductive evaluation**: the split is pair-disjoint, not node-disjoint, so the main results table does not measure generalization to unseen proteins. A simulated semi-cold-start check (`scripts/evaluation/cold_start_eval.py`, `assets/evaluation/cold_start_eval.json`) removes 400 proteins from the trained graph, forces them through the exact production `insert_novel_node_knn` reconstruction path in `/predict`, and scores against real test.csv labels: accuracy 0.833 / ROC-AUC 0.937 (vs. 0.910 / 0.960 for the same pairs when the protein's real node is present), stable across a second seed/held-out set (0.839 / 0.958 vs. 0.927 / 0.980). This is real evidence that the cold-start path works and degrades gracefully rather than failing, but is **not** a from-scratch protein-disjoint retrain — the base models' weights were still originally fit with these proteins' data available, so this should be read as "the inference-time reconstruction mechanism is functional," not "the model generalizes to truly unseen proteins." The Cross-Species page remains exploratory and unevaluated.
-2. **Single split, single run**: the main results come from one seed/split. A 2,000-resample bootstrap on the test set gives 95% CIs for the ensemble: accuracy [0.9176, 0.9251], ROC-AUC [0.9687, 0.9729], F1 [0.9162, 0.9239] (`assets/evaluation/bootstrap_ci.json`) — no independent multi-seed retraining has been done.
+1. **Transductive evaluation**: the split is pair-disjoint, not node-disjoint, so the main results table does not measure generalization to unseen proteins. A simulated semi-cold-start check (`scripts/evaluation/cold_start_eval.py`, `assets/evaluation/cold_start_eval.json`) removes 400 proteins from the trained graph, forces them through the exact production `insert_novel_node_knn` reconstruction path in `/predict`, and scores against real test.csv labels: accuracy 0.832 / ROC-AUC 0.948 (vs. 0.926 / 0.971 for the same pairs when the protein's real node is present), stable across a second seed/held-out set (0.839 / 0.958 vs. 0.927 / 0.980). This is real evidence that the cold-start path works and degrades gracefully rather than failing, but is **not** a from-scratch protein-disjoint retrain — the base models' weights were still originally fit with these proteins' data available, so this should be read as "the inference-time reconstruction mechanism is functional," not "the model generalizes to truly unseen proteins." The Cross-Species page remains exploratory and unevaluated.
+2. **Single split, single run**: the main results come from one seed/split. A 2,000-resample bootstrap on the test set gives 95% CIs for the ensemble: accuracy [0.9274, 0.9346], ROC-AUC [0.9732, 0.9772], F1 [0.9262, 0.9336] (`scripts/evaluation/bootstrap_ci.py`, `assets/evaluation/bootstrap_ci.json`) — no independent multi-seed retraining has been done.
 3. **Biological feature**: the co-localization score is display-only and is not an ensemble input (the meta-vector has 7 features).
 3a. **Degree-bias baseline**: a logistic regression on the log positive-degree of the two proteins alone reaches accuracy 0.7063 / ROC-AUC 0.7838 on the test set (`assets/evaluation/audit/audit_after_data.json`), so a substantial part of the signal is node-degree bias that the transductive split does not remove.
-3b. **Calibration**: on val.csv the Platt calibrator lowered GraphSAGE ECE from 0.15344 to 0.05018 and Brier from 0.11871 to 0.07455 (`assets/evaluation/graph_calibration.json`; the calibrator is fit and scored on the same val set, the cross-fitted ECE is 0.05009).
+3b. **Calibration**: on val.csv the Platt calibrator lowered GraphSAGE ECE from 0.14472 to 0.05097 and Brier from 0.10694 to 0.06616 (`assets/evaluation/graph_calibration.json`; the calibrator is fit and scored on the same val set, the cross-fitted ECE is 0.05097).
 4. **Synthetic negatives**: negatives are sampled, not experimentally validated, and may include unannotated true interactions.
 5. **External benchmarks**: run with the same, unretrained checkpoints via the exact `/predict` inference path (`scripts/evaluation/external_benchmark_shs27k.py`, `scripts/evaluation/external_benchmark_huri.py`), against real labels, not against a curated "easy" slice.
-   - **SHS27k** (Chen et al.; 15,248 pairs, 1,690 proteins, 81% byte-identical to training proteins — same underlying database, STRING, just a different curated snapshot, not an independent source): accuracy 0.698, ROC-AUC 0.802, F1 0.612 (`assets/evaluation/external_benchmark_shs27k.json`). A steep drop from the 92.13% in-domain result, consistent with this project's own cited literature that cross-dataset PPI accuracy plateaus well below in-domain numbers.
-   - **HuRI / HI-union** (Luck et al. 2020, systematic yeast-two-hybrid screen — a genuinely independent source, not derived from STRING; 1,394 pairs sampled from the full 64,006-pair set, 1,028 proteins): accuracy 0.523, ROC-AUC 0.573, F1 0.144 (`assets/evaluation/external_benchmark_huri.json`), barely above chance. The confusion matrix shows the model predicts positive on only 5.7% of pairs versus the true 50% positive rate — a strong under-confidence bias on this out-of-distribution data, not random noise. This is the clearest evidence in the whole project that the model does not generalize to a genuinely different interaction-detection modality, and should be stated plainly as a limitation, not minimized.
-   - Neither benchmark involved any retraining; both reuse the checkpoints behind the main 92.13% result and the same cold-start reconstruction path as `scripts/evaluation/cold_start_eval.py` for proteins absent from the training graph.
-6. **Embedding scale**: only the 35M-parameter ESM-2 model was used.
-7. **Therapeutic targets**: the TTPS score (0.40 degree + 0.35 betweenness + 0.25 ChEMBL indicator) is a heuristic with user-chosen weights, not a validated ranking.
+   - **SHS27k** (Chen et al.; 15,248 pairs, 1,690 proteins, 81% byte-identical to training proteins — same underlying database, STRING, just a different curated snapshot, not an independent source): accuracy 0.699, ROC-AUC 0.815, F1 0.605 (`assets/evaluation/external_benchmark_shs27k.json`). A steep drop from the 93.10% in-domain result, consistent with this project's own cited literature that cross-dataset PPI accuracy plateaus well below in-domain numbers.
+   - **HuRI / HI-union** (Luck et al. 2020, systematic yeast-two-hybrid screen — a genuinely independent source, not derived from STRING; 700 pairs sampled from the full 64,006-pair set, 684 scored, 728 genes): accuracy 0.519, ROC-AUC 0.585, F1 0.118 (`assets/evaluation/external_benchmark_huri.json`), barely above chance. The confusion matrix shows the model predicts positive on only 4.5% of pairs versus the true 50% positive rate — a strong under-confidence bias on this out-of-distribution data, not random noise. This is the clearest evidence in the whole project that the model does not generalize to a genuinely different interaction-detection modality, and should be stated plainly as a limitation, not minimized.
+   - Neither benchmark involved any retraining; both reuse the checkpoints behind the main 93.10% result and the same cold-start reconstruction path as `scripts/evaluation/cold_start_eval.py` for proteins absent from the training graph.
+6. **Embedding scale**: only one protein language model size was evaluated in the final system (ESM-2 150M, `esm2_t30_150M_UR50D`, 640-d); larger ESM-2 variants (650M, 3B) were not tried.
+7. **Therapeutic targets**: the TTPS score (0.40 degree + 0.35 betweenness + 0.25 ChEMBL indicator) is a heuristic with user-chosen weights, not a validated ranking. The predicted network (`scripts/build_predicted_network.py`, `assets/evaluation/predicted_network_summary.json`) adds 19,596 ensemble-predicted interactions from the held-out val/test pairs to the 80,685 known ones; 18,543 of them are STRING interactions and 1,053 are not (candidate new interactions or false positives, which the model cannot distinguish). Only held-out pairs were scored, so it does not search the full space of unseen protein pairs.
 
 ---
 

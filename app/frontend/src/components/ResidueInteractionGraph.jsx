@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { Box, Typography, Paper, CircularProgress, Chip, Stack } from '@mui/material';
 import ForceGraph2D from 'react-force-graph-2d';
 import { ppiService } from '../services/api';

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import ForceGraph3D from 'react-force-graph-3d';
 import { motion } from 'framer-motion';
 import { Globe, ZoomIn, ZoomOut, Maximize, Loader2, AlertTriangle } from 'lucide-react';

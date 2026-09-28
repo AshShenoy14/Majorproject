@@ -19,7 +19,10 @@ def test_endpoint_all_benchmarks(client):
     assert res.status_code == 200
     data = res.json()
     # every committed artifact should be present and match the verified numbers
-    assert data["bootstrap_ci"]["accuracy"]["mean"] == pytest.approx(0.9213, abs=1e-3)
+    # the bootstrap must describe the current model: its mean sits on the final test accuracy
+    final = client.get("/evaluation/final").json()
+    ens_acc = next(v for k, v in final["models"].items() if "Ensemble" in k)["accuracy"]
+    assert data["bootstrap_ci"]["accuracy"]["mean"] == pytest.approx(ens_acc, abs=2e-3)
     assert data["cold_start"]["cold_start_novel_protein_via_knn"]["accuracy"] == pytest.approx(0.833, abs=1e-2)
     assert data["shs27k"]["overall"]["accuracy"] == pytest.approx(0.698, abs=1e-2)
     assert data["huri"]["overall"]["roc_auc"] == pytest.approx(0.585, abs=1e-2)
@@ -143,3 +146,42 @@ def test_endpoint_chat_message(client):
     assert res.status_code == 200
     data = res.json()
     assert "response" in data
+
+
+def test_mutate_residue_mismatch_is_reported_not_500(client):
+    seq = client.post("/predict", json={"protein1_id": "ENSP00000222573", "protein2_id": "ENSP00000226218"}).json()["protein1_seq"]
+    wrong = "W" if seq[4] != "W" else "A"
+    res = client.post("/analysis/mutate", json={
+        "protein1_id": "ENSP00000222573", "protein2_id": "ENSP00000226218",
+        "mutations": [{"protein": 1, "pos": 5, "orig": wrong, "mut": "A"},
+                      {"protein": 1, "pos": 99999, "orig": "A", "mut": "G"}]})
+    assert res.status_code == 200
+    mismatch, out_of_range = res.json()["mutation_results"]
+    assert "mismatch" in mismatch["error"] and mismatch["impact_delta"] is None
+    assert "outside" in out_of_range["error"]
+
+
+def test_optimize_unknown_protein_is_404(client):
+    res = client.post("/analysis/optimize", json={"protein1_id": "NOT_A_PROTEIN", "protein2_id": "ENSP00000226218"})
+    assert res.status_code == 404
+
+
+def test_hotspot_job_runs_with_progress(client):
+    """Long analyses run as background jobs; short custom sequences keep this test fast."""
+    import time
+    seq_a, seq_b = "MKTAYIAKQRQISFVKSHFSRQLEERLGLIE", "MVLSPADKTNVKAAWGKVGAHAGEYGAEALE"
+    start = client.post("/analysis/jobs/hotspots", json={"protein1_id": "JOB_A", "protein2_id": "JOB_B",
+                                                         "protein1_seq": seq_a, "protein2_seq": seq_b})
+    assert start.status_code == 200
+    job_id = start.json()["job_id"]
+    for _ in range(240):
+        job = client.get(f"/analysis/jobs/{job_id}").json()
+        if job["status"] in ("done", "error"):
+            break
+        time.sleep(0.5)
+    assert job["status"] == "done", job
+    assert job["progress"]["done"] == job["progress"]["total"] > 0
+    result = job["result"]
+    assert len(result["protein1"]["residue_impact"]) == len(seq_a)
+    assert len(result["protein2"]["residue_impact"]) == len(seq_b)
+    assert client.get("/analysis/jobs/does-not-exist").status_code == 404

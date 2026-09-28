@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { PDB_1YCR_DATA } from './pdb1ycrData';
 
@@ -77,7 +77,7 @@ function createAtomSpheres(atoms, baseColor, radiusScale = 0.82) {
   };
 
   for (let i = 0; i < count; i++) {
-    const [x, y, z, elem, resName, resSeq, atomName] = atoms[i];
+    const [x, y, z, elem, , , atomName] = atoms[i];
     const r = radii[elem] || 1.45 * radiusScale;
 
     dummy.position.set(x, y, z);
@@ -113,7 +113,7 @@ const HeroProtein3D = () => {
 
   // Hover tooltip state
   const [tooltip, setTooltip] = useState(null);
-  const [isInteracting, setIsInteracting] = useState(false);
+  const [, setIsInteracting] = useState(false);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -334,7 +334,7 @@ const HeroProtein3D = () => {
 
     const animate = () => {
       animationFrameId = requestAnimationFrame(animate);
-      const delta = clock.getDelta();
+      clock.getDelta(); // advances the clock; getElapsedTime() below drives the animation
       const elapsedTime = clock.getElapsedTime();
 
       // Continuous, smooth 360° idle rotation with graceful momentum blending

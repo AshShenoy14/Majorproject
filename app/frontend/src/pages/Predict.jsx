@@ -1,18 +1,48 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Search, Activity, BarChart3, Info, CheckCircle2, 
-  XCircle, AlertCircle, Loader2, ChevronRight, 
-  ShieldCheck, Cpu, Database, Terminal as TerminalIcon,
-  Zap, ArrowRightLeft, LayoutGrid, Box, BookOpen, Download,
-  Sparkles, Gauge, Server, Clock, UploadCloud, ToggleLeft, ToggleRight,
-  GraduationCap, FlaskConical, Table2, FileDown, Camera, FileText, Layers, Image,
-  Dna, Pill, Share2, GitCompare, Bot, Boxes, ArrowRight, ExternalLink, Compass
+import {
+  BarChart3,
+  Info,
+  CheckCircle2,
+  XCircle,
+  Loader2,
+  ChevronRight,
+  ShieldCheck,
+  Cpu,
+  Database,
+  Terminal as TerminalIcon,
+  Zap,
+  ArrowRightLeft,
+  LayoutGrid,
+  Box,
+  BookOpen,
+  Download,
+  Sparkles,
+  Gauge,
+  Server,
+  Clock,
+  UploadCloud,
+  GraduationCap,
+  FlaskConical,
+  Table2,
+  FileDown,
+  Camera,
+  Layers,
+  Dna,
+  Pill,
+  Share2,
+  GitCompare,
+  Bot,
+  Boxes,
+  ArrowRight,
+  ExternalLink
 } from 'lucide-react';
-import { 
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, 
-  Tooltip, ResponsiveContainer, Cell, PieChart, Pie 
+import {
+  ResponsiveContainer,
+  Cell,
+  PieChart,
+  Pie
 } from 'recharts';
 import html2pdf from 'html2pdf.js';
 import { ppiService } from '../services/api';
@@ -37,8 +67,6 @@ const Predict = () => {
   const [selectedCase, setSelectedCase] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
-  const [selectedResidueP1, setSelectedResidueP1] = useState(null);
-  const [selectedResidueP2, setSelectedResidueP2] = useState(null);
   const [error, setError] = useState(null);
   const [logs, setLogs] = useState([]);
   const [latency, setLatency] = useState(42);
@@ -54,18 +82,6 @@ const Predict = () => {
 
   const addLog = (msg, type = 'info') => {
     setLogs(prev => [...prev, { msg, type, time: new Date().toLocaleTimeString() }].slice(-10));
-  };
-
-  const handleResidueSelect = (resObj) => {
-    if (!resObj) return;
-    const isProtein1 = resObj.proteinName === protein1 || resObj.proteinNum === 1;
-    if (isProtein1) {
-      setSelectedResidueP1({ residue_number: resObj.pos, residue_name: resObj.aa || 'AA' });
-      addLog(`3D View Synced → Protein A: Residue #${resObj.pos} (${resObj.aa || '?'})`, 'info');
-    } else {
-      setSelectedResidueP2({ residue_number: resObj.pos, residue_name: resObj.aa || 'AA' });
-      addLog(`3D View Synced → Protein B: Residue #${resObj.pos} (${resObj.aa || '?'})`, 'info');
-    }
   };
 
   useEffect(() => {
@@ -533,6 +549,13 @@ const Predict = () => {
                 </>
               )}
 
+              {error && (
+                <div role="alert" className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700">
+                  <XCircle size={14} className="shrink-0 mt-0.5" />
+                  <span>{error}</span>
+                </div>
+              )}
+
               <button 
                 type="submit" 
                 disabled={loading}
@@ -847,7 +870,6 @@ const Predict = () => {
                                   pdbId={protein1} 
                                   fallbackPdbId="1tnr" 
                                   label={`Protein A: ${protein1}`} 
-                                  selectedResidue={selectedResidueP1}
                                 />
                               </div>
                               <div className="w-full max-w-full min-w-0 bg-slate-50/70 border border-slate-100 p-4 md:p-5 rounded-3xl flex flex-col justify-between">
@@ -855,7 +877,6 @@ const Predict = () => {
                                   pdbId={protein2} 
                                   fallbackPdbId="1a2y" 
                                   label={`Protein B: ${protein2}`} 
-                                  selectedResidue={selectedResidueP2}
                                 />
                               </div>
                             </div>

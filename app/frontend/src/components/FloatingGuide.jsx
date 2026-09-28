@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Activity, X, Zap, Dna, Share2, Pill, Globe, ArrowRight, HelpCircle, BookOpen } from 'lucide-react';
+import { Activity, X, Zap, Dna, Share2, Globe, ArrowRight, BookOpen } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const FloatingGuide = () => {

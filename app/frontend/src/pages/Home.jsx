@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   Activity,
@@ -6,22 +6,10 @@ import {
   Zap,
   CheckCircle,
   ArrowRight,
-  Database,
   Search,
   Share2,
-  Dna,
-  Pill,
-  Boxes,
   BarChart3,
-  GitCompare,
-  Bot,
-  Globe,
-  Sparkles,
-  ShieldCheck,
-  FlaskConical,
-  Layers,
-  ChevronRight,
-  ExternalLink
+  Sparkles
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ppiService } from '../services/api';

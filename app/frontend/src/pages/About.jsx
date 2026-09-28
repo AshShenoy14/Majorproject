@@ -1,11 +1,9 @@
-import React from 'react';
 import { motion } from 'framer-motion';
-import { 
-  BookOpen, 
-  Cpu, 
-  Activity, 
-  ShieldCheck, 
-  Zap,
+import {
+  BookOpen,
+  Cpu,
+  Activity,
+  ShieldCheck,
   Globe,
   Users,
   Lightbulb

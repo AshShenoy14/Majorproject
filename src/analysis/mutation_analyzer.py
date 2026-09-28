@@ -52,12 +52,16 @@ class MutationAnalyzer:
             target_seq = p1_seq if mut['protein'] == 1 else p2_seq
             pos = mut['pos'] - 1 # 1-indexed to 0-indexed
             
+            not_evaluated = {"base_score": base_score, "mutated_score": None, "impact_delta": None,
+                             "interpretation": "Not evaluated"}
             if pos < 0 or pos >= len(target_seq):
-                results.append({**mut, "error": "Position out of bounds", "impact": 0})
+                results.append({**mut, **not_evaluated,
+                                "error": f"Position {mut['pos']} is outside the sequence (length {len(target_seq)})"})
                 continue
-                
+
             if target_seq[pos] != mut['orig']:
-                results.append({**mut, "error": f"Original residue mismatch (found {target_seq[pos]} at {mut['pos']})", "impact": 0})
+                results.append({**mut, **not_evaluated,
+                                "error": f"Original residue mismatch: the sequence has {target_seq[pos]} at position {mut['pos']}, not {mut['orig']}"})
                 continue
             
             # Create mutated sequence
@@ -95,20 +99,32 @@ class MutationAnalyzer:
                                  p1_id: str, p1_seq: str, 
                                  p2_id: str, p2_seq: str, 
                                  mode: str = 'disrupt', # 'disrupt' or 'stabilize'
-                                 top_n: int = 5) -> Dict[str, Any]:
+                                 top_n: int = 5,
+                                 progress=None) -> Dict[str, Any]:
         """
         Suggests mutations that most strongly disrupt or stabilize the interaction.
-        Uses a heuristic search around predicted hotspots.
+        Uses a heuristic search around predicted hotspots: the 3 highest-impact positions of protein 1 (occlusion
+        scan) are each mutated to all 19 alternatives and scored exactly. progress(done, total, stage) is optional.
         """
-        # 1. First, find hotspots to narrow search space
+        # 1. First, find hotspots to narrow search space (only protein 1 is mutated, so only it is scanned)
         from src.analysis.hotspot_analyzer import HotspotAnalyzer
         ha = HotspotAnalyzer(self.seq_model, self.esm_extractor, self.bio_manager, self.bio_encoder)
-        hotspots = ha.identify_hotspots(p1_id, p1_seq, p2_id, p2_seq)
+        n_scan = ha.count_passes(p1_seq, p2_seq, proteins=(1,))
+        n_subs = 3 * 19
+        total = n_scan + n_subs
+        hotspots = ha.identify_hotspots(p1_id, p1_seq, p2_id, p2_seq, proteins=(1,), progress=progress)
         
-        # 2. Pick top positions based on impact
+        # 2. Pick the 3 strongest hotspot regions. For long proteins each masked window stands for a stretch of
+        #    residues with one shared impact value, so take the centre of each of the top 3 distinct runs
+        #    instead of 3 (tied) residues from the same run.
         impacts = hotspots['protein1']['residue_impact']
-        # Get indices of top 3 impact positions
-        top_positions = np.argsort(impacts)[-3:][::-1]
+        runs, start = [], 0
+        for i in range(1, len(impacts) + 1):
+            if i == len(impacts) or impacts[i] != impacts[start]:
+                runs.append((impacts[start], start, i - 1))
+                start = i
+        runs.sort(key=lambda r: r[0], reverse=True)
+        top_positions = [(a + b) // 2 for _, a, b in runs[:3]]
         
         candidates = []
         amino_acids = "ACDEFGHIKLMNPQRSTVWY"
@@ -146,7 +162,13 @@ class MutationAnalyzer:
                     mut_info.append((pos, orig_aa, mut_aa, k))
 
             if mut_dict:
-                mut_embs = self.esm_extractor.get_embeddings(mut_dict, batch_size=16)
+                mut_embs = {}
+                keys = list(mut_dict)
+                for c in range(0, len(keys), 8):
+                    chunk = {k: mut_dict[k] for k in keys[c:c + 8]}
+                    mut_embs.update(self.esm_extractor.get_embeddings(chunk, batch_size=8))
+                    if progress:
+                        progress(n_scan + min(c + 8, len(keys)), total, "Scoring substitutions at the top hotspots")
                 mut_list = []
                 for pos, orig_aa, mut_aa, k in mut_info:
                     e1_m = mut_embs[k].unsqueeze(0).to(self.device).float()

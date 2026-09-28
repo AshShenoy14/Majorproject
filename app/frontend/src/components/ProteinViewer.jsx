@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { Box, Typography, Skeleton, useTheme } from '@mui/material';
+import { useEffect, useRef } from 'react';
+import { Box, Typography, useTheme } from '@mui/material';
 
 const ProteinViewer = ({ proteinId }) => {
     const viewerRef = useRef(null);
@@ -90,10 +90,11 @@ const ProteinViewer = ({ proteinId }) => {
             checkPluginAndRender();
         }
 
+        const container = viewerRef.current;
         return () => {
             isMounted.current = false;
-            if (viewerRef.current) {
-                viewerRef.current.innerHTML = '';
+            if (container) {
+                container.innerHTML = '';
             }
         };
     }, [proteinId, isDark]);

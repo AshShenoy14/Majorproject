@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect, useCallback } from 'react';
+import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import {
   Zap,
@@ -12,8 +12,7 @@ import {
   BarChart3,
   ArrowRight,
   ChevronLeft,
-  ChevronRight,
-  Sparkles
+  ChevronRight
 } from 'lucide-react';
 
 const RESEARCH_ENGINES = [
@@ -161,7 +160,6 @@ const ResearchSuiteCarousel = () => {
         {RESEARCH_ENGINES.map((card, index) => {
           const diff = getOffset(index);
           const isCenter = diff === 0;
-          const isVisible = Math.abs(diff) <= 2;
 
           // Compute transform styles based on circular distance
           let x = 0;
@@ -215,7 +213,7 @@ const ResearchSuiteCarousel = () => {
             <motion.div
               key={card.id}
               className="absolute"
-              style={{ zIndex }}
+              style={{ zIndex, pointerEvents }}
               animate={{
                 x,
                 y,

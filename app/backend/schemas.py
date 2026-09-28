@@ -77,9 +77,9 @@ class MutationResult(BaseModel):
     orig: str
     mut: str
     base_score: float = Field(..., description="Original interaction probability")
-    mutated_score: float = Field(..., description="Interaction probability after mutation")
-    impact_delta: float = Field(..., description="Change in probability (mutated - base)")
-    interpretation: str = Field(..., description="Qualitative impact of the mutation")
+    mutated_score: Optional[float] = Field(None, description="Interaction probability after mutation (None if not evaluated)")
+    impact_delta: Optional[float] = Field(None, description="Change in probability (mutated - base); None if not evaluated")
+    interpretation: str = Field(..., description="Qualitative impact of the mutation, or 'Not evaluated'")
     error: Optional[str] = None
 
 class MutationAnalysisResponse(BaseModel):

@@ -1,9 +1,15 @@
-import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { 
-  Home, Search, Dna, Box, Share2, 
-  ShieldAlert, Info, Database, Activity, 
-  Bot, Globe, Settings, Cpu, X
+import {
+  Home,
+  Search,
+  Dna,
+  Box,
+  Share2,
+  ShieldAlert,
+  Activity,
+  Bot,
+  Globe,
+  X
 } from 'lucide-react';
 
 const Sidebar = ({ onClose }) => {

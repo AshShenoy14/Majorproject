@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Info, X, ExternalLink, Dna, Activity, ShieldAlert, CheckCircle2 } from 'lucide-react';
+import { X, ExternalLink, Dna, Activity, ShieldAlert } from 'lucide-react';
 
 const KNOWN_PROTEINS = {
   'ENSP00000269305': {

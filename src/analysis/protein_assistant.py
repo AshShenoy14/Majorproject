@@ -7,6 +7,7 @@ diseases, drug targets, and the TransGraph-PPI system.
 import re
 import random
 import os
+import time
 import requests
 from typing import Optional, Dict, List
 from google import genai
@@ -21,6 +22,12 @@ MISTRAL_MODEL = os.getenv("MISTRAL_MODEL", "mistral-small-latest")
 MISTRAL_URL = "https://api.mistral.ai/v1/chat/completions"
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+# "gemini-flash-latest" is an alias Google keeps pointed at a current Flash model (fixed names such as
+# gemini-1.5-pro get retired and then return 404). Override with GEMINI_MODEL in .env.
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
+# After Mistral answers 429 (rate limit / quota), skip it for this long instead of adding a failed call to every message.
+MISTRAL_COOLDOWN_SECONDS = 600
+_mistral_retry_after = 0.0
 if GEMINI_API_KEY:
     GEMINI_CLIENT = genai.Client(api_key=GEMINI_API_KEY)
 else:
@@ -225,7 +232,8 @@ class ProteinAssistant:
             context += f"Protein {k}: {PROTEIN_KNOWLEDGE[k]['function']}\n"
 
         # 2. Try Primary Provider: Mistral API
-        if MISTRAL_API_KEY:
+        global _mistral_retry_after
+        if MISTRAL_API_KEY and time.time() >= _mistral_retry_after:
             try:
                 headers = {
                     "Authorization": f"Bearer {MISTRAL_API_KEY}",
@@ -250,6 +258,8 @@ class ProteinAssistant:
                         "sources": ["Mistral AI (Primary)", "TransGraph-PPI Knowledge Base"]
                     }
                 else:
+                    if res.status_code == 429:
+                        _mistral_retry_after = time.time() + MISTRAL_COOLDOWN_SECONDS
                     print(f"Mistral API error HTTP {res.status_code}: {res.text}. Falling back to Gemini.")
             except Exception as e:
                 print(f"Mistral API Exception: {e}. Falling back to Gemini.")
@@ -259,14 +269,14 @@ class ProteinAssistant:
             try:
                 prompt = f"{context}\n\nUser Question: {question}\n\nAssistant:"
                 response = GEMINI_CLIENT.models.generate_content(
-                    model='gemini-1.5-pro',
+                    model=GEMINI_MODEL,
                     contents=prompt
                 )
                 if response and response.text:
                     return {
                         "response": response.text,
                         "suggestions": random.sample(SUGGESTIONS, 3),
-                        "sources": ["Google Gemini AI (Fallback)", "TransGraph-PPI Knowledge Base"]
+                        "sources": [f"Google Gemini ({GEMINI_MODEL})", "TransGraph-PPI Knowledge Base"]
                     }
             except Exception as e:
                 print(f"Gemini AI Error: {e}")

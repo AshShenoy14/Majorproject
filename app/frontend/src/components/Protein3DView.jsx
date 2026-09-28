@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 // Industry standard PDBe-Molstar 3D protein structure viewer
 // Maps Ensembl / UniProt IDs to representative PDB 3D structures and highlights interaction interfaces.
@@ -71,12 +71,13 @@ const Protein3DView = ({ pdbId, label, selectedResidue, interactionRegion, fallb
       }
     };
 
+    const container = viewerContainerRef.current;
     loadViewer();
 
     return () => {
       isMounted = false;
-      if (viewerContainerRef.current) {
-        viewerContainerRef.current.innerHTML = '';
+      if (container) {
+        container.innerHTML = '';
       }
       pluginInstanceRef.current = null;
     };

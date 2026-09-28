@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -164,6 +164,8 @@ const StructureViewer = () => {
       }, 100);
       return () => clearInterval(interval);
     }
+    // Mount-only: initViewer guards against re-initialising, and re-running this on every render would restart polling.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSearch = async (e) => {
@@ -303,6 +305,11 @@ const StructureViewer = () => {
               className="w-full h-full rounded-2xl bg-slate-50"
               style={{ position: 'relative' }}
             />
+            {viewerLoading && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-xs font-bold text-slate-400" role="status">
+                Loading 3D viewer…
+              </div>
+            )}
             
             {!metadata && !loading && (
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">

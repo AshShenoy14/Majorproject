@@ -1,14 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  ShieldAlert, 
-  Filter, 
-  Search, 
-  ExternalLink, 
-  TrendingUp, 
-  PieChart as PieIcon,
-  Tag,
+import { motion } from 'framer-motion';
+import {
+  Filter,
+  Search,
+  ExternalLink,
+  TrendingUp,
   CheckCircle2,
   AlertCircle,
   Loader2,
@@ -16,15 +13,12 @@ import {
   Info,
   Sparkles
 } from 'lucide-react';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer, 
-  Cell 
+import {
+  BarChart,
+  Bar,
+  Tooltip,
+  ResponsiveContainer,
+  Cell
 } from 'recharts';
 import { ppiService } from '../services/api';
 
@@ -97,6 +91,12 @@ const DrugInsights = () => {
 
   return (
     <div className="space-y-8 pb-12">
+      {error && (
+        <div role="alert" className="p-4 bg-red-50 border border-red-200 rounded-2xl text-sm text-red-700 flex items-center gap-2">
+          <AlertCircle size={16} className="shrink-0" /> {error}
+        </div>
+      )}
+
       {/* Explanatory Guide Banner */}
       <div className="bg-slate-900 border border-emerald-500/30 text-slate-200 p-6 rounded-[2rem] flex items-start gap-4 shadow-xl">
         <div className="p-3 bg-emerald-500/20 rounded-2xl text-emerald-400 font-black text-xs uppercase tracking-widest shrink-0 flex items-center gap-1.5">

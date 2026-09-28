@@ -93,7 +93,14 @@ export const ppiService = {
       protein2_seq: p2_seq
     }),
 
-  getVulnerability: (p1, p2, delta) => 
+  // Long analyses (1-2 min on CPU) run as background jobs: start, then poll getJob(job_id) until status is done/error.
+  startHotspotJob: (p1_id, p2_id) =>
+    api.post('/analysis/jobs/hotspots', { protein1_id: p1_id, protein2_id: p2_id }),
+  startOptimizeJob: (p1_id, p2_id, mode = 'disrupt') =>
+    api.post(`/analysis/jobs/optimize?mode=${mode}`, { protein1_id: p1_id, protein2_id: p2_id }),
+  getJob: (jobId) => api.get(`/analysis/jobs/${jobId}`),
+
+  getVulnerability: (p1, p2, delta) =>
     api.get(`/analysis/vulnerability?p1=${p1}&p2=${p2}&delta=${delta}`),
 
   // AI Assistant

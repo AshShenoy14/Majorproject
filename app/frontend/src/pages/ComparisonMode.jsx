@@ -1,13 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  GitCompare, Dna, ChevronRight, Loader2, AlertCircle,
-  TrendingUp, TrendingDown, Minus, Zap, Map, CheckCircle
+  GitCompare,
+  Dna,
+  Loader2,
+  AlertCircle,
+  TrendingUp,
+  TrendingDown,
+  Zap,
+  CheckCircle
 } from 'lucide-react';
 import {
-  ResponsiveContainer, BarChart, Bar, XAxis, YAxis,
-  CartesianGrid, Tooltip, Cell, PieChart, Pie
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Cell
 } from 'recharts';
 import { ppiService } from '../services/api';
 

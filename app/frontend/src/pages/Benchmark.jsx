@@ -1,12 +1,27 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  BarChart2, Database, AlertTriangle, Loader2, RefreshCw, 
-  CheckCircle2, ShieldCheck, Sparkles, TrendingUp, Layers, 
-  Activity, ArrowUpRight, HelpCircle
+import { useEffect, useState, useCallback } from 'react';
+import { motion } from 'framer-motion';
+import {
+  BarChart2,
+  Database,
+  AlertTriangle,
+  Loader2,
+  RefreshCw,
+  ShieldCheck,
+  Sparkles,
+  TrendingUp,
+  Layers,
+  Activity,
+  ArrowUpRight
 } from 'lucide-react';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, Cell
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Legend
 } from 'recharts';
 import { ppiService } from '../services/api';
 
@@ -55,6 +70,7 @@ const Benchmark = () => {
   }));
   const counts = evaluation?.dataset_rows;
 
+  const ens = evaluation?.models?.['Full Ensemble (XGBoost)'];
   const bs = benchmarks?.bootstrap_ci;
   const cs = benchmarks?.cold_start;
   const shs = benchmarks?.shs27k;
@@ -99,8 +115,8 @@ const Benchmark = () => {
           </div>
           <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Ensemble Accuracy</span>
           <div className="flex items-baseline gap-2 mt-1">
-            <span className="text-3xl font-black text-slate-800 tracking-tight">92.11%</span>
-            <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">SOTA Test</span>
+            <span className="text-3xl font-black text-slate-800 tracking-tight">{ens ? `${(ens.accuracy * 100).toFixed(2)}%` : '—'}</span>
+            <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">Held-out test</span>
           </div>
           {bs?.accuracy && (
             <div className="mt-2 text-[11px] font-mono text-slate-500 bg-slate-50 px-2 py-1 rounded-lg border border-slate-100 inline-block">
@@ -115,8 +131,8 @@ const Benchmark = () => {
           </div>
           <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Ensemble ROC-AUC</span>
           <div className="flex items-baseline gap-2 mt-1">
-            <span className="text-3xl font-black text-slate-800 tracking-tight">0.9708</span>
-            <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">PR-AUC 0.9759</span>
+            <span className="text-3xl font-black text-slate-800 tracking-tight">{ens ? ens.roc_auc.toFixed(4) : '—'}</span>
+            <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">PR-AUC {ens ? ens.pr_auc.toFixed(4) : '—'}</span>
           </div>
           {bs?.roc_auc && (
             <div className="mt-2 text-[11px] font-mono text-slate-500 bg-slate-50 px-2 py-1 rounded-lg border border-slate-100 inline-block">
@@ -132,7 +148,7 @@ const Benchmark = () => {
           <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Cold-Start Accuracy</span>
           <div className="flex items-baseline gap-2 mt-1">
             <span className="text-3xl font-black text-slate-800 tracking-tight">
-              {cs ? `${(cs.cold_start_novel_protein_via_knn?.accuracy * 100).toFixed(1)}%` : '83.3%'}
+              {cs ? `${(cs.cold_start_novel_protein_via_knn?.accuracy * 100).toFixed(1)}%` : '—'}
             </span>
             <span className="text-xs font-bold text-cyan-700 bg-cyan-50 px-1.5 py-0.5 rounded">KNN Inductive</span>
           </div>
@@ -146,7 +162,7 @@ const Benchmark = () => {
           <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">External Transfer (SHS27k)</span>
           <div className="flex items-baseline gap-2 mt-1">
             <span className="text-3xl font-black text-slate-800 tracking-tight">
-              {shs ? `0.${Math.round(shs.overall?.roc_auc * 10000)}` : '0.8023'}
+              {shs ? shs.overall?.roc_auc.toFixed(4) : '—'}
             </span>
             <span className="text-xs font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">ROC-AUC</span>
           </div>
@@ -270,15 +286,15 @@ const Benchmark = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {[
-                { name: 'Accuracy', mean: bs?.accuracy?.mean || 0.9213, lo: bs?.accuracy?.ci_lo || 0.9176, hi: bs?.accuracy?.ci_hi || 0.9251 },
-                { name: 'ROC-AUC', mean: bs?.roc_auc?.mean || 0.9708, lo: bs?.roc_auc?.ci_lo || 0.9687, hi: bs?.roc_auc?.ci_hi || 0.9729 },
-                { name: 'F1 Score', mean: bs?.f1?.mean || 0.9200, lo: bs?.f1?.ci_lo || 0.9162, hi: bs?.f1?.ci_hi || 0.9239 }
+                { name: 'Accuracy', mean: bs?.accuracy?.mean, lo: bs?.accuracy?.ci_lo, hi: bs?.accuracy?.ci_hi },
+                { name: 'ROC-AUC', mean: bs?.roc_auc?.mean, lo: bs?.roc_auc?.ci_lo, hi: bs?.roc_auc?.ci_hi },
+                { name: 'F1 Score', mean: bs?.f1?.mean, lo: bs?.f1?.ci_lo, hi: bs?.f1?.ci_hi }
               ].map(item => (
                 <div key={item.name} className="p-4 rounded-xl bg-slate-50 border border-slate-100">
                   <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{item.name}</span>
-                  <div className="text-2xl font-black text-slate-800 mt-1">{(item.mean * 100).toFixed(2)}%</div>
+                  <div className="text-2xl font-black text-slate-800 mt-1">{item.mean != null ? `${(item.mean * 100).toFixed(2)}%` : '—'}</div>
                   <div className="mt-2 text-xs font-mono font-bold text-indigo-600 bg-white px-2.5 py-1 rounded border border-slate-200/60 inline-block">
-                    95% CI: [{(item.lo * 100).toFixed(2)}%, {(item.hi * 100).toFixed(2)}%]
+                    95% CI: {item.lo != null ? `[${(item.lo * 100).toFixed(2)}%, ${(item.hi * 100).toFixed(2)}%]` : 'not available'}
                   </div>
                 </div>
               ))}
@@ -304,23 +320,23 @@ const Benchmark = () => {
               <div className="p-5 rounded-2xl bg-cyan-50/60 border border-cyan-100">
                 <span className="text-xs font-black uppercase tracking-wider text-cyan-800">Cold-Start Reconstruction (KNN Path)</span>
                 <div className="text-3xl font-black text-slate-800 mt-2">
-                  {cs ? `${(cs.cold_start_novel_protein_via_knn?.accuracy * 100).toFixed(2)}%` : '83.33%'}
+                  {cs ? `${(cs.cold_start_novel_protein_via_knn?.accuracy * 100).toFixed(2)}%` : '—'}
                 </div>
                 <div className="mt-2 text-xs text-slate-600 space-y-1">
-                  <div>ROC-AUC: <span className="font-mono font-bold text-cyan-700">{cs ? cs.cold_start_novel_protein_via_knn?.roc_auc.toFixed(4) : '0.9373'}</span></div>
-                  <div>F1 Score: <span className="font-mono font-bold text-cyan-700">{cs ? cs.cold_start_novel_protein_via_knn?.f1.toFixed(4) : '0.8049'}</span></div>
-                  <div>Evaluated pairs: <span className="font-mono text-slate-700">{cs?.cold_start_novel_protein_via_knn?.n || 1152}</span></div>
+                  <div>ROC-AUC: <span className="font-mono font-bold text-cyan-700">{cs ? cs.cold_start_novel_protein_via_knn?.roc_auc.toFixed(4) : '—'}</span></div>
+                  <div>F1 Score: <span className="font-mono font-bold text-cyan-700">{cs ? cs.cold_start_novel_protein_via_knn?.f1.toFixed(4) : '—'}</span></div>
+                  <div>Evaluated pairs: <span className="font-mono text-slate-700">{cs?.cold_start_novel_protein_via_knn?.n ?? '—'}</span></div>
                 </div>
               </div>
 
               <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200">
                 <span className="text-xs font-black uppercase tracking-wider text-slate-700">Warm Baseline (Full Known Graph)</span>
                 <div className="text-3xl font-black text-slate-800 mt-2">
-                  {cs ? `${(cs.warm_baseline_same_pairs_full_graph?.accuracy * 100).toFixed(2)}%` : '90.97%'}
+                  {cs ? `${(cs.warm_baseline_same_pairs_full_graph?.accuracy * 100).toFixed(2)}%` : '—'}
                 </div>
                 <div className="mt-2 text-xs text-slate-600 space-y-1">
-                  <div>ROC-AUC: <span className="font-mono font-bold text-slate-700">{cs ? cs.warm_baseline_same_pairs_full_graph?.roc_auc.toFixed(4) : '0.9604'}</span></div>
-                  <div>F1 Score: <span className="font-mono font-bold text-slate-700">{cs ? cs.warm_baseline_same_pairs_full_graph?.f1.toFixed(4) : '0.9065'}</span></div>
+                  <div>ROC-AUC: <span className="font-mono font-bold text-slate-700">{cs ? cs.warm_baseline_same_pairs_full_graph?.roc_auc.toFixed(4) : '—'}</span></div>
+                  <div>F1 Score: <span className="font-mono font-bold text-slate-700">{cs ? cs.warm_baseline_same_pairs_full_graph?.f1.toFixed(4) : '—'}</span></div>
                   <div>Same test pairs with full topological connectivity</div>
                 </div>
               </div>
@@ -340,7 +356,7 @@ const Benchmark = () => {
                   <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
                     Same Source, Alternate Curation
                   </span>
-                  <span className="text-xs font-mono text-slate-400">15,248 pairs</span>
+                  <span className="text-xs font-mono text-slate-400">{shs?.overall?.n != null ? `${shs.overall.n.toLocaleString()} pairs` : ''}</span>
                 </div>
                 <h4 className="text-lg font-black text-slate-800">SHS27k Benchmark (Chen et al.)</h4>
                 <p className="text-xs text-slate-500 mt-2 leading-relaxed">
@@ -351,19 +367,19 @@ const Benchmark = () => {
                   <div className="p-3 bg-slate-50 rounded-xl text-center">
                     <span className="text-[10px] uppercase font-bold text-slate-400">Accuracy</span>
                     <div className="text-base font-black text-slate-800 mt-0.5">
-                      {shs ? `${(shs.overall?.accuracy * 100).toFixed(1)}%` : '69.8%'}
+                      {shs ? `${(shs.overall?.accuracy * 100).toFixed(1)}%` : '—'}
                     </div>
                   </div>
                   <div className="p-3 bg-slate-50 rounded-xl text-center">
                     <span className="text-[10px] uppercase font-bold text-slate-400">ROC-AUC</span>
                     <div className="text-base font-black text-amber-700 mt-0.5">
-                      {shs ? shs.overall?.roc_auc.toFixed(4) : '0.8023'}
+                      {shs ? shs.overall?.roc_auc.toFixed(4) : '—'}
                     </div>
                   </div>
                   <div className="p-3 bg-slate-50 rounded-xl text-center">
                     <span className="text-[10px] uppercase font-bold text-slate-400">F1 Score</span>
                     <div className="text-base font-black text-slate-800 mt-0.5">
-                      {shs ? shs.overall?.f1.toFixed(4) : '0.6119'}
+                      {shs ? shs.overall?.f1.toFixed(4) : '—'}
                     </div>
                   </div>
                 </div>
@@ -381,7 +397,7 @@ const Benchmark = () => {
                   <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-violet-50 text-violet-800 border border-violet-200">
                     Independent Source (Yeast-2-Hybrid)
                   </span>
-                  <span className="text-xs font-mono text-slate-400">1,394 pairs</span>
+                  <span className="text-xs font-mono text-slate-400">{huri?.overall?.n != null ? `${huri.overall.n.toLocaleString()} pairs` : ''}</span>
                 </div>
                 <h4 className="text-lg font-black text-slate-800">HuRI / HI-union (Luck et al. Nature 2020)</h4>
                 <p className="text-xs text-slate-500 mt-2 leading-relaxed">
@@ -392,19 +408,19 @@ const Benchmark = () => {
                   <div className="p-3 bg-slate-50 rounded-xl text-center">
                     <span className="text-[10px] uppercase font-bold text-slate-400">Accuracy</span>
                     <div className="text-base font-black text-slate-800 mt-0.5">
-                      {huri ? `${(huri.overall?.accuracy * 100).toFixed(1)}%` : '52.3%'}
+                      {huri ? `${(huri.overall?.accuracy * 100).toFixed(1)}%` : '—'}
                     </div>
                   </div>
                   <div className="p-3 bg-slate-50 rounded-xl text-center">
                     <span className="text-[10px] uppercase font-bold text-slate-400">ROC-AUC</span>
                     <div className="text-base font-black text-violet-700 mt-0.5">
-                      {huri ? huri.overall?.roc_auc.toFixed(4) : '0.5726'}
+                      {huri ? huri.overall?.roc_auc.toFixed(4) : '—'}
                     </div>
                   </div>
                   <div className="p-3 bg-slate-50 rounded-xl text-center">
                     <span className="text-[10px] uppercase font-bold text-slate-400">Seen in Train</span>
                     <div className="text-base font-black text-slate-800 mt-0.5">
-                      {huri ? `${(huri.both_proteins_seen_in_training_subset?.accuracy * 100).toFixed(1)}%` : '62.0%'}
+                      {huri ? `${(huri.both_proteins_seen_in_training_subset?.accuracy * 100).toFixed(1)}%` : '—'}
                     </div>
                   </div>
                 </div>

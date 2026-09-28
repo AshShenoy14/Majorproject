@@ -1,11 +1,20 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import cytoscape from 'cytoscape';
 import {
-  Share2, Maximize2, RotateCcw, Info, Search,
-  ChevronRight, Activity, Database, Star, Filter,
-  SlidersHorizontal, Navigation, Circle, GitMerge
+  Share2,
+  Maximize2,
+  RotateCcw,
+  Info,
+  Search,
+  Activity,
+  Database,
+  Star,
+  SlidersHorizontal,
+  Navigation,
+  Circle,
+  GitMerge
 } from 'lucide-react';
 import { ppiService } from '../services/api';
 
@@ -46,61 +55,23 @@ const NetworkExplorer = () => {
   const [searchQ, setSearchQ] = useState(paramQ);
   const [confidenceMin, setConfidenceMin] = useState(0);
   const [showHubsOnly, setShowHubsOnly] = useState(false);
-  const [allNodes, setAllNodes] = useState([]);   // raw nodes from API
-  const [allEdges, setAllEdges] = useState([]);   // raw edges from API
 
   // Shortest path state
   const [pathStart, setPathStart] = useState(paramStart);
   const [pathEnd, setPathEnd] = useState(paramEnd);
   const [pathResult, setPathResult] = useState([]);
 
-  // Build cytoscape elements from current filter state
-  const rebuildGraph = useCallback((nodes, edges, minConf, hubsOnly, topHubs) => {
+  // "Hub Proteins Only": fade every non-hub protein (and edges not touching a hub) so the top hubs stand out
+  useEffect(() => {
     if (!cyRef.current) return;
-
-    const hubSet = new Set(topHubs.slice(0, 5).map(m => m.protein));
-
-    // Filter nodes
-    let filteredNodes = nodes;
-    if (hubsOnly) filteredNodes = filteredNodes.filter(n => hubSet.has(n.id));
-
-    // Filter edges by confidence
-    const filteredEdges = edges.filter(e => (e.weight || 0.5) >= minConf);
-
-    // Only keep nodes that appear in filtered edges
-    const activeIds = new Set();
-    filteredEdges.forEach(e => { activeIds.add(e.source); activeIds.add(e.target); });
-    if (!hubsOnly) filteredNodes = filteredNodes.filter(n => activeIds.has(n.id));
-
-    const elements = [
-      ...filteredNodes.map(n => ({
-        data: {
-          id: n.id,
-          label: n.label || n.id.slice(0, 8),
-          isHub: hubSet.has(n.id),
-          degree: cyRef.current.getElementById(n.id)?.degree?.() || 0,
-        }
-      })),
-      ...filteredEdges.map(e => ({
-        data: {
-          source: e.source,
-          target: e.target,
-          weight: e.weight || 0.5,
-        }
-      }))
-    ];
-
-    cyRef.current.elements().remove();
-    cyRef.current.add(elements);
-
-    // Style hubs differently
-    cyRef.current.style()
-      .selector('node[?isHub]')
-      .style({ 'background-color': '#7c3aed', 'width': '40px', 'height': '40px', 'border-color': '#7c3aed', 'border-width': '3px' })
-      .update();
-
-    cyRef.current.layout({ name: 'cose', animate: true, componentSpacing: 100 }).run();
-  }, []);
+    cyRef.current.nodes().forEach(n => {
+      n.style('opacity', showHubsOnly && !n.data('isHub') ? 0.12 : 1);
+    });
+    cyRef.current.edges().forEach(e => {
+      const hubEdge = e.source().data('isHub') || e.target().data('isHub');
+      e.style('opacity', showHubsOnly && !hubEdge ? 0.04 : 0.6);
+    });
+  }, [showHubsOnly]);
 
   useEffect(() => {
     const initNetwork = async () => {
@@ -113,8 +84,6 @@ const NetworkExplorer = () => {
 
         const nodes = netRes.data.nodes;
         const edges = netRes.data.edges;
-        setAllNodes(nodes);
-        setAllEdges(edges);
         setMetrics(centralityRes.data);
 
         if (containerRef.current) {
@@ -381,10 +350,10 @@ const NetworkExplorer = () => {
               <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-2">Path ({pathResult.length} hops)</p>
               <div className="flex flex-wrap gap-1">
                 {pathResult.map((id, i) => (
-                  <React.Fragment key={i}>
+                  <Fragment key={i}>
                     <span className="text-[9px] bg-white border border-rose-200 px-1.5 py-0.5 rounded font-bold text-slate-700">{id.slice(0,10)}</span>
                     {i < pathResult.length - 1 && <span className="text-rose-400 text-xs">›</span>}
-                  </React.Fragment>
+                  </Fragment>
                 ))}
               </div>
             </div>

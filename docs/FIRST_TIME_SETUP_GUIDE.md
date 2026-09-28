@@ -12,7 +12,7 @@ Complete step-by-step instructions for setting up and training the model from sc
 | **Node.js** | 18+ (for frontend) |
 | **GPU (Recommended)** | NVIDIA GPU with CUDA support (embedding extraction is very slow on CPU) |
 | **RAM** | Minimum 16 GB (32 GB recommended) |
-| **Disk Space** | ~20 GB free (embeddings file alone is ~15 GB) |
+| **Disk Space** | ~5 GB free for the project data, models and model cache (the ESM-2 weights are ~570 MB and `models/random_forest_baseline.pkl` ~200 MB), plus the Python and Node dependencies |
 | **Internet** | Required for downloading STRING DB data (~80 MB + ~7 MB) and ESM-2 model weights |
 
 ---
@@ -97,15 +97,15 @@ python src/data/feature_extraction.py
 ```
 
 **What this does:**
-- Downloads the ESM-2 protein language model (`facebook/esm2_t12_35M_UR50D`) from HuggingFace (~135 MB, automatic)
-- Generates 480-dimensional embeddings for every unique protein
+- Downloads the ESM-2 protein language model (`facebook/esm2_t30_150M_UR50D`) from HuggingFace (~570 MB, automatic, cached in `.cache/`)
+- Generates one 640-dimensional (mean-pooled, float16) embedding for every unique protein
 - Saves `embeddings.pt` to `data/processed/`
 
 > [!CAUTION]
 > **This is the most time-consuming step!**
 > - **With GPU**: ~2-4 hours depending on GPU
 > - **Without GPU (CPU only)**: Can take 12-24+ hours
-> - The output file (`embeddings.pt`) will be **~15 GB**
+> - The output file (`embeddings.pt`) is small (~19 MB for 12,323 proteins); the time goes into running ESM-2
 > - Make sure you have enough disk space before starting
 
 > [!TIP]
@@ -213,17 +213,20 @@ data/
 │   ├── 9606.protein.links.v12.0.txt.gz    (~80 MB)
 │   └── 9606.protein.sequences.v12.0.fa.gz (~7 MB)
 ├── processed/
-│   ├── train.csv                          (~11 MB)
-│   ├── val.csv                            (~1.4 MB)
-│   ├── test.csv                           (~1.4 MB)
-│   ├── embeddings.pt                      (~15 GB) ⚠️ Largest file
-│   ├── ppi_graph.pt                       (~26 MB)
-│   ├── ppi_graph_mapping.pt               (~345 KB)
-│   └── sequences_cache.json               (~7.7 MB)
+│   ├── train.csv                          (~5.3 MB)
+│   ├── val.csv                            (~670 KB)
+│   ├── test.csv                           (~670 KB)
+│   ├── embeddings.pt                      (~19 MB)
+│   ├── ppi_graph.pt                       (~33 MB)
+│   ├── ppi_graph_mapping.pt               (~340 KB)
+│   ├── sequences_cache.json               (~7.5 MB)
+│   └── predicted_network.csv              (~5 MB, from scripts/build_predicted_network.py)
 models/
-├── sequence_model_best.pth                (~792 KB)
-├── graph_model_best.pth                   (~435 KB)
-└── ensemble_model.pkl                     (~330 KB)
+├── sequence_model_best.pth                (~25 MB)
+├── graph_model_best.pth                   (~4.6 MB)
+├── graph_calibrator.json                  (<1 KB)
+├── ensemble_model.pkl                     (~3 MB)
+└── random_forest_baseline.pkl             (~200 MB, baseline only)
 ```
 
 ---
@@ -234,20 +237,16 @@ Since embeddings extraction takes the longest time, you can save hours by copyin
 
 | Priority | File | Size | What Happens If Missing |
 |---|---|---|---|
-| 🔴 **Must have** | `data/processed/embeddings.pt` | ~15 GB | Must regenerate (hours) |
-| 🔴 **Must have** | `data/processed/ppi_graph.pt` | ~26 MB | Must regenerate |
-| 🔴 **Must have** | `data/processed/ppi_graph_mapping.pt` | ~345 KB | Must regenerate |
-| 🟡 **Recommended** | `data/processed/train.csv` | ~11 MB | Must run preprocess again |
-| 🟡 **Recommended** | `data/processed/val.csv` | ~1.4 MB | Must run preprocess again |
-| 🟡 **Recommended** | `data/processed/test.csv` | ~1.4 MB | Must run preprocess again |
-| 🟢 **Optional** | `models/*.pth`, `models/*.pkl` | ~1.5 MB total | Can retrain (faster step) |
+| 🔴 **Must have** | `data/processed/embeddings.pt` | ~19 MB | Must regenerate (hours) |
+| 🔴 **Must have** | `data/processed/ppi_graph.pt` | ~33 MB | Must regenerate |
+| 🔴 **Must have** | `data/processed/ppi_graph_mapping.pt` | ~340 KB | Must regenerate |
+| 🟡 **Recommended** | `data/processed/train.csv` | ~5.3 MB | Must run preprocess again |
+| 🟡 **Recommended** | `data/processed/val.csv` | ~670 KB | Must run preprocess again |
+| 🟡 **Recommended** | `data/processed/test.csv` | ~670 KB | Must run preprocess again |
+| 🟢 **Optional** | `models/*.pth`, `models/*.pkl`, `models/graph_calibrator.json` | ~33 MB (+ ~200 MB RF baseline) | Can retrain (faster step) |
 
 > [!TIP]
-> There is already a `data.zip` file (~15 GB) in the project root that may contain all the processed data. Unzip it with:
-> ```bash
-> # Extract data.zip into the data/ folder
-> tar -xf data.zip
-> ```
+> The processed data and models are small enough (well under 1 GB without the RF baseline) to copy as a zip from a teammate's machine; extract it so the files land in `data/processed/` and `models/`.
 > Then you can skip straight to **Step 3** (training) or even **Step 4** (web app) if models are included.
 
 ---

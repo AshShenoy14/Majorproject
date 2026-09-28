@@ -1,20 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
-import { 
-  Search, 
-  Command, 
-  Activity, 
-  Zap, 
-  Dna, 
+import {
+  Search,
+  Command,
+  Activity,
+  Zap,
+  Dna,
   Boxes,
   Pill,
-  Bot, 
+  Bot,
   Home as HomeIcon,
-  Globe,
   PanelLeft,
   Rows,
   BarChart3,
-  GitCompare,
   Network
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -76,7 +74,7 @@ const Layout = ({ children }) => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const filteredPages = Object.entries(PAGE_META).filter(([path, data]) => 
+  const filteredPages = Object.entries(PAGE_META).filter(([, data]) => 
     data.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
     data.subtitle.toLowerCase().includes(searchQuery.toLowerCase())
   );

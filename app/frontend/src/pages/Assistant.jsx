@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -8,7 +8,6 @@ import {
   User,
   Loader2,
   BookOpen,
-  ExternalLink,
   ChevronRight,
   Dna,
   FlaskConical,
