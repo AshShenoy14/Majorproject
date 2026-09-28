@@ -115,7 +115,7 @@ Notes:
 ## ⚙️ Model Notes
 
 - Sequence embeddings use ESM-2 `esm2_t30_150M_UR50D` (150M parameters, 640 dimensions).
-- `config.yaml` holds device and training defaults. No latency or hardware benchmarks are reported here.
+- Training defaults (epochs, early-stopping patience, learning rate, batch size) live in `SEQ_CFG` / `GRAPH_CFG` in `src/training/base_trainers.py`; the training scripts accept `--epochs`, `--lr` (and `--batch_size` for the sequence model) to override them. No latency or hardware benchmarks are reported here.
 
 ---
 
@@ -159,7 +159,7 @@ python -m uvicorn app.backend.main:app --port 8000 --reload
 
 ### 2. Start Standard GAT Backend (Controlled Comparison Service — Port 8001, Optional)
 ```bash
-python ESMGAT/backend/main.py --port 8001
+python ESMGAT/backend/main.py
 ```
 *API docs available at `http://localhost:8001/docs`.*
 *(If this service is offline, GraphSAGE prediction continues functioning normally).*
@@ -200,16 +200,14 @@ python src/training/train_random_forest.py                                      
 python src/training/train_ensemble.py
 
 # 6. Final held-out test evaluation + SHAP (writes assets/evaluation/final_test_metrics.json)
-python src/analysis/compare_models.py
+python src/evaluation/compare_models.py
 
 # Optional: dataset / calibration audit
-python scripts/audit_measurements.py --out assets/evaluation/audit/audit_current.json
+python scripts/evaluation/audit_measurements.py --out assets/evaluation/audit/audit_current.json
 ```
 
 `scripts/colab_pipeline.sh` runs steps 1-6 in order with Drive-backed checkpoints and finishes with
 `pip freeze > requirements-lock.txt`; that lock file must be generated in the Colab runtime that produced the results.
-
-Archived, unused-in-results experiments (heterogeneous graph GNN, meta-learner search scripts) live in `experiments/archive/`.
 
 ### Running Test Suite
 ```bash
@@ -224,23 +222,35 @@ pytest tests/ -v
 TransGraph-PPI
 ├── app
 │   ├── backend               # Primary FastAPI REST API (GraphSAGE, SHAP, network endpoints; Port 8000)
-│   └── frontend              # React + Vite web dashboard (Dual model selector, 3D viewer)
+│   │   └── routers           # One router per feature area (prediction, network, biology, mutation, ...)
+│   └── frontend              # React + Vite web dashboard (src/pages, src/components, src/services/api.js)
 ├── ESMGAT                    # Standard GAT Controlled Comparison Tree
 │   ├── backend               # Isolated GAT FastAPI REST API (Port 8001)
-│   ├── checkpoints/oof       # 5-fold GAT OOF predictions
+│   ├── checkpoints/oof       # 5-fold GAT OOF predictions (not in git)
 │   ├── models                # Standard GAT neural network & ensemble wrappers
-│   ├── training              # GAT training, OOF generation, and stacking scripts
+│   ├── results               # GAT evaluation metrics, reports, SHAP outputs
+│   ├── training              # GAT training, OOF generation, stacking and evaluation scripts
 │   └── weights               # Frozen GAT weights (gat_model_best.pth, calibrator, ensemble)
+├── assets
+│   ├── evaluation            # Final test metrics, bootstrap CIs, benchmark JSONs and plots
+│   └── report_figures        # Figures used in the report
+├── checkpoints               # Training resume points + 5-fold base-model OOF predictions (not in git)
 ├── data
-│   ├── processed             # Dataset CSVs, embeddings, graph representations
-│   └── raw                   # Raw database downloads
-├── docs                      # Validation records & diagnostic reports
-├── models                    # Frozen GraphSAGE PyTorch & XGBoost production checkpoints
+│   ├── processed             # Dataset CSVs, embeddings, graph representations (not in git)
+│   └── raw                   # Raw database downloads (not in git)
+├── docs                      # Setup guide, validation record, benchmarks, paper, proposal
+│   └── examples              # Sample batch-prediction input
+├── models                    # Frozen GraphSAGE PyTorch & XGBoost production checkpoints (not in git)
+├── notebooks                 # Colab training notebooks (main pipeline + GAT comparison)
+├── scripts                   # Pipeline runner, split/path verification, target population
+│   └── evaluation            # Cold-start, external benchmarks, audit, and plot generation
 ├── src
-│   ├── data                  # Collection, preprocessing, ESM-2 extraction scripts
-│   ├── models                # MLP and GraphSAGE neural network definitions
-│   ├── training              # Sequence, graph (GraphSAGE), and ensemble training scripts
-│   └── evaluation            # Metric calculation and validation scripts
+│   ├── analysis              # Runtime analysis used by the API (SHAP, mutations, hotspots, network, assistant)
+│   ├── data                  # Collection, preprocessing, ESM-2 extraction, sequence/ID/target managers
+│   ├── evaluation            # Final held-out test evaluation (compare_models.py) and statistical tests
+│   ├── models                # MLP, GraphSAGE and XGBoost ensemble definitions
+│   ├── training              # Sequence, graph (GraphSAGE), RF baseline and ensemble training scripts
+│   └── utils                 # Paths, ESM config, calibration, seeding, feature helpers
 ├── tests                     # Unit & end-to-end integration safety tests
 └── README.md
 ```
@@ -249,16 +259,16 @@ TransGraph-PPI
 
 ## ⚠️ Explicit Limitations
 
-1. **Transductive evaluation**: the split is pair-disjoint, not node-disjoint, so the main results table does not measure generalization to unseen proteins. A simulated semi-cold-start check (`scripts/cold_start_eval.py`, `assets/evaluation/cold_start_eval.json`) removes 400 proteins from the trained graph, forces them through the exact production `insert_novel_node_knn` reconstruction path in `/predict`, and scores against real test.csv labels: accuracy 0.833 / ROC-AUC 0.937 (vs. 0.910 / 0.960 for the same pairs when the protein's real node is present), stable across a second seed/held-out set (0.839 / 0.958 vs. 0.927 / 0.980). This is real evidence that the cold-start path works and degrades gracefully rather than failing, but is **not** a from-scratch protein-disjoint retrain — the base models' weights were still originally fit with these proteins' data available, so this should be read as "the inference-time reconstruction mechanism is functional," not "the model generalizes to truly unseen proteins." The Cross-Species page remains exploratory and unevaluated.
+1. **Transductive evaluation**: the split is pair-disjoint, not node-disjoint, so the main results table does not measure generalization to unseen proteins. A simulated semi-cold-start check (`scripts/evaluation/cold_start_eval.py`, `assets/evaluation/cold_start_eval.json`) removes 400 proteins from the trained graph, forces them through the exact production `insert_novel_node_knn` reconstruction path in `/predict`, and scores against real test.csv labels: accuracy 0.833 / ROC-AUC 0.937 (vs. 0.910 / 0.960 for the same pairs when the protein's real node is present), stable across a second seed/held-out set (0.839 / 0.958 vs. 0.927 / 0.980). This is real evidence that the cold-start path works and degrades gracefully rather than failing, but is **not** a from-scratch protein-disjoint retrain — the base models' weights were still originally fit with these proteins' data available, so this should be read as "the inference-time reconstruction mechanism is functional," not "the model generalizes to truly unseen proteins." The Cross-Species page remains exploratory and unevaluated.
 2. **Single split, single run**: the main results come from one seed/split. A 2,000-resample bootstrap on the test set gives 95% CIs for the ensemble: accuracy [0.9176, 0.9251], ROC-AUC [0.9687, 0.9729], F1 [0.9162, 0.9239] (`assets/evaluation/bootstrap_ci.json`) — no independent multi-seed retraining has been done.
 3. **Biological feature**: the co-localization score is display-only and is not an ensemble input (the meta-vector has 7 features).
 3a. **Degree-bias baseline**: a logistic regression on the log positive-degree of the two proteins alone reaches accuracy 0.7063 / ROC-AUC 0.7838 on the test set (`assets/evaluation/audit/audit_after_data.json`), so a substantial part of the signal is node-degree bias that the transductive split does not remove.
 3b. **Calibration**: on val.csv the Platt calibrator lowered GraphSAGE ECE from 0.15344 to 0.05018 and Brier from 0.11871 to 0.07455 (`assets/evaluation/graph_calibration.json`; the calibrator is fit and scored on the same val set, the cross-fitted ECE is 0.05009).
 4. **Synthetic negatives**: negatives are sampled, not experimentally validated, and may include unannotated true interactions.
-5. **External benchmarks**: run with the same, unretrained checkpoints via the exact `/predict` inference path (`scripts/external_benchmark_shs27k.py`, `scripts/external_benchmark_huri.py`), against real labels, not against a curated "easy" slice.
+5. **External benchmarks**: run with the same, unretrained checkpoints via the exact `/predict` inference path (`scripts/evaluation/external_benchmark_shs27k.py`, `scripts/evaluation/external_benchmark_huri.py`), against real labels, not against a curated "easy" slice.
    - **SHS27k** (Chen et al.; 15,248 pairs, 1,690 proteins, 81% byte-identical to training proteins — same underlying database, STRING, just a different curated snapshot, not an independent source): accuracy 0.698, ROC-AUC 0.802, F1 0.612 (`assets/evaluation/external_benchmark_shs27k.json`). A steep drop from the 92.13% in-domain result, consistent with this project's own cited literature that cross-dataset PPI accuracy plateaus well below in-domain numbers.
    - **HuRI / HI-union** (Luck et al. 2020, systematic yeast-two-hybrid screen — a genuinely independent source, not derived from STRING; 1,394 pairs sampled from the full 64,006-pair set, 1,028 proteins): accuracy 0.523, ROC-AUC 0.573, F1 0.144 (`assets/evaluation/external_benchmark_huri.json`), barely above chance. The confusion matrix shows the model predicts positive on only 5.7% of pairs versus the true 50% positive rate — a strong under-confidence bias on this out-of-distribution data, not random noise. This is the clearest evidence in the whole project that the model does not generalize to a genuinely different interaction-detection modality, and should be stated plainly as a limitation, not minimized.
-   - Neither benchmark involved any retraining; both reuse the checkpoints behind the main 92.13% result and the same cold-start reconstruction path as `scripts/cold_start_eval.py` for proteins absent from the training graph.
+   - Neither benchmark involved any retraining; both reuse the checkpoints behind the main 92.13% result and the same cold-start reconstruction path as `scripts/evaluation/cold_start_eval.py` for proteins absent from the training graph.
 6. **Embedding scale**: only the 35M-parameter ESM-2 model was used.
 7. **Therapeutic targets**: the TTPS score (0.40 degree + 0.35 betweenness + 0.25 ChEMBL indicator) is a heuristic with user-chosen weights, not a validated ranking.
 

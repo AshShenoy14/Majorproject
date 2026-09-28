@@ -134,27 +134,40 @@ class MutationAnalyzer:
             
             base_score = torch.sigmoid(self.seq_model(e1_base, e2_base)).item()
 
+            mut_dict = {}
+            mut_info = []
             for pos in top_positions:
                 orig_aa = p1_seq[pos]
                 for mut_aa in amino_acids:
                     if mut_aa == orig_aa: continue
-                    
-                    # Create mutated sequence
                     mut_seq = p1_seq[:pos] + mut_aa + p1_seq[pos+1:]
-                    mut_embs = self.esm_extractor.get_embeddings({p1_id: mut_seq}, batch_size=1)
-                    e1_mut = mut_embs[p1_id].unsqueeze(0).to(self.device).float()
-                    
+                    k = f"m_{pos}_{mut_aa}"
+                    mut_dict[k] = mut_seq
+                    mut_info.append((pos, orig_aa, mut_aa, k))
+
+            if mut_dict:
+                mut_embs = self.esm_extractor.get_embeddings(mut_dict, batch_size=16)
+                mut_list = []
+                for pos, orig_aa, mut_aa, k in mut_info:
+                    e1_m = mut_embs[k].unsqueeze(0).to(self.device).float()
                     if self.bio_manager and self.bio_encoder:
-                        e1_mut = torch.cat([e1_mut, b1], dim=1)
-                        
-                    mut_score = torch.sigmoid(self.seq_model(e1_mut, e2_base)).item()
-                    
+                        e1_m = torch.cat([e1_m, b1], dim=1)
+                    mut_list.append(e1_m)
+
+                mut_batch = torch.cat(mut_list, dim=0)
+                e2_base_rep = e2_base.repeat(mut_batch.size(0), 1)
+                with torch.no_grad():
+                    mut_scores = torch.sigmoid(self.seq_model(mut_batch, e2_base_rep)).squeeze(-1).tolist()
+                if isinstance(mut_scores, float):
+                    mut_scores = [mut_scores]
+
+                for (pos, orig_aa, mut_aa, _), score in zip(mut_info, mut_scores):
                     candidates.append({
                         "pos": int(pos + 1),
                         "orig": orig_aa,
                         "mut": mut_aa,
-                        "score": mut_score,
-                        "delta": mut_score - base_score
+                        "score": score,
+                        "delta": score - base_score
                     })
         
         # 4. Sort and return

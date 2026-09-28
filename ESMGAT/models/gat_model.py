@@ -76,6 +76,27 @@ class GATLinkPredictor(nn.Module):
         x = F.dropout(x, p=self.dropout, training=self.training)
         return x
 
+    def encode_with_attention(self, x, edge_index):
+        """
+        Same computation as encode(), but also returns each GATConv layer's attention coefficients.
+
+        Returns (z, [(edge_index_1, alpha_1), (edge_index_2, alpha_2)]), where edge_index_l includes the self-loops
+        GATConv adds and alpha_l has shape [num_edges, heads]. alpha_l[e, h] is the weight target node
+        edge_index_l[1, e] gives source node edge_index_l[0, e] in head h; weights over a node's incoming edges
+        sum to 1 per head.
+        """
+        x = self.input_norm(x)
+        x, att1 = self.conv1(x, edge_index, return_attention_weights=True)
+        x = self.bn1(x)
+        x = torch.relu(x)
+        x = F.dropout(x, p=self.dropout, training=self.training)
+
+        x, att2 = self.conv2(x, edge_index, return_attention_weights=True)
+        x = self.bn2(x)
+        x = torch.relu(x)
+        x = F.dropout(x, p=self.dropout, training=self.training)
+        return x, [att1, att2]
+
     def decode(self, z, src, dst):
         h_u, h_v = z[src], z[dst]
         bilinear_out = self.bilinear(h_u, h_v)

@@ -108,7 +108,7 @@ const NetworkExplorer = () => {
       try {
         const [netRes, centralityRes] = await Promise.all([
           ppiService.getNetwork(80),
-          ppiService.getCentrality(15)
+          ppiService.getCentrality(15, 'known')  // hubs of the drawn (known) subgraph
         ]);
 
         const nodes = netRes.data.nodes;

@@ -308,7 +308,7 @@ def evaluate_models(dry_run=False):
     if val_rf is not None:
         val_thresh_rf, _ = find_optimal_threshold(val_labels, val_rf, method="f1")
 
-    # Fresh validation predictions for scripts/audit_measurements.py (SHAP / ECE / Brier of THIS run's models).
+    # Fresh validation predictions for scripts/evaluation/audit_measurements.py (SHAP / ECE / Brier of THIS run's models).
     if not dry_run:
         os.makedirs(MODELS_DIR / "experiments", exist_ok=True)
         np.savez(MODELS_DIR / "experiments" / "features_cache.npz", va_y=val_labels, va_seq=val_seq, va_graph=val_graph)

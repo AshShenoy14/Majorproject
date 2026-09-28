@@ -10,7 +10,7 @@ router = APIRouter(tags=["Analysis"])
              response_model=MutationAnalysisResponse,
              summary="Analyze Mutation Impact",
              description="Predicts how specific amino acid mutations affect the interaction probability of a protein pair.")
-async def scan_mutations(request: MutationRequest):
+def scan_mutations(request: MutationRequest):
     """
     Simulates in-silico mutations and measures the delta in interaction probability.
     """
@@ -55,7 +55,7 @@ async def scan_mutations(request: MutationRequest):
 @router.post("/analysis/hotspots",
              summary="Identify Interaction Hotspots",
              description="Detects critical residues (hotspots) for the interaction using gradient-based importance.")
-async def get_hotspots(request: ProteinPair):
+def get_hotspots(request: ProteinPair):
     """
     Identifies specific amino acids that contribute most significantly to the interaction.
     """
@@ -96,7 +96,7 @@ async def get_hotspots(request: ProteinPair):
 @router.post("/analysis/explain-gnn",
              summary="Deep GNN Feature and Neighbor Explanation",
              description="Runs PyTorch Geometric GNNExplainer on a pair for detailed research explainability.")
-async def explain_gnn_deep(request: ProteinPair):
+def explain_gnn_deep(request: ProteinPair):
     from src.analysis.explain_model import explain_prediction as explain_gnn
 
     p1 = request.protein1_id.strip() if request.protein1_id else None
@@ -125,7 +125,7 @@ async def explain_gnn_deep(request: ProteinPair):
 @router.post("/analysis/residue_graph",
              summary="Generate Residue Interaction Graph",
              description="Generates a graph representation of internal residue-residue interactions for a single protein.")
-async def get_residue_graph(request: ResidueGraphRequest):
+def get_residue_graph(request: ResidueGraphRequest):
     """
     Constructs a RIG (Residue Interaction Graph) based on distance-truncated contacts.
     """
@@ -160,7 +160,7 @@ async def get_residue_graph(request: ResidueGraphRequest):
 @router.post("/analysis/optimize",
              summary="Optimize Interaction",
              description="Suggests mutations to either disrupt or enhance a protein-protein interaction.")
-async def get_optimization(request: ProteinPair, mode: str = "disrupt"):
+def get_optimization(request: ProteinPair, mode: str = "disrupt"):
     """
     In-silico optimization or disruption of a PPI.
     """

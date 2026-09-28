@@ -4,8 +4,10 @@ from typing import List, Dict
 import pandas as pd
 from tqdm import tqdm
 import argparse
+import json
 import sys
 import os
+import threading
 import gzip
 from Bio import SeqIO
 import numpy as np
@@ -91,12 +93,53 @@ class ESMFeatureExtractor:
             
         self.model.eval()
 
+        # Embedding cache keyed by the amino-acid SEQUENCE (never by protein ID): callers such as the mutation and
+        # hotspot analyzers pass mutated/masked sequences under the original protein ID, and users can submit a
+        # custom sequence for a known ID, so an ID-keyed cache would silently return the wrong embedding.
+        self.cache: Dict[str, torch.Tensor] = {}
+        self._lock = threading.Lock()  # the backend serves requests from a thread pool; one ESM pass at a time
+        self._seed_cache()
+
+    MAX_CACHE_SIZE = 50000
+
+    def _seed_cache(self):
+        """Seeds the cache from data/processed/embeddings.pt (ID-keyed) using the sequences they were computed from."""
+        emb_file = PROCESSED_DATA_DIR / "embeddings.pt"
+        seq_file = PROCESSED_DATA_DIR / "sequences_cache.json"
+        if not emb_file.exists() or not seq_file.exists():
+            return
+        try:
+            stored = torch.load(emb_file, weights_only=False)
+            with open(seq_file) as f:
+                seqs = json.load(f)
+        except Exception as e:
+            print(f"Embedding cache not seeded ({e}).")
+            return
+        dim = self.model.config.hidden_size if hasattr(self.model, "config") else ESM_EMBED_DIM
+        stale = [pid for pid, e in stored.items() if e.shape[-1] != dim]
+        if stale:
+            # e.g. a 480-d embeddings.pt left over from esm2_t12_35M: never mix embedding models
+            print(f"Embedding cache not seeded: stored embeddings have dim {stored[stale[0]].shape[-1]}, expected {dim}.")
+            return
+        for pid, emb in stored.items():
+            if pid in seqs:
+                self.cache[seqs[pid]] = emb
+        print(f"Embedding cache seeded with {len(self.cache)} precomputed sequences.")
+
+    def _remember(self, sequence: str, emb: torch.Tensor):
+        if len(self.cache) < self.MAX_CACHE_SIZE:
+            self.cache[sequence] = emb
+
     def get_embeddings(self, sequences: Dict[str, str], batch_size: int = 4, save_path: str = None) -> Dict[str, torch.Tensor]:
         """
         Generates embeddings for a dictionary of sequences with checkpointing.
         """
+        with self._lock:
+            return self._get_embeddings_locked(sequences, batch_size, save_path)
+
+    def _get_embeddings_locked(self, sequences: Dict[str, str], batch_size: int, save_path: str) -> Dict[str, torch.Tensor]:
         embeddings = {}
-        
+
         # Load existing if available (RESUME)
         if save_path and os.path.exists(save_path):
             try:
@@ -113,10 +156,14 @@ class ESMFeatureExtractor:
                 print(f"Error loading existing embeddings: {e}. Starting fresh.")
                 embeddings = {}
 
+        # Pull the rest from the sequence-keyed cache
+        for pid, seq in sequences.items():
+            if pid not in embeddings and seq in self.cache:
+                embeddings[pid] = self.cache[seq]
+
         # Filter out already processed
         remaining_ids = [pid for pid in sequences.keys() if pid not in embeddings]
         if not remaining_ids:
-            print("All sequences already processed!")
             return embeddings
 
         print(f"Processing {len(remaining_ids)} remaining proteins...")
@@ -141,8 +188,10 @@ class ESMFeatureExtractor:
                     mask = inputs["attention_mask"].unsqueeze(-1).to(outputs.last_hidden_state.dtype)
                     batch_embeddings = (outputs.last_hidden_state * mask).sum(dim=1) / mask.sum(dim=1)
                     
-                for pid, emb in zip(batch_ids, batch_embeddings):
-                    embeddings[pid] = emb.cpu().half()
+                for pid, seq, emb in zip(batch_ids, batch_seqs, batch_embeddings):
+                    h_emb = emb.cpu().half()
+                    embeddings[pid] = h_emb
+                    self._remember(seq, h_emb)
             except torch.cuda.OutOfMemoryError:
                 print(f"\nWarning: Skipped batch due to OOM even with size {batch_size}. Trying individuals...")
                 if self.device == "cuda":
@@ -154,7 +203,9 @@ class ESMFeatureExtractor:
                         inp = self.tokenizer([seq], return_tensors="pt", truncation=True, max_length=1024).to(self.device)
                         with torch.no_grad():
                             out = self.model(**inp)
-                            embeddings[pid] = out.last_hidden_state.mean(dim=1)[0].cpu().half()
+                            h_emb = out.last_hidden_state.mean(dim=1)[0].cpu().half()
+                            embeddings[pid] = h_emb
+                            self._remember(seq, h_emb)
                     except Exception as e:
                         print(f"Error processing {pid}: {e}")
                 if self.device == "cuda":

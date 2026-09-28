@@ -1,6 +1,6 @@
 """
-Sanity checks for the committed external-benchmark artifacts (scripts/external_benchmark_shs27k.py
-and scripts/external_benchmark_huri.py). Does not re-run either benchmark (both are slow: SHS27k
+Sanity checks for the committed external-benchmark artifacts (scripts/evaluation/external_benchmark_shs27k.py
+and scripts/evaluation/external_benchmark_huri.py). Does not re-run either benchmark (both are slow: SHS27k
 extracts ESM-2 embeddings for ~300 sequences on CPU, HuRI additionally makes real network calls to
 the Ensembl REST API) -- it only checks that a committed result exists and is internally consistent.
 """
@@ -13,7 +13,7 @@ from src.utils.paths import PROJECT_ROOT
 def _load(name):
     path = PROJECT_ROOT / "assets" / "evaluation" / name
     if not path.exists():
-        pytest.skip(f"{name} not generated (run the corresponding scripts/external_benchmark_*.py)")
+        pytest.skip(f"{name} not generated (run the corresponding scripts/evaluation/external_benchmark_*.py)")
     return json.loads(path.read_text())
 
 

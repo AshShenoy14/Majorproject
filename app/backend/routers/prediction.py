@@ -14,7 +14,7 @@ router = APIRouter(tags=["Prediction"])
              response_model=PredictionResponse,
              summary="Predict Interaction probability",
              description="Predicts the interaction probability between two proteins using a hybrid ESM-MLP and GraphSAGE ensemble model.")
-async def predict_interaction(pair: ProteinPair):
+def predict_interaction(pair: ProteinPair):
     """
     Computes a hybrid interaction probability for a protein pair.
 
@@ -50,8 +50,22 @@ async def predict_interaction(pair: ProteinPair):
         if p1 not in sequences or p2 not in sequences:
             raise HTTPException(status_code=404, detail="Could not find sequences for one or both proteins.")
 
-        # 2. Get Embeddings
-        embs = state.models["esm"].get_embeddings(sequences, batch_size=2)
+        # 2. Get Embeddings (with precomputed cache hit)
+        cached_embs = state.data_cache.get("embeddings", {})
+        missing_seqs = {}
+        embs = {}
+        for pid, seq in sequences.items():
+            if pid in cached_embs:
+                embs[pid] = cached_embs[pid]
+            else:
+                missing_seqs[pid] = seq
+
+        if missing_seqs:
+            computed = state.models["esm"].get_embeddings(missing_seqs, batch_size=2)
+            for pid, emb in computed.items():
+                embs[pid] = emb
+                cached_embs[pid] = emb  # cache in-memory for session
+
         e1 = embs[p1].unsqueeze(0).to(state.models["esm"].device).float()
         e2 = embs[p2].unsqueeze(0).to(state.models["esm"].device).float()
 
@@ -216,7 +230,7 @@ async def predict_interaction(pair: ProteinPair):
              response_model=List[PredictionResponse],
              summary="Batch Predict Interactions",
              description="Processes multiple protein pairs sequentially for interaction prediction.")
-async def predict_batch(request: BatchPredictionRequest):
+def predict_batch(request: BatchPredictionRequest):
     """
     Accepts a list of protein pairs and returns a list of prediction responses.
     """
@@ -226,7 +240,7 @@ async def predict_batch(request: BatchPredictionRequest):
         p1 = pair.protein1_id or "Unknown_P1"
         p2 = pair.protein2_id or "Unknown_P2"
         try:
-            res = await predict_interaction(pair)
+            res = predict_interaction(pair)
             results.append(res)
         except Exception as e:
             error_msg = str(e)

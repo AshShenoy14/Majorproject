@@ -16,7 +16,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { AutoGraph as GraphIcon, Biotech as BioIcon } from '@mui/icons-material';
 import axios from 'axios';
 import { ppiService } from '../services/api';
-import InteractionVisualizer from './InteractionVisualizer';
+import InteractionVisualizer from '../components/InteractionVisualizer';
 
 // Exploratory non-human protein pairs (accessions verified against UniProt). No ground-truth label is used or shown.
 const SPECIES_TESTS = [

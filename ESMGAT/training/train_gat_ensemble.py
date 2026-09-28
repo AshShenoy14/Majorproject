@@ -2,7 +2,7 @@
 GAT 5-Fold Stratified Out-Of-Fold (OOF) Stacking & XGBoost Meta-Learner Pipeline.
 
 Strict Isolation:
-  - Stable GraphSAGE artifacts in models/, checkpoints/, and checkpoints_new/ are FROZEN and strictly READ-ONLY.
+  - Stable GraphSAGE artifacts in models/ and checkpoints/ are FROZEN and strictly READ-ONLY.
   - All GAT artifacts are written strictly under ESMGAT/.
   - Explicit path safety assertions raise RuntimeError if any write targets outside ESMGAT/.
   - test.csv is strictly forbidden in Step 4 (reserved exclusively for Step 5 final evaluation).
@@ -93,7 +93,7 @@ def generate_gat_oof_predictions(
     os.makedirs(oof_dir, exist_ok=True)
 
     if stable_oof_dir is None:
-        stable_oof_dir = PROJECT_ROOT / "checkpoints_new" / "checkpoints" / "oof"
+        stable_oof_dir = PROJECT_ROOT / "checkpoints" / "oof"
 
     cfg = dict(GAT_CFG)
     if gat_cfg:

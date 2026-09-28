@@ -36,6 +36,8 @@ const DrugInsights = () => {
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState(urlQuery);
+  const [network, setNetwork] = useState('predicted');
+  const [networkStats, setNetworkStats] = useState(null);
 
   useEffect(() => {
     if (urlQuery) {
@@ -49,8 +51,12 @@ const DrugInsights = () => {
       setError(null);
       try {
         // Fetch computational Therapeutic Target Priority Scores (TTPS)
-        const res = await ppiService.getTherapeuticTargets(50, 0.40, 0.35, 0.25);
+        const [res, stats] = await Promise.all([
+          ppiService.getTherapeuticTargets(50, 0.40, 0.35, 0.25, network),
+          ppiService.getNetworkStats(network),
+        ]);
         setData(res.data || []);
+        setNetworkStats(stats.data || null);
       } catch (err) {
         console.error("Drug insights error:", err);
         setError("Failed to load computational therapeutic target priority scores.");
@@ -59,7 +65,7 @@ const DrugInsights = () => {
       }
     };
     fetchData();
-  }, []);
+  }, [network]);
 
   const filteredData = data.filter(item => {
     const matchesSearch = 
@@ -110,6 +116,26 @@ const DrugInsights = () => {
             <span><strong className="text-teal-400">NormBetweenness (0.35):</strong> Bottleneck traffic control</span>
             <span><strong className="text-purple-400">ChEMBL Target (0.25):</strong> Existing drug evidence</span>
           </div>
+          {networkStats && (
+            <div className="text-[11px] text-slate-300 border-t border-slate-800 pt-2">
+              {networkStats.network === 'predicted' ? (
+                <span>
+                  <strong className="text-sky-300">Predicted network:</strong>{' '}
+                  {networkStats.known_edges?.toLocaleString()} known interactions +{' '}
+                  {networkStats.predicted_edges?.toLocaleString()} interactions predicted by the ensemble on held-out pairs
+                  ({networkStats.predicted_edges_confirmed_by_string?.toLocaleString()} confirmed by STRING,{' '}
+                  {networkStats.predicted_edges_not_in_string?.toLocaleString()} candidate new interactions)
+                  across {networkStats.num_nodes?.toLocaleString()} proteins.
+                </span>
+              ) : (
+                <span>
+                  <strong className="text-sky-300">Known network:</strong>{' '}
+                  {networkStats.num_edges?.toLocaleString()} training interactions across {networkStats.num_nodes?.toLocaleString()} proteins.
+                  {network === 'predicted' && !networkStats.predicted_network_available && ' (Predicted network not built yet: run scripts/build_predicted_network.py.)'}
+                </span>
+              )}
+            </div>
+          )}
           <div className="mt-2 text-[10px] text-amber-300/90 font-medium flex items-center gap-1.5 border-t border-slate-800 pt-2">
             <Info size={12} className="shrink-0" />
             <span>Note: TTPS is a computational prioritization metric derived from graph topology and biological database cross-referencing to guide candidate selection. Downstream experimental validation is required.</span>
@@ -205,6 +231,22 @@ const DrugInsights = () => {
           />
         </div>
 
+        <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl shrink-0" role="group" aria-label="Interaction network">
+          {[
+            { id: 'predicted', label: 'Predicted Network' },
+            { id: 'known', label: 'Known Network' },
+          ].map(n => (
+            <button
+              key={n.id}
+              onClick={() => setNetwork(n.id)}
+              aria-pressed={network === n.id}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${network === n.id ? 'bg-white text-scientific-primary shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              {n.label}
+            </button>
+          ))}
+        </div>
+
         <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0">
            <Filter size={18} className="text-slate-400 mr-2" />
            {[
@@ -234,6 +276,9 @@ const DrugInsights = () => {
                 <th className="px-6 py-5 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">TTPS Priority Score</th>
                 <th className="px-6 py-5 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Degree (Norm)</th>
                 <th className="px-6 py-5 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Betweenness (Norm)</th>
+                {network === 'predicted' && (
+                  <th className="px-6 py-5 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]" title="Interactions of this protein predicted by the ensemble on held-out pairs">Predicted Edges</th>
+                )}
                 <th className="px-6 py-5 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">ChEMBL Status</th>
                 <th className="px-6 py-5 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Action</th>
               </tr>
@@ -241,7 +286,7 @@ const DrugInsights = () => {
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan="6" className="px-6 py-12 text-center">
+                  <td colSpan={network === 'predicted' ? 7 : 6} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center gap-3">
                        <Loader2 className="animate-spin text-scientific-primary" size={32} />
                        <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Computing Target Priority Scores...</p>
@@ -286,6 +331,16 @@ const DrugInsights = () => {
                   <td className="px-6 py-4">
                      <span className="text-xs font-semibold text-slate-600 font-mono">{Number(item.norm_betweenness || 0).toFixed(3)}</span>
                   </td>
+                  {network === 'predicted' && (
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col">
+                        <span className="text-xs font-semibold text-slate-600 font-mono">{item.predicted_interactions ?? 0}</span>
+                        {(item.novel_predicted_interactions ?? 0) > 0 && (
+                          <span className="text-[10px] text-sky-600 font-medium">{item.novel_predicted_interactions} not in STRING</span>
+                        )}
+                      </div>
+                    </td>
+                  )}
                   <td className="px-6 py-4">
                     {item.is_chembl_target ? (
                       <div className="flex flex-col gap-1">

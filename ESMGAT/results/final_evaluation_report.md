@@ -158,7 +158,7 @@ All frozen production artifacts were verified before and after evaluation:
 
 All Step 5 outputs are located strictly under `ESMGAT/`:
 
-1. `ESMGAT/training/evaluate_step5.py` — Evaluation and SHAP execution pipeline.
+1. `ESMGAT/training/evaluate_gat.py` — Evaluation and SHAP execution pipeline.
 2. `ESMGAT/results/final_predictions.csv` — Predictions for all 20,172 test pairs.
 3. `ESMGAT/results/final_comparison.csv` — Comparative metrics table.
 4. `ESMGAT/results/final_test_metrics.json` — Detailed JSON metrics with TP/TN/FP/FN and metadata.

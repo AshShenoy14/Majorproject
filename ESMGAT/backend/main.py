@@ -113,6 +113,16 @@ def load_gat_system():
     gat_state["gat_model"] = gat_model
     print(f"[GAT Backend] Standard GAT Model loaded successfully from {gat_weights_path}.")
 
+    # The graph is static, so node embeddings and attention coefficients are computed once and reused.
+    with torch.no_grad():
+        z, attention = gat_model.encode_with_attention(graph.x, graph.edge_index)
+        if not torch.allclose(z, gat_model.encode(graph.x, graph.edge_index)):
+            raise RuntimeError("encode_with_attention() does not reproduce encode(); refusing to serve.")
+    gat_state["z"] = z
+    gat_state["attention"] = [(ei.cpu(), alpha.cpu()) for ei, alpha in attention]
+    gat_state["inv_mapping"] = {idx: pid for pid, idx in gat_state["mapping"].items()}
+    print(f"[GAT Backend] Cached node embeddings and attention for {len(attention)} GAT layers.")
+
     # 6. GAT XGBoost Ensemble & Calibrator
     ensemble_path = PROJECT_ROOT / "ESMGAT" / "weights" / "gat_ensemble_model.pkl"
     calibrator_path = PROJECT_ROOT / "ESMGAT" / "weights" / "gat_calibrator.json"
@@ -198,6 +208,92 @@ def model_info():
     }
 
 
+def _attention_neighbors(node_idx: int, partner_idx: Optional[int], layer: int) -> Dict[str, Any]:
+    """Head-averaged attention that node_idx pays to each incoming neighbour (incl. its self-loop) in one GAT layer."""
+    edge_index, alpha = gat_state["attention"][layer]
+    mask = edge_index[1] == node_idx
+    sources = edge_index[0][mask].tolist()
+    per_head = alpha[mask]
+    mean = per_head.mean(dim=1)
+    n_in = len(sources)
+    return {
+        "uniform_weight": 1.0 / n_in if n_in else 0.0,
+        "entries": {
+            src: {
+                "weight": float(mean[i]),
+                "head_weights": [float(w) for w in per_head[i]],
+                "lift": float(mean[i]) * n_in,  # >1 = more attention than an even split over neighbours
+                "is_self": src == node_idx,
+                "is_partner": partner_idx is not None and src == partner_idx,
+            }
+            for i, src in enumerate(sources)
+        },
+    }
+
+
+def _gat_attention_explanation(nodes1: List[int], nodes2: List[int], top_k: int = 10) -> Dict[str, Any]:
+    """
+    Attention-based explanation for a pair: which graph neighbours each protein's GAT encoding attends to,
+    per layer, and the neighbours both proteins attend to. Proteins missing from the graph are represented
+    by their nearest-embedding surrogate node (the same kNN nodes the prediction uses).
+    """
+    inv = gat_state["inv_mapping"]
+    n1, n2 = nodes1[0], nodes2[0]
+
+    layers = []
+    all_ids = set()
+    for layer in range(len(gat_state["attention"])):
+        att1 = _attention_neighbors(n1, n2, layer)
+        att2 = _attention_neighbors(n2, n1, layer)
+
+        def top(att):
+            ranked = sorted(att["entries"].items(), key=lambda kv: kv[1]["weight"], reverse=True)[:top_k]
+            return [{"node": src, **vals} for src, vals in ranked]
+
+        shared_nodes = (set(att1["entries"]) & set(att2["entries"])) - {n1, n2}
+        shared = sorted(
+            ({"node": s, "weight_protein1": att1["entries"][s]["weight"], "weight_protein2": att2["entries"][s]["weight"]}
+             for s in shared_nodes),
+            key=lambda d: d["weight_protein1"] + d["weight_protein2"], reverse=True,
+        )[:top_k]
+        layer_out = {
+            "layer": layer + 1,
+            "protein1_uniform_weight": att1["uniform_weight"],
+            "protein2_uniform_weight": att2["uniform_weight"],
+            "protein1_top": top(att1),
+            "protein2_top": top(att2),
+            "shared": shared,
+            "num_shared": len(shared_nodes),
+        }
+        layers.append(layer_out)
+        for key in ("protein1_top", "protein2_top", "shared"):
+            all_ids.update(inv[d["node"]] for d in layer_out[key])
+
+    uniprot = gat_state["id_mapper"].ensp_to_uniprot(sorted(all_ids | {inv[n1], inv[n2]}))
+    for layer_out in layers:
+        for key in ("protein1_top", "protein2_top", "shared"):
+            for d in layer_out[key]:
+                pid = inv[d.pop("node")]
+                d["protein_id"] = pid
+                d["uniprot_id"] = uniprot.get(pid, pid)
+
+    def node_info(nodes):
+        edge_index = gat_state["attention"][0][0]
+        return {
+            "graph_node": inv[nodes[0]],
+            "uniprot_id": uniprot.get(inv[nodes[0]], inv[nodes[0]]),
+            "num_neighbors": int((edge_index[1] == nodes[0]).sum()) - 1,  # minus the self-loop
+        }
+
+    return {
+        "method": "GATConv attention coefficients (averaged over 4 heads) from the frozen GAT encoder; "
+                  "weights over each node's neighbours (and itself) sum to 1 per layer.",
+        "protein1": node_info(nodes1),
+        "protein2": node_info(nodes2),
+        "layers": layers,
+    }
+
+
 def _run_single_gat_prediction(p1: str, p2: str, s1: Optional[str] = None, s2: Optional[str] = None) -> Dict[str, Any]:
     # 1. Resolve sequences
     sequences = {}
@@ -215,8 +311,9 @@ def _run_single_gat_prediction(p1: str, p2: str, s1: Optional[str] = None, s2: O
     if p1 not in sequences or p2 not in sequences:
         raise HTTPException(status_code=404, detail=f"Could not find amino acid sequences for '{p1}' and/or '{p2}'.")
 
-    # 2. Compute ESM embeddings
+    # 2. ESM embeddings (the extractor reuses precomputed embeddings for known sequences, keyed by sequence)
     embs = gat_state["feature_extractor"].get_embeddings(sequences, batch_size=2)
+
     device = gat_state["device"]
     e1 = embs[p1].unsqueeze(0).to(device).float()
     e2 = embs[p2].unsqueeze(0).to(device).float()
@@ -233,12 +330,11 @@ def _run_single_gat_prediction(p1: str, p2: str, s1: Optional[str] = None, s2: O
     m_p1 = gat_state["id_mapper"].resolve_to_graph_id(p1, set(mapping.keys()))
     m_p2 = gat_state["id_mapper"].resolve_to_graph_id(p2, set(mapping.keys()))
 
+    z = gat_state["z"]  # cached encoder output for the static graph (identical to a fresh forward pass)
     if m_p1 in mapping and m_p2 in mapping:
-        idx1 = mapping[m_p1]
-        idx2 = mapping[m_p2]
-        edge_label_index = torch.tensor([[idx1], [idx2]], dtype=torch.long, device=device)
+        nb1, nb2 = [mapping[m_p1]], [mapping[m_p2]]
         with torch.no_grad():
-            g_out = gat_state["gat_model"](graph.x, graph.edge_index, edge_label_index)
+            g_out = gat_state["gat_model"].decode(z, torch.tensor(nb1, device=device), torch.tensor(nb2, device=device))
             graph_prob = torch.sigmoid(g_out).item()
     else:
         # Novel / missing node fallback using top-k cosine similarity
@@ -262,10 +358,14 @@ def _run_single_gat_prediction(p1: str, p2: str, s1: Optional[str] = None, s2: O
         src_indices = [i1 for i1 in nb1 for i2 in nb2]
         dst_indices = [i2 for i1 in nb1 for i2 in nb2]
         if src_indices and dst_indices:
-            edge_label_index = torch.tensor([src_indices, dst_indices], dtype=torch.long, device=device)
             with torch.no_grad():
-                g_out = gat_state["gat_model"](graph.x, graph.edge_index, edge_label_index)
+                g_out = gat_state["gat_model"].decode(
+                    z, torch.tensor(src_indices, device=device), torch.tensor(dst_indices, device=device))
                 graph_prob = torch.sigmoid(g_out).mean().item()
+
+    attention = _gat_attention_explanation(nb1, nb2)
+    attention["protein1"]["surrogate"] = m_p1 not in mapping
+    attention["protein2"]["surrogate"] = m_p2 not in mapping
 
     # 5. GAT Stacking Ensemble Prediction
     gat_ensemble = gat_state["gat_ensemble"]
@@ -320,6 +420,7 @@ def _run_single_gat_prediction(p1: str, p2: str, s1: Optional[str] = None, s2: O
         },
         "shap_explanations": shap_values,
         "gnn_explanation": None,
+        "attention_explanation": attention,
         "protein1_uniprot_id": uniprot_maps.get(p1, p1),
         "protein2_uniprot_id": uniprot_maps.get(p2, p2),
         "protein1_seq": sequences.get(p1),

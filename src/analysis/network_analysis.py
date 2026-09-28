@@ -2,6 +2,7 @@ import networkx as nx
 import pandas as pd
 import matplotlib.pyplot as plt
 import os
+import threading
 from typing import List, Tuple, Dict, Any
 
 class NetworkAnalyzer:
@@ -10,6 +11,7 @@ class NetworkAnalyzer:
         Initialize the analyzer with a NetworkX graph.
         """
         self.graph = graph
+        self._centralities_lock = threading.Lock()  # warmed in a background thread by the backend
 
     def build_from_dataframe(self, df: pd.DataFrame, source_col: str = 'protein1', target_col: str = 'protein2', weight_col: str = None):
         """
@@ -23,6 +25,10 @@ class NetworkAnalyzer:
         Calculates Degree, Betweenness, and Closeness centrality.
         Returns a DataFrame sorted by Degree Centrality.
         """
+        with self._centralities_lock:
+            return self._calculate_centralities_locked()
+
+    def _calculate_centralities_locked(self) -> pd.DataFrame:
         if getattr(self, '_centralities_cache', None) is not None:
             return self._centralities_cache.copy()
 

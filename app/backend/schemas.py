@@ -140,4 +140,7 @@ class TherapeuticTargetResponse(BaseModel):
     degree_centrality: float = Field(..., description="Raw degree centrality in PPI network")
     betweenness_centrality: float = Field(..., description="Raw betweenness centrality in PPI network")
     eigenvector_centrality: float = Field(..., description="Raw eigenvector centrality in PPI network")
+    network: str = Field("known", description="Network the scores were computed on: 'predicted' or 'known'")
+    predicted_interactions: int = Field(0, description="Edges of this protein predicted by the ensemble on held-out pairs")
+    novel_predicted_interactions: int = Field(0, description="Predicted edges of this protein that are not STRING interactions")
 

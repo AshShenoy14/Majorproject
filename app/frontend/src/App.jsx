@@ -17,7 +17,7 @@ const Assistant = lazy(() => import('./pages/Assistant'));
 const About = lazy(() => import('./pages/About'));
 const Benchmark = lazy(() => import('./pages/Benchmark'));
 const ComparisonMode = lazy(() => import('./pages/ComparisonMode'));
-const CrossSpeciesTesting = lazy(() => import('./components/CrossSpeciesTesting'));
+const CrossSpeciesTesting = lazy(() => import('./pages/CrossSpeciesTesting'));
 
 function App() {
     const [loading, setLoading] = useState(() => {

@@ -10,7 +10,7 @@ router = APIRouter(tags=["Biology"])
 @router.get("/drug_targets",
             summary="Get Drug Targets",
             description="Retrieves known drug targets for a given list of proteins.")
-async def get_drug_targets(proteins: str = None):
+def get_drug_targets(proteins: str = None):
     """
     Returns drug target information from ChEMBL/UniProt mappings.
     """
@@ -38,7 +38,7 @@ async def get_drug_targets(proteins: str = None):
             response_model=List[BioMetaResponse],
             summary="Get Biological Metadata",
             description="Fetches localization and pathway information for specific proteins.")
-async def get_bio_metadata(proteins: str):
+def get_bio_metadata(proteins: str):
     """
     Returns subcellular localization and functional pathway data.
     """
@@ -60,7 +60,7 @@ async def get_bio_metadata(proteins: str):
             response_model=FeasibilityResponse,
             summary="Check Interaction Feasibility",
             description="Checks if two proteins share compatible subcellular localizations.")
-async def check_feasibility(p1: str, p2: str):
+def check_feasibility(p1: str, p2: str):
     """
     Determines if an interaction is physically possible based on biological context.
     """
@@ -79,7 +79,7 @@ async def check_feasibility(p1: str, p2: str):
 @router.get("/analysis/vulnerability",
             summary="Calculate Pathway Vulnerability",
             description="Assesses how fragile a biological pathway is to mutations in a specific protein pair.")
-async def get_vulnerability(p1: str, p2: str, delta: float):
+def get_vulnerability(p1: str, p2: str, delta: float):
     """
     Calculates vulnerability scores for downstream pathways.
     """

@@ -47,13 +47,14 @@ export const ppiService = {
   getDrugTargets: (proteins = null) => 
     api.get(`/drug_targets${proteins ? `?proteins=${proteins}` : ''}`),
 
-  getTherapeuticTargets: (limit = 50, wDegree = 0.40, wBetweenness = 0.35, wChembl = 0.25) =>
-    api.get(`/analysis/therapeutic-targets?limit=${limit}&w_degree=${wDegree}&w_betweenness=${wBetweenness}&w_chembl=${wChembl}`),
+  // network: 'predicted' (known + ensemble-predicted interactions) or 'known' (training interactions only)
+  getTherapeuticTargets: (limit = 50, wDegree = 0.40, wBetweenness = 0.35, wChembl = 0.25, network = 'predicted') =>
+    api.get(`/analysis/therapeutic-targets?limit=${limit}&w_degree=${wDegree}&w_betweenness=${wBetweenness}&w_chembl=${wChembl}&network=${network}`),
 
 
-  getCentrality: (topK = 10) => api.get(`/analysis/centrality?top_k=${topK}`),
+  getCentrality: (topK = 10, network = 'predicted') => api.get(`/analysis/centrality?top_k=${topK}&network=${network}`),
 
-  getNetworkStats: () => api.get('/analysis/stats'),
+  getNetworkStats: (network = 'predicted') => api.get(`/analysis/stats?network=${network}`),
 
   getFinalEvaluation: () => api.get('/evaluation/final'),
   getAllBenchmarks: () => api.get('/evaluation/benchmarks'),

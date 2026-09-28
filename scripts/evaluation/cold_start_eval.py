@@ -35,7 +35,7 @@ Caveats (read before quoting these numbers as inductive generalization):
     never tested, but weaker evidence than a genuine held-out-protein retrain.
 """
 import sys, os, json, argparse
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 import numpy as np
 import pandas as pd
 import torch
@@ -205,7 +205,7 @@ def main():
     out = {
         "description": "Simulated semi-cold-start eval: one pair endpoint physically removed from the trained "
                         "graph and reconstructed via the production insert_novel_node_knn() path; no retraining. "
-                        "See scripts/cold_start_eval.py docstring for caveats before citing as inductive generalization.",
+                        "See scripts/evaluation/cold_start_eval.py docstring for caveats before citing as inductive generalization.",
         "n_novel_proteins_removed": len(novel_proteins),
         "k_neighbors": args.k,
         "seed": args.seed,

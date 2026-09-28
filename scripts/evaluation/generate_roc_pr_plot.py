@@ -16,7 +16,7 @@ c_graph = '#0D9488'  # Teal
 c_ens = '#4F46E5'    # Indigo/Purple
 c_rf = '#94A3B8'     # Slate gray
 
-# Models and AUC values matching Table I in paper.tex
+# Models and AUC values matching Table I in docs/paper.tex
 # Table I:
 # ESM-MLP: ROC-AUC 0.9530, PR-AUC 0.9569
 # GraphSAGE: ROC-AUC 0.9562, PR-AUC 0.9681

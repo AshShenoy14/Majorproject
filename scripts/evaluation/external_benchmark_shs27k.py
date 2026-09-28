@@ -11,7 +11,7 @@ A direct sequence check found 1376 of SHS27k's 1690 unique proteins (81.4%) are 
 proteins already in this project's training data. This script therefore reports two numbers:
   1. "overall": every SHS27k pair, run through the same production code path as /predict (warm
      graph lookup for proteins with a matching training-time node; cold-start KNN reconstruction
-     -- see scripts/cold_start_eval.py -- for the ~19% that are not byte-identical to any training
+     -- see scripts/evaluation/cold_start_eval.py -- for the ~19% that are not byte-identical to any training
      protein).
   2. "novel_subset_only": restricted to pairs where AT LEAST ONE protein is not byte-identical to
      any training protein -- the closest this dataset can offer to an out-of-training-set check.
@@ -22,7 +22,7 @@ not as evidence of generalization to a fully independent data source.
 No retraining happens anywhere in this script; it only runs inference with the existing checkpoints.
 """
 import sys, os, json, argparse
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 import numpy as np
 import pandas as pd
 import torch

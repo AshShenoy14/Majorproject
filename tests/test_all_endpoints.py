@@ -97,6 +97,41 @@ def test_endpoint_therapeutic_targets(client):
     data = res.json()
     assert isinstance(data, list)
 
+def test_endpoint_therapeutic_targets_network_choice(client):
+    known = client.get("/analysis/therapeutic-targets?limit=5&network=known").json()
+    assert known and all(r["network"] == "known" and r["predicted_interactions"] == 0 for r in known)
+
+    stats = client.get("/analysis/stats").json()
+    if not stats.get("predicted_network_available"):
+        pytest.skip("predicted_network.csv not generated (run scripts/build_predicted_network.py)")
+    predicted = client.get("/analysis/therapeutic-targets?limit=20&network=predicted").json()
+    assert all(r["network"] == "predicted" for r in predicted)
+    assert any(r["predicted_interactions"] > 0 for r in predicted)
+    assert stats["network"] == "predicted" and stats["num_edges"] > client.get("/analysis/stats?network=known").json()["num_edges"]
+
+
+def test_slow_request_does_not_block_server(client):
+    """Routes are sync (thread pool), so a long ESM computation must not freeze unrelated endpoints."""
+    import random
+    import threading
+    import time
+
+    rng = random.Random(0)
+    seq = "".join(rng.choice("ACDEFGHIKLMNPQRSTVWY") for _ in range(1000))  # novel sequence: forces an ESM pass
+    worker = threading.Thread(target=lambda: client.post("/predict", json={
+        "protein1_id": "SLOW_TEST_PROTEIN", "protein2_id": "ENSP00000226218", "protein1_seq": seq}))
+    worker.start()
+    time.sleep(0.5)
+    t0 = time.time()
+    res = client.get("/analysis/stats?network=known")
+    elapsed = time.time() - t0
+    still_running = worker.is_alive()
+    worker.join()
+    assert res.status_code == 200
+    if not still_running:
+        pytest.skip("prediction finished before the probe; machine too fast for this check")
+    assert elapsed < 3.0, f"/analysis/stats took {elapsed:.1f}s while /predict was running"
+
 def test_endpoint_chat_greeting(client):
     res = client.get("/chat/greeting")
     assert res.status_code == 200

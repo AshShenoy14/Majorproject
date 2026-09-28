@@ -18,6 +18,7 @@ import html2pdf from 'html2pdf.js';
 import { ppiService } from '../services/api';
 import Protein3DView from '../components/Protein3DView';
 import ProteinInfoButton from '../components/ProteinInfoModal';
+import GATAttentionPanel from '../components/GATAttentionPanel';
 
 const CASE_STUDIES = [
   { label: "🎯 Oncology (TP53 & MDM2)", p1: "ENSP00000269305", p2: "ENSP00000258149", desc: "Tumor suppressor binding regulating cell cycle & apoptosis." },
@@ -1266,6 +1267,15 @@ const Predict = () => {
                             </table>
                           </div>
                         </div>
+
+                        {result.attention_explanation ? (
+                          <GATAttentionPanel attention={result.attention_explanation} />
+                        ) : (
+                          <div className="bg-slate-50 border border-slate-200 p-4 px-6 rounded-2xl text-xs text-slate-500 flex items-start gap-2">
+                            <Info size={14} className="shrink-0 mt-0.5 text-violet-500" />
+                            <span>GraphSAGE has no attention mechanism. Select the <strong>ESM-2 + Standard GAT + XGBoost</strong> model to see which graph neighbours the GAT attended to for this pair.</span>
+                          </div>
+                        )}
                       </motion.div>
                     )}
 

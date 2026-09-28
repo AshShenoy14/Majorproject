@@ -9,7 +9,7 @@ router = APIRouter(prefix="/chat", tags=["AI Assistant"])
 @router.get("/greeting",
             summary="Get AI Assistant Greeting",
             description="Returns a welcome message and suggested questions for the protein assistant.")
-async def get_chat_greeting():
+def get_chat_greeting():
     if "assistant" not in state.analyzers:
         raise HTTPException(status_code=503, detail="Protein Assistant not initialized")
     return state.analyzers["assistant"].get_greeting()
@@ -19,7 +19,7 @@ async def get_chat_greeting():
              response_model=ChatResponse,
              summary="Chat with Protein AI Assistant",
              description="Ask questions about proteins, diseases, drug targets, and biology concepts.")
-async def chat_with_assistant(request: ChatRequest):
+def chat_with_assistant(request: ChatRequest):
     if "assistant" not in state.analyzers:
         raise HTTPException(status_code=503, detail="Protein Assistant not initialized")
 

@@ -12,8 +12,8 @@ Model-based metrics are only meaningful when models were trained on the CURRENT 
 skipped with --skip-model-metrics (used right after re-running preprocessing, before retraining).
 
 Usage:
-  python scripts/audit_measurements.py --out assets/evaluation/audit/audit_before.json
-  python scripts/audit_measurements.py --out assets/evaluation/audit/audit_after.json --skip-model-metrics
+  python scripts/evaluation/audit_measurements.py --out assets/evaluation/audit/audit_before.json
+  python scripts/evaluation/audit_measurements.py --out assets/evaluation/audit/audit_after.json --skip-model-metrics
 """
 import os
 import sys
@@ -23,7 +23,7 @@ import argparse
 import numpy as np
 import pandas as pd
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 from src.utils.paths import PROCESSED_DATA_DIR, STRING_FILE, MODELS_DIR, PROJECT_ROOT
 
 

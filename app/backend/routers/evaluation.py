@@ -11,15 +11,15 @@ FINAL_EVALUATION_PATH = PROJECT_ROOT / "assets" / "evaluation" / "final_test_met
 
 @router.get("/final",
             summary="Get Final Test Evaluation",
-            description="Read-only. Returns the final held-out test evaluation written by src/analysis/compare_models.py.")
-async def get_final_evaluation():
+            description="Read-only. Returns the final held-out test evaluation written by src/evaluation/compare_models.py.")
+def get_final_evaluation():
     """
     Serves assets/evaluation/final_test_metrics.json unchanged. No metrics are computed or stored here.
     """
     if not FINAL_EVALUATION_PATH.exists():
         raise HTTPException(
             status_code=404,
-            detail="Final evaluation results not found. Run `python src/analysis/compare_models.py` to generate them."
+            detail="Final evaluation results not found. Run `python src/evaluation/compare_models.py` to generate them."
         )
     try:
         with open(FINAL_EVALUATION_PATH, "r", encoding="utf-8") as f:
@@ -31,7 +31,7 @@ async def get_final_evaluation():
 @router.get("/benchmarks",
             summary="Get All Evaluation Benchmarks",
             description="Returns bootstrap CIs, cold-start metrics, and external benchmarks (SHS27k, HuRI).")
-async def get_all_benchmarks():
+def get_all_benchmarks():
     """
     Returns bootstrap confidence intervals, cold-start simulation, and external benchmark artifacts.
     """

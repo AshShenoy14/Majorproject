@@ -5,6 +5,7 @@ load_system() (e.g. `explainer`) are visible everywhere: use `state.explainer`,
 `state.models`, etc. rather than `from app.backend.state import explainer`.
 """
 import sys
+import threading
 
 import torch
 import torch.nn.functional as F
@@ -116,6 +117,17 @@ async def load_system():
             pr_col = data_cache["graph"].x[:, -1].cpu().tolist()
             data_cache["pagerank"] = {pid: pr_col[idx] for pid, idx in data_cache["mapping"].items()}
 
+        emb_cache_path = PROCESSED_DATA_DIR / "embeddings.pt"
+        if emb_cache_path.exists():
+            try:
+                data_cache["embeddings"] = torch.load(emb_cache_path, weights_only=False)
+                print(f"Loaded {len(data_cache['embeddings'])} precomputed protein embeddings into cache.")
+            except Exception as e:
+                print(f"Warning: Failed to preload embeddings cache: {e}")
+                data_cache["embeddings"] = {}
+        else:
+            data_cache["embeddings"] = {}
+
         # 3. Load Ensemble model
         ensemble_path = PROJECT_ROOT / "models" / "ensemble_model.pkl"
         if not ensemble_path.exists():
@@ -140,6 +152,40 @@ async def load_system():
             analyzers["network"] = NetworkAnalyzer()
             analyzers["network"].build_from_dataframe(df_pos)
             print("Network Analyzer Ready.")
+
+        # Predicted network: known interactions + ensemble-predicted held-out interactions
+        # (built by scripts/build_predicted_network.py). Optional; the known network is used without it.
+        predicted_path = PROCESSED_DATA_DIR / "predicted_network.csv"
+        if predicted_path.exists():
+            print("Initializing Predicted Network Analyzer...")
+            pred_df = pd.read_csv(predicted_path)
+            analyzers["network_predicted"] = NetworkAnalyzer()
+            analyzers["network_predicted"].build_from_dataframe(pred_df)
+            predicted_only = pred_df[pred_df["source"] == "predicted"]
+            counts, novel_counts = {}, {}
+            for p1, p2, label in predicted_only[["protein1", "protein2", "label"]].itertuples(index=False):
+                for pid in (p1, p2):
+                    counts[pid] = counts.get(pid, 0) + 1
+                    if label == 0:
+                        novel_counts[pid] = novel_counts.get(pid, 0) + 1
+            data_cache["predicted_edge_counts"] = counts
+            data_cache["predicted_novel_counts"] = novel_counts
+            data_cache["predicted_network_summary"] = {
+                "known_edges": int((pred_df["source"] == "known").sum()),
+                "predicted_edges": int(len(predicted_only)),
+                "predicted_edges_confirmed_by_string": int((predicted_only["label"] == 1).sum()),
+                "predicted_edges_not_in_string": int((predicted_only["label"] == 0).sum()),
+            }
+            print("Predicted Network Analyzer Ready.")
+
+        # Centralities take ~25 s per network on CPU (sampled betweenness); compute them in the background so the
+        # first /analysis/therapeutic-targets or /analysis/centrality call does not approach the frontend timeout.
+        def _warm_centralities():
+            for name in ("network", "network_predicted"):
+                if name in analyzers:
+                    analyzers[name].calculate_centralities()
+            print("Network centralities precomputed.")
+        threading.Thread(target=_warm_centralities, name="centrality-warmup", daemon=True).start()
 
         # 4. Mutation and Novel Analyzers
         if "seq_model" in models and "esm" in models:

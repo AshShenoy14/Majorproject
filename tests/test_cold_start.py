@@ -20,7 +20,7 @@ def test_knn_dynamic_graph_insertion():
 
 
 def test_cold_start_eval_artifact_exists_and_is_sane():
-    """scripts/cold_start_eval.py scores the production cold-start path (insert_novel_node_knn +
+    """scripts/evaluation/cold_start_eval.py scores the production cold-start path (insert_novel_node_knn +
     GraphSAGE decode) against real test.csv labels after physically removing proteins from the
     trained graph. This checks the committed result is present and internally consistent -- it does
     not re-run the (slow, CPU-only) evaluation itself."""
@@ -29,7 +29,7 @@ def test_cold_start_eval_artifact_exists_and_is_sane():
 
     path = PROJECT_ROOT / "assets" / "evaluation" / "cold_start_eval.json"
     if not path.exists():
-        pytest.skip("cold_start_eval.json not generated (run scripts/cold_start_eval.py)")
+        pytest.skip("cold_start_eval.json not generated (run scripts/evaluation/cold_start_eval.py)")
     data = json.loads(path.read_text())
     cold = data["cold_start_novel_protein_via_knn"]
     warm = data["warm_baseline_same_pairs_full_graph"]

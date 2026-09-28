@@ -57,7 +57,7 @@ const Home = () => {
     // All figures come from the backend; nothing is pre-filled with placeholder values.
     const fetchStats = async () => {
       try {
-        const response = await ppiService.getNetworkStats();
+        const response = await ppiService.getNetworkStats('known');  // dataset figures: training interactions
         if (response.data?.num_nodes != null) {
           setStats(prev => ({
             ...prev,
@@ -93,7 +93,7 @@ const Home = () => {
         {/* Background Image with Overlay */}
         <div
           className="absolute inset-0 z-0 bg-cover bg-center opacity-[0.05] pointer-events-none"
-          style={{ backgroundImage: "url('/ppi_hero_bg_1777021983794.png')" }}
+          style={{ backgroundImage: "url('/ppi_hero_bg.png')" }}
         />
         <div className="absolute inset-0 z-0 bg-gradient-to-r from-white via-white/50 to-transparent pointer-events-none" />
 

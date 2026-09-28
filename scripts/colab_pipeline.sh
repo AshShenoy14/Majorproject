@@ -19,7 +19,7 @@ else
   python src/data/preprocess_data.py --seed 42
 fi
 python scripts/verify_splits.py
-python scripts/audit_measurements.py --out assets/evaluation/audit/audit_after_data.json --skip-model-metrics
+python scripts/evaluation/audit_measurements.py --out assets/evaluation/audit/audit_after_data.json --skip-model-metrics
 
 rm -f data/processed/embeddings.pt data/processed/ppi_graph.pt data/processed/ppi_graph_mapping.pt   # never mix embedding models
 python src/data/feature_extraction.py --batch-size 16
@@ -30,12 +30,12 @@ python src/training/train_sequence_model.py --embedding_path data/processed/embe
 python src/training/train_graph_model.py --graph_path data/processed/ppi_graph.pt --checkpoint_dir "$CK" --ckpt_every 5
 python src/training/train_random_forest.py
 python src/training/train_ensemble.py --checkpoint_dir "$CK" --ckpt_every 5
-python src/analysis/compare_models.py
-python scripts/cold_start_eval.py
-python scripts/external_benchmark_shs27k.py
-python scripts/external_benchmark_huri.py
+python src/evaluation/compare_models.py
+python scripts/evaluation/cold_start_eval.py
+python scripts/evaluation/external_benchmark_shs27k.py
+python scripts/evaluation/external_benchmark_huri.py
 
 sha256sum data/processed/*.csv data/processed/*.pt models/*.pth models/*.pkl models/*.json > assets/evaluation/artifact_hashes.txt   # provenance for later local re-verification
 cp -r models assets/evaluation "$DRIVE/"                       # keep artefacts even if the session dies later (before the audit, which can fail)
-python scripts/audit_measurements.py --out assets/evaluation/audit/audit_after_full.json
+python scripts/evaluation/audit_measurements.py --out assets/evaluation/audit/audit_after_full.json
 pip freeze > requirements-lock.txt                             # reproducibility: commit this next to requirements.txt

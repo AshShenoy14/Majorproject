@@ -40,52 +40,61 @@ class HotspotAnalyzer:
             
             base_score = torch.sigmoid(self.seq_model(e1_base, e2_base)).item()
 
-        # 2. Perturb Protein 1
-        scores_p1 = []
-        for i in range(0, len(p1_seq) - window_size + 1):
-            # Mask window with 'X'
-            masked_seq = p1_seq[:i] + "X" * window_size + p1_seq[i+window_size:]
-            
-            with torch.no_grad():
-                mut_embs = self.esm_extractor.get_embeddings({p1_id: masked_seq}, batch_size=1)
-                e1_mut = mut_embs[p1_id].unsqueeze(0).to(self.device).float()
-                
-                # Re-add bio features to mutated input (protein 1 bio doesn't change with sequence)
-                if self.bio_manager and self.bio_encoder:
-                    e1_mut = torch.cat([e1_mut, b1], dim=1)
-                
-                mut_score = torch.sigmoid(self.seq_model(e1_mut, e2_base)).item()
-                scores_p1.append(mut_score)
-        
-        # 3. Perturb Protein 2
-        scores_p2 = []
-        for i in range(0, len(p2_seq) - window_size + 1):
-            masked_seq = p2_seq[:i] + "X" * window_size + p2_seq[i+window_size:]
-            
-            with torch.no_grad():
-                mut_embs = self.esm_extractor.get_embeddings({p2_id: masked_seq}, batch_size=1)
-                e2_mut = mut_embs[p2_id].unsqueeze(0).to(self.device).float()
-                
-                # Re-add bio features to mutated input (protein 2 bio doesn't change with sequence)
-                if self.bio_manager and self.bio_encoder:
-                    e2_mut = torch.cat([e2_mut, b2], dim=1)
-                
-                mut_score = torch.sigmoid(self.seq_model(e1_base, e2_mut)).item()
-                scores_p2.append(mut_score)
+        # 2. Vectorized Perturbation Function
+        def compute_perturbations(target_seq, base_other_emb, is_p1=True):
+            seq_len = len(target_seq)
+            if seq_len < window_size:
+                return [0.0] * seq_len
 
-        # 4. Process results
-        def process_scores(scores, base, seq_len):
-            deltas = [base - s for s in scores] # Higher delta = more critical (score dropped when masked)
-            # Map window scores back to individual residues (max of windows containing residue)
+            # Adaptive step for responsive interactive performance on CPU
+            step = max(1, (seq_len - window_size) // 30) if seq_len > 35 else 1
+
+            windows = []
+            masked_dict = {}
+            for i in range(0, seq_len - window_size + 1, step):
+                masked_seq = target_seq[:i] + "X" * window_size + target_seq[i+window_size:]
+                wid = f"w_{i}"
+                masked_dict[wid] = masked_seq
+                windows.append((i, wid))
+
+            if not windows:
+                return [0.0] * seq_len
+
+            # Extract all masked embeddings in parallel batches
+            mut_embs = self.esm_extractor.get_embeddings(masked_dict, batch_size=16)
+
+            mut_list = []
+            for _, wid in windows:
+                m_emb = mut_embs[wid].unsqueeze(0).to(self.device).float()
+                if self.bio_manager and self.bio_encoder:
+                    b_target = b1 if is_p1 else b2
+                    m_emb = torch.cat([m_emb, b_target], dim=1)
+                mut_list.append(m_emb)
+
+            mut_batch = torch.cat(mut_list, dim=0)
+            base_other_rep = base_other_emb.repeat(mut_batch.size(0), 1)
+
+            with torch.no_grad():
+                if is_p1:
+                    raw_out = self.seq_model(mut_batch, base_other_rep)
+                else:
+                    raw_out = self.seq_model(base_other_rep, mut_batch)
+                mut_scores = torch.sigmoid(raw_out).squeeze(-1).tolist()
+
+            if isinstance(mut_scores, float):
+                mut_scores = [mut_scores]
+
             res_impact = [0.0] * seq_len
-            for i, d in enumerate(deltas):
-                for j in range(i, i + window_size):
-                    if j < seq_len:
-                        res_impact[j] = max(res_impact[j], d)
+            for (w_start, _), m_score in zip(windows, mut_scores):
+                delta = max(0.0, base_score - m_score)
+                w_end = min(seq_len, w_start + max(step, window_size))
+                for j in range(w_start, w_end):
+                    res_impact[j] = max(res_impact[j], delta)
+
             return res_impact
 
-        total_p1 = process_scores(scores_p1, base_score, len(p1_seq))
-        total_p2 = process_scores(scores_p2, base_score, len(p2_seq))
+        total_p1 = compute_perturbations(p1_seq, e2_base, is_p1=True)
+        total_p2 = compute_perturbations(p2_seq, e1_base, is_p1=False)
 
         return {
             "base_score": base_score,
