@@ -295,7 +295,7 @@ If you reference or build upon this research framework in your work:
 ```bibtex
 @misc{transgraph_ppi_2026,
   title={TransGraph-PPI: Research Framework for Multimodal Protein-Protein Interaction Prediction},
-  author={Ashwini Shenoy B and Basil S},
+  author={Ashwini Shenoy B, Basil S, Ajay Preenal Dsouza, Bhavish V},
   year={2026},
   publisher={GitHub},
   journal={GitHub Repository},
