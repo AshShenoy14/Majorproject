@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   BarChart3,
@@ -23,8 +23,6 @@ import {
   Server,
   Clock,
   UploadCloud,
-  GraduationCap,
-  FlaskConical,
   Table2,
   FileDown,
   Camera,
@@ -46,6 +44,8 @@ import {
 } from 'recharts';
 import html2pdf from 'html2pdf.js';
 import { ppiService } from '../services/api';
+import { useTechDetails } from '../techDetails';
+import { TechOnly } from '../components/TechDetails';
 import Protein3DView from '../components/Protein3DView';
 import ProteinInfoButton from '../components/ProteinInfoModal';
 import GATAttentionPanel from '../components/GATAttentionPanel';
@@ -75,7 +75,7 @@ const Predict = () => {
   // ── UI PAGE & EXPORT STATE ──────────────────────────────────
   const [activeResultPage, setActiveResultPage] = useState('probability'); // 'probability' | 'evidence' | 'discovery'
   const [exportingPdf, setExportingPdf] = useState(false);
-  const [expertMode, setExpertMode] = useState(false);  // false = Beginner, true = Research
+  const { showTech: expertMode } = useTechDetails();  // plain view unless "Technical details" is on
   const [batchResults, setBatchResults] = useState([]);   // batch CSV results
   const [batchLoading, setBatchLoading] = useState(false);
   const fileInputRef = useRef(null);
@@ -145,7 +145,7 @@ const Predict = () => {
         ...response.data,
         active_model: selectedModel,
         model_title: selectedModel === 'graphsage' ? 'ESM-2 + GraphSAGE + XGBoost' : 'ESM-2 + Standard GAT + XGBoost',
-        model_role: selectedModel === 'graphsage' ? 'Primary Final Model' : 'Controlled Experimental Comparison',
+        model_role: selectedModel === 'graphsage' ? 'Main model' : 'Controlled Experimental Comparison',
         threshold: response.data.threshold ?? (selectedModel === 'graphsage' ? 0.45 : 0.50),
       };
       setResult(resData);
@@ -281,7 +281,7 @@ const Predict = () => {
       const esm = r.esm_probability != null ? r.esm_probability.toFixed(4) : '';
       const gat = r.gat_probability != null ? r.gat_probability.toFixed(4) : '';
       const conf = r.confidence_score != null ? r.confidence_score.toFixed(4) : '';
-      const interacts = status === 'error' ? 'ERROR' : (r.interaction_probability > 0.5 ? 'YES' : 'NO');
+      const interacts = status === 'error' ? 'ERROR' : (r.interaction_probability >= (r.threshold ?? 0.45) ? 'YES' : 'NO');
       const err = r.error ? `"${r.error.replace(/"/g, '""')}"` : '';
       return `${p1},${p2},${status},${prob},${esm},${gat},${conf},${interacts},${err}`;
     }).join('\n');
@@ -294,10 +294,23 @@ const Predict = () => {
     URL.revokeObjectURL(url);
   }, [batchResults]);
 
+  // Examples on Home / How it works link here with ?p1=...&p2=...: fill both proteins (the user still presses Predict)
+  const [searchParams] = useSearchParams();
+  useEffect(() => {
+    const q1 = searchParams.get('p1');
+    const q2 = searchParams.get('p2');
+    if (q1 && q2) {
+      setInputMode('ids');
+      setProtein1(q1);
+      setProtein2(q2);
+    }
+  }, [searchParams]);
+
   return (
     <div className="flex flex-col gap-6">
-      
-      {/* Telemetry Header */}
+
+      {/* Telemetry Header (technical view only) */}
+      <TechOnly>
       <div className="bg-slate-900 text-white rounded-2xl p-4 px-6 flex flex-wrap items-center justify-between gap-4 shadow-xl border border-slate-800">
         <div className="flex items-center gap-3">
           <div className="w-3 h-3 rounded-full bg-emerald-400 animate-ping" />
@@ -324,6 +337,7 @@ const Predict = () => {
           </div>
         </div>
       </div>
+      </TechOnly>
 
       <div className="flex flex-col lg:flex-row min-h-[calc(100vh-160px)] gap-6 pb-8">
         
@@ -339,20 +353,18 @@ const Predict = () => {
                 <Zap size={20} fill="currentColor" />
               </div>
               <div>
-                <h2 className="text-lg font-black text-slate-800 tracking-tight">Analysis Portal</h2>
-                <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600">
-                  {selectedModel === 'graphsage' ? 'Primary: GraphSAGE' : 'Comparison: Standard GAT'}
-                </p>
+                <h1 className="text-xl font-black text-slate-900 tracking-tight">Check two proteins</h1>
+                <p className="text-sm text-slate-600">Will they interact? Pick an example or enter your own.</p>
               </div>
             </div>
 
             {/* Quick 1-Click Viva Demo Presets */}
             <div className="mb-4 bg-slate-50/80 border border-slate-200/80 rounded-2xl p-3">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500 flex items-center gap-1.5">
-                  <Sparkles size={12} className="text-amber-500" /> Quick Demo Presets
+                <span className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                  <Sparkles size={14} className="text-amber-600" aria-hidden="true" /> Try an example
                 </span>
-                <span className="text-[10px] text-slate-400 font-medium">1-click populate</span>
+                <span className="text-xs text-slate-600">fills in both proteins</span>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 {CASE_STUDIES.map((c, i) => (
@@ -366,8 +378,8 @@ const Predict = () => {
                         : 'bg-white hover:bg-slate-100/80 border-slate-200 text-slate-700 hover:border-slate-300'
                     }`}
                   >
-                    <span className="font-bold text-[11px] truncate">{c.label}</span>
-                    <span className="text-[9px] text-slate-400 font-mono mt-0.5 truncate">{c.p1.slice(0, 11)}... & {c.p2.slice(0, 11)}...</span>
+                    <span className="font-bold text-xs truncate">{c.label}</span>
+                    <span className="text-[11px] text-slate-600 mt-0.5 line-clamp-2">{c.desc}</span>
                   </button>
                 ))}
               </div>
@@ -376,18 +388,19 @@ const Predict = () => {
             {/* Model Architecture Selector (PART 10) */}
             <div className="mb-4 space-y-1.5 bg-slate-50/80 border border-slate-200/80 rounded-2xl p-3">
               <div className="flex items-center justify-between">
-                <label className="text-[10px] font-black text-slate-600 uppercase tracking-[0.15em] flex items-center gap-1.5">
-                  <Cpu size={12} className="text-emerald-500" /> Model Architecture
+                <label htmlFor="model-select" className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                  <Cpu size={14} className="text-emerald-700" aria-hidden="true" /> Model
                 </label>
                 <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider ${
                   selectedModel === 'graphsage' 
                     ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' 
                     : 'bg-amber-100 text-amber-800 border border-amber-300'
                 }`}>
-                  {selectedModel === 'graphsage' ? 'Primary' : 'Comparison'}
+                  {selectedModel === 'graphsage' ? 'Recommended' : 'Comparison'}
                 </span>
               </div>
               <select
+                id="model-select"
                 value={selectedModel}
                 onChange={(e) => {
                   const m = e.target.value;
@@ -396,24 +409,30 @@ const Predict = () => {
                 }}
                 className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-800 font-bold focus:border-emerald-500 outline-none cursor-pointer shadow-xs transition-all"
               >
-                <option value="graphsage">GraphSAGE Ensemble (Primary Final Model)</option>
-                <option value="gat">GAT Ensemble (Controlled Comparison)</option>
+                <option value="graphsage">Main model (most accurate)</option>
+                <option value="gat">Comparison model (graph attention, shows attention map)</option>
               </select>
-              <div className="text-[10px] text-slate-500 font-medium leading-relaxed pt-0.5">
-                {selectedModel === 'graphsage' ? (
-                  <span>⭐ <strong>Primary Final Model:</strong> ESM-2 + GraphSAGE + XGBoost (Acc: 93.10%, ROC-AUC: 0.9753). Port 8000.</span>
-                ) : (
-                  <span>🔬 <strong>Controlled Comparison:</strong> ESM-2 + Standard GAT + XGBoost (Acc: 89.79%, ROC-AUC: 0.9582). Port 8001.</span>
-                )}
-              </div>
+              <p className="text-xs text-slate-700 leading-relaxed pt-0.5">
+                {selectedModel === 'graphsage'
+                  ? '93.10% of test predictions correct.'
+                  : '89.79% correct. Use it to see which neighbouring proteins the model paid attention to.'}
+                <TechOnly>
+                  <span className="block mt-1 text-slate-600">
+                    {selectedModel === 'graphsage'
+                      ? 'ESM-2 + GraphSAGE + XGBoost (ROC-AUC 0.9753), backend port 8000.'
+                      : 'ESM-2 + standard GAT + XGBoost (ROC-AUC 0.9582), backend port 8001.'}
+                  </span>
+                </TechOnly>
+              </p>
             </div>
 
             {/* Input Method Dropdown Selector */}
             <div className="mb-4 space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-1">
-                <Layers size={12} className="text-emerald-500" /> Custom Input Mode
+              <label htmlFor="input-mode" className="text-sm font-bold text-slate-800 ml-1 flex items-center gap-1">
+                <Layers size={14} className="text-emerald-700" aria-hidden="true" /> How will you enter the proteins?
               </label>
               <select
+                id="input-mode"
                 value={inputMode}
                 onChange={(e) => {
                   const mode = e.target.value;
@@ -424,19 +443,20 @@ const Predict = () => {
                 }}
                 className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 font-bold focus:border-emerald-500 focus:bg-white outline-none cursor-pointer shadow-xs transition-all"
               >
-                <option value="ids">🆔 Use Protein IDs (UniProt / Ensembl)</option>
-                <option value="sequence">🧬 Enter Amino Acid Sequence</option>
-                <option value="case_studies">🎯 Select Case Studies</option>
+                <option value="ids">Protein IDs (e.g. ENSP00000269305)</option>
+                <option value="sequence">Amino-acid sequences (letters)</option>
+                <option value="case_studies">Pick from examples</option>
               </select>
             </div>
 
             {/* Case Studies Sub-selector */}
             {inputMode === 'case_studies' && (
               <div className="mb-4 bg-emerald-50/70 border border-emerald-200/60 rounded-2xl p-3.5 space-y-2">
-                <label className="text-[10px] font-black text-emerald-700 uppercase tracking-[0.2em] flex items-center gap-1">
-                  <BookOpen size={12} /> Choose Case Study Preset
+                <label htmlFor="case-select" className="text-sm font-bold text-emerald-800 flex items-center gap-1">
+                  <BookOpen size={14} aria-hidden="true" /> Choose an example
                 </label>
                 <select
+                  id="case-select"
                   value={selectedCase || ''}
                   onChange={(e) => {
                     const c = CASE_STUDIES.find(cs => cs.label === e.target.value);
@@ -444,7 +464,7 @@ const Predict = () => {
                   }}
                   className="w-full bg-white border border-emerald-300 rounded-xl px-3 py-2 text-xs text-slate-700 font-bold focus:border-emerald-500 outline-none cursor-pointer"
                 >
-                  <option value="" disabled>-- Select a Preset --</option>
+                  <option value="" disabled>Select an example</option>
                   {CASE_STUDIES.map((c, i) => (
                     <option key={i} value={c.label}>
                       {c.label} ({c.p1} & {c.p2})
@@ -464,17 +484,19 @@ const Predict = () => {
                 <>
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Protein Alpha ID</label>
+                      <label htmlFor="protein1-id" className="text-sm font-bold text-slate-800 ml-1">Protein 1</label>
                       {protein1 && <ProteinInfoButton proteinId={protein1} label="Info" />}
                     </div>
                     <div className="relative">
-                      <input 
+                      <input
+                        id="protein1-id"
+                        aria-describedby="protein-id-help"
                         value={protein1}
                         onChange={(e) => setProtein1(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 font-mono text-sm focus:border-emerald-500 focus:bg-white outline-none transition-all shadow-inner"
+                        className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-slate-800 font-mono text-sm focus:border-emerald-600 focus:bg-white outline-none transition-all shadow-inner"
                         placeholder="ENSP..."
                       />
-                      <Database size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" />
+                      <Database size={16} aria-hidden="true" className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
                     </div>
                   </div>
 
@@ -485,7 +507,9 @@ const Predict = () => {
                         setProtein1(protein2);
                         setProtein2(protein1);
                       }}
-                      className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-emerald-500 shadow-md z-10 hover:rotate-180 transition-transform duration-500 cursor-pointer"
+                      className="w-8 h-8 rounded-full bg-white border border-slate-300 flex items-center justify-center text-emerald-700 shadow-md z-10 hover:rotate-180 transition-transform duration-500 cursor-pointer"
+                      aria-label="Swap protein 1 and protein 2"
+                      title="Swap protein 1 and protein 2"
                     >
                       <ArrowRightLeft size={14} />
                     </button>
@@ -493,34 +517,41 @@ const Predict = () => {
 
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Protein Beta ID</label>
+                      <label htmlFor="protein2-id" className="text-sm font-bold text-slate-800 ml-1">Protein 2</label>
                       {protein2 && <ProteinInfoButton proteinId={protein2} label="Info" />}
                     </div>
                     <div className="relative">
-                      <input 
+                      <input
+                        id="protein2-id"
+                        aria-describedby="protein-id-help"
                         value={protein2}
                         onChange={(e) => setProtein2(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 font-mono text-sm focus:border-emerald-500 focus:bg-white outline-none transition-all shadow-inner"
+                        className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-3 text-slate-800 font-mono text-sm focus:border-emerald-600 focus:bg-white outline-none transition-all shadow-inner"
                         placeholder="ENSP..."
                       />
-                      <Database size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" />
+                      <Database size={16} aria-hidden="true" className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" />
                     </div>
                   </div>
+                  <p id="protein-id-help" className="text-xs text-slate-600 ml-1">
+                    Use an Ensembl protein ID such as <span className="font-mono">ENSP00000269305</span> (TP53).
+                  </p>
                 </>
               )}
 
               {inputMode === 'sequence' && (
                 <>
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Protein 1 Identifier / Name</label>
+                    <label htmlFor="seq-name-1" className="text-sm font-bold text-slate-800 ml-1">Protein 1 name</label>
                     <input 
+                      id="seq-name-1"
                       value={protein1}
                       onChange={(e) => setProtein1(e.target.value)}
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-700 font-mono text-xs focus:border-emerald-500 focus:bg-white outline-none transition-all shadow-inner"
                       placeholder="e.g., Protein_Alpha"
                     />
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 mt-2 block">Amino Acid Sequence 1</label>
+                    <label htmlFor="seq-1" className="text-sm font-bold text-slate-800 ml-1 mt-2 block">Protein 1 sequence (amino-acid letters)</label>
                     <textarea
+                      id="seq-1"
                       rows={3}
                       value={seq1}
                       onChange={(e) => setSeq1(e.target.value)}
@@ -530,15 +561,17 @@ const Predict = () => {
                   </div>
 
                   <div className="space-y-1.5 pt-2">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Protein 2 Identifier / Name</label>
+                    <label htmlFor="seq-name-2" className="text-sm font-bold text-slate-800 ml-1">Protein 2 name</label>
                     <input 
+                      id="seq-name-2"
                       value={protein2}
                       onChange={(e) => setProtein2(e.target.value)}
                       className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-700 font-mono text-xs focus:border-emerald-500 focus:bg-white outline-none transition-all shadow-inner"
                       placeholder="e.g., Protein_Beta"
                     />
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 mt-2 block">Amino Acid Sequence 2</label>
+                    <label htmlFor="seq-2" className="text-sm font-bold text-slate-800 ml-1 mt-2 block">Protein 2 sequence (amino-acid letters)</label>
                     <textarea
+                      id="seq-2"
                       rows={3}
                       value={seq2}
                       onChange={(e) => setSeq2(e.target.value)}
@@ -559,18 +592,19 @@ const Predict = () => {
               <button 
                 type="submit" 
                 disabled={loading}
-                className="w-full bg-gradient-to-r from-emerald-500 via-teal-500 to-indigo-500 hover:from-emerald-400 hover:to-indigo-400 text-white font-black py-4 rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 uppercase tracking-widest text-xs mt-2 cursor-pointer"
+                className="w-full bg-gradient-to-r from-emerald-500 via-teal-500 to-indigo-500 hover:from-emerald-400 hover:to-indigo-400 text-white font-black py-4 rounded-xl transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 text-base mt-2 cursor-pointer"
               >
-                {loading ? <Loader2 className="animate-spin" size={18} /> : <Zap size={18} />}
-                Predict Interaction
+                {loading ? <Loader2 className="animate-spin" size={18} aria-hidden="true" /> : <Zap size={18} aria-hidden="true" />}
+                {loading ? 'Predicting…' : 'Predict'}
               </button>
             </form>
 
-            {/* Batch Upload */}
-            <div className="border-t border-slate-100 pt-4 space-y-3">
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1 flex items-center gap-1">
-                <UploadCloud size={12} className="text-indigo-400" /> Batch CSV Analysis
-              </label>
+            {/* Batch Upload (advanced) */}
+            <details className="border-t border-slate-200 pt-4 space-y-3 group/more">
+              <summary className="text-sm font-bold text-slate-800 cursor-pointer select-none">More options</summary>
+              <p className="text-sm text-slate-700 flex items-center gap-1.5 mt-3">
+                <UploadCloud size={14} className="text-indigo-600" aria-hidden="true" /> Check many pairs at once from a CSV file
+              </p>
               <button
                 type="button"
                 disabled={batchLoading}
@@ -578,7 +612,7 @@ const Predict = () => {
                 className="w-full bg-slate-50 hover:bg-indigo-50 border border-dashed border-slate-300 hover:border-indigo-400 text-slate-500 hover:text-indigo-600 font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2 text-xs cursor-pointer disabled:opacity-50"
               >
                 {batchLoading ? <Loader2 className="animate-spin" size={15} /> : <Table2 size={15} />}
-                {batchLoading ? 'Processing...' : 'Upload CSV (id1,id2 per line)'}
+                {batchLoading ? 'Processing...' : 'Upload CSV (one pair per line: id1,id2)'}
               </button>
               <input
                 ref={fileInputRef}
@@ -587,45 +621,17 @@ const Predict = () => {
                 className="hidden"
                 onChange={handleBatchUpload}
               />
-            </div>
-
-            {/* Mode Toggle */}
-            <div className="border-t border-slate-100 pt-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {expertMode ? <FlaskConical size={14} className="text-violet-500" /> : <GraduationCap size={14} className="text-teal-500" />}
-                  <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
-                    {expertMode ? 'Research Mode (Expert)' : 'Explorer Mode (General Audience)'}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setExpertMode(v => !v)}
-                  className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${
-                    expertMode ? 'bg-violet-500' : 'bg-teal-400'
-                  }`}
-                  title="Toggle between General Audience Explorer Mode and Expert Research Mode"
-                >
-                  <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all duration-300 ${
-                    expertMode ? 'left-7' : 'left-1'
-                  }`} />
-                </button>
-              </div>
-              <p className="text-[9px] text-slate-400 mt-1.5 leading-relaxed">
-                {expertMode
-                  ? 'Research Mode: Deep SHAP matrices, GraphSAGE graph signal, & raw metrics.'
-                  : 'Explorer Mode: Simple plain-language explanations & key visual insights.'}
-              </p>
-            </div>
+            </details>
           </div>
 
-          {/* Live Telemetry Log */}
+          {/* Processing log (technical) */}
+          <TechOnly>
           <div className="flex-1 bg-white rounded-[2.5rem] border border-slate-100 p-8 font-mono text-[11px] overflow-hidden flex flex-col shadow-inner relative">
             <div className="flex items-center gap-3 mb-6 text-slate-400 border-b border-slate-50 pb-4 uppercase tracking-[0.2em] font-black">
-              <TerminalIcon size={14} className="text-indigo-400" /> Neural Processing Logs
+              <TerminalIcon size={14} className="text-indigo-600" aria-hidden="true" /> Processing log
             </div>
             <div className="flex-1 overflow-y-auto space-y-2 no-scrollbar">
-              {logs.length === 0 && <div className="text-slate-700 italic">Waiting for input sequence...</div>}
+              {logs.length === 0 && <div className="text-slate-700 italic">Waiting for a prediction...</div>}
               {logs.map((log, i) => (
                 <div key={i} className="flex gap-3 animate-in fade-in slide-in-from-left-2 duration-300">
                   <span className="text-slate-600">[{log.time}]</span>
@@ -641,10 +647,11 @@ const Predict = () => {
               <div ref={logEndRef} />
             </div>
           </div>
+          </TechOnly>
         </aside>
 
         {/* RIGHT: Multi-Page Analytical Workspace */}
-        <main className="flex-1 bg-white/50 rounded-[3rem] border border-slate-100 p-8 relative overflow-hidden flex flex-col min-w-0 shadow-sm">
+        <section aria-label="Prediction result" className="flex-1 bg-white/50 rounded-[3rem] border border-slate-100 p-8 relative overflow-hidden flex flex-col min-w-0 shadow-sm">
           <AnimatePresence mode="wait">
             {!result && !loading ? (
               <motion.div 
@@ -653,10 +660,10 @@ const Predict = () => {
                 className="h-full flex flex-col items-center justify-center text-center p-12"
               >
                 <div className="w-28 h-28 rounded-full bg-slate-50 flex items-center justify-center mb-8 border border-slate-100 shadow-inner">
-                  <Box size={48} className="text-slate-300" />
+                  <Box size={48} className="text-slate-400" aria-hidden="true" />
                 </div>
-                <h3 className="text-3xl font-black text-slate-800 mb-3 tracking-tight">Workspace Idle</h3>
-                <p className="text-slate-400 max-w-sm font-medium leading-relaxed">Enter protein IDs or select a Demo Case Study to launch neural interaction prediction.</p>
+                <h2 className="text-3xl font-black text-slate-900 mb-3 tracking-tight">Ready when you are</h2>
+                <p className="text-slate-700 max-w-sm leading-relaxed">Pick an example on the left, or enter two protein IDs, then press <strong>Predict</strong>. The result appears here in a few seconds.</p>
               </motion.div>
             ) : loading ? (
               <motion.div 
@@ -670,7 +677,7 @@ const Predict = () => {
                     <div className="w-16 h-16 bg-emerald-500/10 blur-2xl animate-pulse" />
                   </div>
                 </div>
-                <p className="mt-10 text-slate-400 font-black uppercase tracking-[0.4em] text-[10px] animate-pulse">Decoding Fusion Gradients ({latency}ms)</p>
+                <p className="mt-10 text-slate-700 font-semibold animate-pulse" role="status">Comparing the two proteins… this usually takes a few seconds.</p>
               </motion.div>
             ) : (
               <motion.div 
@@ -692,7 +699,7 @@ const Predict = () => {
                       }`}
                     >
                       <Gauge size={15} />
-                      <span>Page 1: Probability</span>
+                      <span>1. Result</span>
                     </button>
 
                     <button
@@ -704,7 +711,7 @@ const Predict = () => {
                       }`}
                     >
                       <BarChart3 size={15} />
-                      <span>Page 2: Evidence Weightage</span>
+                      <span>2. Why?</span>
                     </button>
 
                     <button
@@ -716,7 +723,7 @@ const Predict = () => {
                       }`}
                     >
                       <Sparkles size={15} />
-                      <span>Page 3: Discovery Hub</span>
+                      <span>3. Next steps</span>
                     </button>
                   </div>
 
@@ -724,7 +731,7 @@ const Predict = () => {
                   <button
                     onClick={handleDownloadPDF}
                     disabled={exportingPdf}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs flex items-center gap-2 shadow-sm hover:shadow transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                    className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl font-bold text-xs flex items-center gap-2 shadow-sm hover:shadow transition-all cursor-pointer active:scale-95 disabled:opacity-50"
                   >
                     {exportingPdf ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
                     <span>{exportingPdf ? 'Exporting...' : 'Download PDF'}</span>
@@ -747,57 +754,55 @@ const Predict = () => {
                         <div className="flex justify-between items-center bg-white p-5 px-7 rounded-[2rem] border border-slate-100 shadow-sm">
                           <div>
                             <div className="flex items-center gap-2 mb-1">
-                              <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500">Page 1 of 3</span>
                               <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
                                 (result.active_model ?? selectedModel) === 'graphsage'
                                   ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                   : 'bg-amber-50 text-amber-700 border border-amber-200'
                               }`}>
-                                {(result.active_model ?? selectedModel) === 'graphsage' ? '⭐ Primary Final Model' : '🔬 Controlled Experimental Comparison'}
+                                {(result.active_model ?? selectedModel) === 'graphsage' ? 'Main model' : 'Comparison model'}
                               </span>
                             </div>
-                            <h3 className="text-xl font-black text-slate-800 tracking-tight">
-                              Interaction Probability & 3D Structural View
-                            </h3>
-                            <p className="text-xs text-slate-500 font-mono mt-0.5">
-                              Model: <strong className="text-slate-700">{(result.active_model ?? selectedModel) === 'graphsage' ? 'ESM-2 + GraphSAGE + XGBoost' : 'ESM-2 + Standard GAT + XGBoost'}</strong> | Pair: <strong className="text-slate-800">{protein1}</strong> ↔ <strong className="text-slate-800">{protein2}</strong>
+                            <h2 className="text-xl font-black text-slate-900 tracking-tight">Result</h2>
+                            <p className="text-sm text-slate-700 mt-0.5">
+                              Proteins: <strong className="font-mono">{protein1}</strong> and <strong className="font-mono">{protein2}</strong>
+                              {expertMode && <span className="text-slate-600"> · {(result.active_model ?? selectedModel) === 'graphsage' ? 'ESM-2 + GraphSAGE + XGBoost' : 'ESM-2 + Standard GAT + XGBoost'}</span>}
                             </p>
                           </div>
-                          <button
+                          <TechOnly><button
                             onClick={() => handleExportCardFigure('page-1-container', 'Probability_and_Structure')}
                             className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs flex items-center gap-2 transition-all cursor-pointer"
                           >
                             <Camera size={14} className="text-emerald-600" /> Export Figure
-                          </button>
+                          </button></TechOnly>
                         </div>
 
-                        {!expertMode && (
-                          <div className="bg-emerald-50/80 border border-emerald-200/80 p-4 px-6 rounded-2xl flex items-start gap-3 text-slate-700 text-xs leading-relaxed shadow-sm">
-                            <Sparkles size={18} className="text-emerald-500 shrink-0 mt-0.5" />
-                            <div>
-                              <span className="font-bold text-emerald-900 block mb-0.5">Summary:</span>
-                              Predicted interaction probability between <span className="font-bold text-slate-900">{protein1}</span> and <span className="font-bold text-slate-900">{protein2}</span> is <strong className="text-emerald-700">{((result.interaction_probability ?? 0) * 100).toFixed(1)}%</strong> using the <strong>{(result.active_model ?? selectedModel) === 'graphsage' ? 'GraphSAGE Ensemble (Primary Final Model)' : 'Standard GAT Ensemble (Controlled Comparison)'}</strong>.
-                            </div>
-                          </div>
-                        )}
+                        <div role="status" className={`p-5 px-6 rounded-2xl flex items-start gap-3 text-base leading-relaxed border ${result.interaction_probability >= (result.threshold ?? (selectedModel === 'gat' ? 0.50 : 0.45)) ? 'bg-emerald-50 border-emerald-300 text-emerald-950' : 'bg-slate-100 border-slate-300 text-slate-900'}`}>
+                          {result.interaction_probability >= (result.threshold ?? (selectedModel === 'gat' ? 0.50 : 0.45)) ? <CheckCircle2 size={22} className="text-emerald-700 shrink-0 mt-0.5" aria-hidden="true" /> : <XCircle size={22} className="text-slate-600 shrink-0 mt-0.5" aria-hidden="true" />}
+                          <p>
+                            The model thinks these two proteins are <strong>{result.interaction_probability >= (result.threshold ?? (selectedModel === 'gat' ? 0.50 : 0.45)) ? 'likely to interact' : 'unlikely to interact'}</strong>
+                            {' '}(estimated chance: <strong>{((result.interaction_probability ?? 0) * 100).toFixed(1)}%</strong>).
+                            {' '}This is a prediction to guide experiments, not a laboratory result.
+                          </p>
+                        </div>
 
                         <div id="page-1-container" className="grid grid-cols-1 md:grid-cols-3 gap-6">
                           
                           {/* Consensus Gauge Card */}
                           <div id="card-probability-gauge" className="bg-white p-6 rounded-[2.5rem] border border-slate-100 flex flex-col items-center justify-between relative shadow-sm">
                             <div className="w-full flex items-center justify-between">
-                              <span className="px-3 py-1 bg-emerald-50 text-emerald-600 text-[9px] font-black rounded-lg uppercase tracking-widest">Prediction Output</span>
-                              <button
+                              <span className="px-3 py-1 bg-emerald-50 text-emerald-800 text-xs font-bold rounded-lg">Chance of interacting</span>
+                              <TechOnly><button
                                 onClick={() => handleExportCardFigure('card-probability-gauge', 'Probability_Gauge')}
                                 className="text-slate-400 hover:text-emerald-600 transition-colors p-1"
                                 title="Export Gauge Figure"
                               >
                                 <Camera size={14} />
-                              </button>
+                              </button></TechOnly>
                             </div>
 
-                            <div className="w-44 h-44 my-4 relative">
-                              <ResponsiveContainer width="100%" height="100%">
+                            <div className="w-44 h-44 my-4 relative" role="img" aria-label={`Estimated chance of interacting: ${(result.interaction_probability * 100).toFixed(1)}%`}>
+                              <div inert="" aria-hidden="true" className="absolute inset-0">
+<ResponsiveContainer width="100%" height="100%">
                                 <PieChart>
                                   <Pie data={[{v: result.interaction_probability*100}, {v: 100 - result.interaction_probability*100}]} innerRadius={60} outerRadius={76} startAngle={90} endAngle={-270} dataKey="v" paddingAngle={2}>
                                     <Cell fill={result.interaction_probability >= (result.threshold ?? (selectedModel === 'gat' ? 0.50 : 0.45)) ? "#10b981" : "#f43f5e"} />
@@ -805,9 +810,10 @@ const Predict = () => {
                                   </Pie>
                                 </PieChart>
                               </ResponsiveContainer>
+                              </div>
                               <div className="absolute inset-0 flex flex-col items-center justify-center">
                                 <span className="text-4xl font-black text-slate-800 tracking-tighter">{(result.interaction_probability*100).toFixed(1)}%</span>
-                                <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Probability</span>
+                                <span className="text-xs font-semibold text-slate-600">estimated</span>
                               </div>
                             </div>
 
@@ -817,11 +823,11 @@ const Predict = () => {
                               const isLikely = result.interaction_probability >= threshold;
                               return (
                                 <div className={`w-full text-center py-2.5 px-4 rounded-2xl text-xs font-black uppercase tracking-wider shadow-sm flex items-center justify-center gap-2 ${
-                                  isLikely ? 'bg-emerald-500 text-white shadow-emerald-200' : 'bg-slate-700 text-white shadow-slate-200'
+                                  isLikely ? 'bg-emerald-700 text-white shadow-emerald-200' : 'bg-slate-700 text-white shadow-slate-200'
                                 }`}>
                                   {isLikely ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
-                                  <span>{isLikely ? 'Likely Interaction' : 'Unlikely Interaction'}</span>
-                                  <span className="text-[10px] font-normal opacity-75 font-mono">(Thresh: {threshold.toFixed(2)})</span>
+                                  <span>{isLikely ? 'Likely to interact' : 'Unlikely to interact'}</span>
+                                  {expertMode && <span className="text-[10px] font-normal opacity-90 font-mono">(threshold {threshold.toFixed(2)})</span>}
                                 </div>
                               );
                             })()}
@@ -829,17 +835,17 @@ const Predict = () => {
                             <div className="mt-4 w-full space-y-2">
                               {[
                                 { 
-                                  label: 'Classification', 
-                                  value: result.interaction_probability >= (result.threshold ?? (selectedModel === 'gat' ? 0.50 : 0.45)) ? 'Likely Interaction' : 'Unlikely Interaction', 
+                                  label: 'Result', 
+                                  value: result.interaction_probability >= (result.threshold ?? (selectedModel === 'gat' ? 0.50 : 0.45)) ? 'Likely to interact' : 'Unlikely to interact', 
                                   color: result.interaction_probability >= (result.threshold ?? (selectedModel === 'gat' ? 0.50 : 0.45)) ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-slate-700 bg-slate-50 border-slate-200' 
                                 },
-                                { label: 'Model', value: (result.active_model ?? selectedModel) === 'graphsage' ? 'GraphSAGE Ensemble' : 'Standard GAT Ensemble', color: 'text-slate-700 bg-slate-50 border-slate-200' },
-                                { label: 'Role', value: (result.active_model ?? selectedModel) === 'graphsage' ? 'Primary Final Model' : 'Controlled Comparison', color: (result.active_model ?? selectedModel) === 'graphsage' ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-amber-700 bg-amber-50 border-amber-200' },
-                                { label: 'Confidence Score', value: `${(result.confidence_score * 100).toFixed(1)}%`, color: 'text-indigo-600 bg-indigo-50 border-indigo-200' },
-                                { label: 'ESM Sequence Signal', value: `${(result.esm_probability * 100).toFixed(1)}%`, color: 'text-teal-600 bg-teal-50 border-teal-200' },
-                                { label: (result.active_model ?? selectedModel) === 'graphsage' ? 'GraphSAGE Graph Signal' : 'Standard GAT Graph Signal', value: `${(result.gat_probability * 100).toFixed(1)}%`, color: 'text-violet-600 bg-violet-50 border-violet-200' },
-                              ].map((m, i) => (
-                                <div key={i} className={`flex items-center justify-between px-3 py-1.5 rounded-xl border text-[10px] font-bold ${m.color}`}>
+                                { label: 'Model', tech: true, value: (result.active_model ?? selectedModel) === 'graphsage' ? 'GraphSAGE Ensemble' : 'Standard GAT Ensemble', color: 'text-slate-700 bg-slate-50 border-slate-200' },
+                                { label: 'Role', tech: true, value: (result.active_model ?? selectedModel) === 'graphsage' ? 'Main model' : 'Controlled Comparison', color: (result.active_model ?? selectedModel) === 'graphsage' ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-amber-700 bg-amber-50 border-amber-200' },
+                                { label: expertMode ? 'Confidence score' : 'How sure the model is', value: `${(result.confidence_score * 100).toFixed(1)}%`, color: 'text-indigo-600 bg-indigo-50 border-indigo-200' },
+                                { label: expertMode ? 'ESM-2 sequence signal' : 'Opinion from the sequences', value: `${(result.esm_probability * 100).toFixed(1)}%`, color: 'text-teal-600 bg-teal-50 border-teal-200' },
+                                { label: expertMode ? ((result.active_model ?? selectedModel) === 'graphsage' ? 'GraphSAGE graph signal' : 'Standard GAT graph signal') : 'Opinion from the network', value: `${(result.gat_probability * 100).toFixed(1)}%`, color: 'text-violet-600 bg-violet-50 border-violet-200' },
+                              ].filter(m => expertMode || !m.tech).map((m, i) => (
+                                <div key={i} className={`flex items-center justify-between px-3 py-1.5 rounded-xl border text-xs font-bold ${m.color}`}>
                                   <span>{m.label}</span>
                                   <span>{m.value}</span>
                                 </div>
@@ -853,15 +859,15 @@ const Predict = () => {
                               <div className="flex items-center gap-2 min-w-0">
                                 <span className="w-2.5 h-2.5 rounded-full bg-cyan-500 animate-pulse shrink-0" />
                                 <span className="px-3 py-1 bg-cyan-50 text-cyan-600 border border-cyan-100 text-[10px] font-black rounded-lg uppercase tracking-widest truncate">
-                                  3D Structural Projection Workbench
+                                  3D shapes of the two proteins
                                 </span>
                               </div>
-                              <button
+                              <TechOnly><button
                                 onClick={() => handleExportCardFigure('card-3d-structure', '3D_Structural_Projection')}
                                 className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0"
                               >
                                 <Camera size={13} className="text-cyan-600" /> Export Figure
-                              </button>
+                              </button></TechOnly>
                             </div>
 
                             <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 w-full max-w-full min-w-0 items-stretch my-2">
@@ -887,20 +893,20 @@ const Predict = () => {
                             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-white/10">
                               <div>
                                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-[10px] font-black uppercase tracking-widest border border-emerald-500/30 mb-2">
-                                  <Sparkles size={12} /> Downstream Biological Workflows
+                                  <Sparkles size={12} aria-hidden="true" /> What you can do next
                                 </div>
-                                <h4 className="text-lg md:text-xl font-black text-white tracking-tight">
-                                  Next Research Actions for {protein1} ↔ {protein2}
-                                </h4>
+                                <h3 className="text-lg md:text-xl font-black text-white tracking-tight">
+                                  Explore {protein1} and {protein2} further
+                                </h3>
                                 <p className="text-xs text-slate-400 mt-0.5">
-                                  TransGraph-PPI is an integrated discovery platform. Select a downstream engine to continue your investigation:
+                                  Choose what to look at next:
                                 </p>
                               </div>
                               <button
                                 onClick={() => setActiveResultPage('discovery')}
                                 className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-xl border border-white/15 transition-all flex items-center gap-1.5 self-start md:self-auto cursor-pointer"
                               >
-                                View Detailed Workbench <ChevronRight size={14} />
+                                All next steps <ChevronRight size={14} aria-hidden="true" />
                               </button>
                             </div>
 
@@ -919,10 +925,8 @@ const Predict = () => {
                                   </span>
                                 </div>
                                 <div>
-                                  <p className="text-xs font-bold text-white group-hover:text-cyan-300 transition-colors">AlphaFold 3D Studio</p>
-                                  <p className="text-[11px] text-slate-400 mt-1 leading-snug">
-                                    Inspect full atomic CIF structures for {protein1} with Mol* viewer controls.
-                                  </p>
+                                  <p className="text-xs font-bold text-white group-hover:text-cyan-300 transition-colors">See the 3D shape</p>
+                                  <p className="text-[11px] text-slate-400 mt-1 leading-snug">Look at the predicted 3D shape of protein 1 (from the AlphaFold database).</p>
                                 </div>
                               </Link>
 
@@ -940,10 +944,8 @@ const Predict = () => {
                                   </span>
                                 </div>
                                 <div>
-                                  <p className="text-xs font-bold text-white group-hover:text-teal-300 transition-colors">In-Silico Mutagenesis</p>
-                                  <p className="text-[11px] text-slate-400 mt-1 leading-snug">
-                                    Scan point mutations on this complex to identify affinity destabilizing hotspots.
-                                  </p>
+                                  <p className="text-xs font-bold text-white group-hover:text-teal-300 transition-colors">Test mutations</p>
+                                  <p className="text-[11px] text-slate-400 mt-1 leading-snug">Change single amino acids and see which changes weaken the predicted interaction.</p>
                                 </div>
                               </Link>
 
@@ -961,10 +963,8 @@ const Predict = () => {
                                   </span>
                                 </div>
                                 <div>
-                                  <p className="text-xs font-bold text-white group-hover:text-indigo-300 transition-colors">ChEMBL Drug Targets</p>
-                                  <p className="text-[11px] text-slate-400 mt-1 leading-snug">
-                                    Evaluate Therapeutic Target Priority Scores (TTPS) and approved drug leads for {protein1}.
-                                  </p>
+                                  <p className="text-xs font-bold text-white group-hover:text-indigo-300 transition-colors">Check drug targets</p>
+                                  <p className="text-[11px] text-slate-400 mt-1 leading-snug">See whether these proteins are ranked as possible drug targets and have medicines.</p>
                                 </div>
                               </Link>
 
@@ -982,10 +982,8 @@ const Predict = () => {
                                   </span>
                                 </div>
                                 <div>
-                                  <p className="text-xs font-bold text-white group-hover:text-violet-300 transition-colors">Interactome Path & Hubs</p>
-                                  <p className="text-[11px] text-slate-400 mt-1 leading-snug">
-                                    Trace shortest path and common interactors across the 12,000-node graph.
-                                  </p>
+                                  <p className="text-xs font-bold text-white group-hover:text-violet-300 transition-colors">See the network</p>
+                                  <p className="text-[11px] text-slate-400 mt-1 leading-snug">Find the shortest chain of interactions linking the two proteins, and the main hubs.</p>
                                 </div>
                               </Link>
 
@@ -1003,10 +1001,8 @@ const Predict = () => {
                                   </span>
                                 </div>
                                 <div>
-                                  <p className="text-xs font-bold text-white group-hover:text-amber-300 transition-colors">WT vs Mutant Comparison</p>
-                                  <p className="text-[11px] text-slate-400 mt-1 leading-snug">
-                                    Quantify exact probability delta between native and mutated sequence variants.
-                                  </p>
+                                  <p className="text-xs font-bold text-white group-hover:text-amber-300 transition-colors">Normal vs mutant</p>
+                                  <p className="text-[11px] text-slate-400 mt-1 leading-snug">Compare the predicted chance before and after changing one amino acid.</p>
                                 </div>
                               </Link>
 
@@ -1024,10 +1020,8 @@ const Predict = () => {
                                   </span>
                                 </div>
                                 <div>
-                                  <p className="text-xs font-bold text-white group-hover:text-rose-300 transition-colors">Bio-Copilot AI Consultation</p>
-                                  <p className="text-[11px] text-slate-400 mt-1 leading-snug">
-                                    Ask our domain LLM to synthesize disease linkages and cellular function for this pair.
-                                  </p>
+                                  <p className="text-xs font-bold text-white group-hover:text-rose-300 transition-colors">Ask the AI assistant</p>
+                                  <p className="text-[11px] text-slate-400 mt-1 leading-snug">Ask questions about these proteins in plain English.</p>
                                 </div>
                               </Link>
                             </div>
@@ -1047,25 +1041,25 @@ const Predict = () => {
                       >
                         <div className="flex justify-between items-center bg-white p-5 px-7 rounded-[2rem] border border-slate-100 shadow-sm">
                           <div>
-                            <span className="text-[10px] font-black uppercase tracking-widest text-indigo-500">Page 2 of 3</span>
-                            <h3 className="text-xl font-black text-slate-800 tracking-tight">Evidence Weightage & Multi-Modal Rationale</h3>
-                            <p className="text-xs text-slate-400 font-mono mt-0.5">Feature Importance & Decision Explainer</p>
+                            <h2 className="text-xl font-black text-slate-900 tracking-tight">Why did the model decide this?</h2>
+                            <p className="text-sm text-slate-700 mt-0.5">The two opinions behind the result, and how the final model combined them.</p>
                           </div>
-                          <button
+                          <TechOnly><button
                             onClick={() => handleExportCardFigure('page-2-container', 'Evidence_Weightage')}
                             className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs flex items-center gap-2 transition-all cursor-pointer"
                           >
                             <Camera size={14} className="text-indigo-600" /> Export Figure
-                          </button>
+                          </button></TechOnly>
                         </div>
 
                         {!expertMode && (
-                          <div className="bg-indigo-50/80 border border-indigo-200/80 p-4 px-6 rounded-2xl flex items-start gap-3 text-slate-700 text-xs leading-relaxed shadow-sm">
-                            <Sparkles size={18} className="text-indigo-500 shrink-0 mt-0.5" />
-                            <div>
-                              <span className="font-bold text-indigo-900 block mb-0.5">Explorer Summary (How the AI makes its decision):</span>
-                              The model evaluates three biological evidence sources: <strong>Amino Acid Sequences</strong>, <strong>3D Molecular Shapes</strong>, and <strong>Biological Graph Networks</strong>. The pie chart below shows how much weight each source contributed to this prediction.
-                            </div>
+                          <div className="bg-indigo-50 border border-indigo-200 p-4 px-6 rounded-2xl flex items-start gap-3 text-slate-800 text-sm leading-relaxed">
+                            <Sparkles size={18} className="text-indigo-700 shrink-0 mt-0.5" aria-hidden="true" />
+                            <p>
+                              The result combines <strong>two opinions</strong>: one from the proteins' amino-acid sequences,
+                              and one from the network of known interactions (which proteins each one already works with).
+                              A final model weighs the two and gives the answer. The bars show each opinion.
+                            </p>
                           </div>
                         )}
 
@@ -1077,27 +1071,27 @@ const Predict = () => {
                               <div className="flex items-center gap-3">
                                 <div className="p-2.5 bg-indigo-50 rounded-xl text-indigo-500"><LayoutGrid size={18} /></div>
                                 <div>
-                                  <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest">Expert Evidence Weighting</h4>
-                                  <p className="text-[10px] text-slate-400">Ensemble Sub-network Contributions</p>
+                                  <h3 className="text-sm font-bold text-slate-900">The two opinions</h3>
+                                  <p className="text-xs text-slate-600">Each model's own estimate</p>
                                 </div>
                               </div>
-                              <button
+                              <TechOnly><button
                                 onClick={() => handleExportCardFigure('card-evidence-weighting', 'Evidence_Weighting_Bars')}
                                 className="text-slate-400 hover:text-indigo-600 p-1 transition-colors"
                               >
                                 <Camera size={14} />
-                              </button>
+                              </button></TechOnly>
                             </div>
 
                             <div className="space-y-8 flex-1 flex flex-col justify-center">
                               {[
-                                { label: 'Protein Language Model (ESM-2)', val: result.esm_probability*100, color: 'bg-emerald-500', desc: 'Sequence embedding compatibility score' },
-                                { label: 'Network Topology (GraphSAGE)', val: result.gat_probability*100, color: 'bg-indigo-500', desc: 'Graph centrality & neighborhood interaction score' },
-                                { label: 'Jury Consensus Agreement', val: result.confidence_score*100, color: 'bg-amber-500', desc: 'Model variance & prediction stability factor' }
+                                { label: expertMode ? 'Sequence model (ESM-2 + MLP)' : 'Opinion from the sequences', val: result.esm_probability*100, color: 'bg-emerald-600', desc: 'Chance of interacting, judged from the two amino-acid sequences alone.' },
+                                { label: expertMode ? ((result.active_model ?? selectedModel) === 'graphsage' ? 'Graph model (GraphSAGE)' : 'Graph model (standard GAT)') : 'Opinion from the network', val: result.gat_probability*100, color: 'bg-indigo-600', desc: "Chance of interacting, judged from the proteins' neighbours in the known interaction network." },
+                                { label: expertMode ? 'Confidence of the final answer' : 'How sure the final answer is', val: result.confidence_score*100, color: 'bg-amber-600', desc: 'How far the final probability is from a 50/50 guess (100% = completely sure).' }
                               ].map((sig, i) => (
                                 <div key={i} className="space-y-2">
                                   <div className="flex justify-between items-center text-[10px] font-black">
-                                    <span className="text-slate-500 uppercase tracking-[0.15em]">{sig.label}</span>
+                                    <span className="text-slate-800 text-xs">{sig.label}</span>
                                     <span className="text-slate-800 font-mono text-xs">{sig.val.toFixed(1)}%</span>
                                   </div>
                                   <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden shadow-inner">
@@ -1107,7 +1101,7 @@ const Predict = () => {
                                       className={`h-full rounded-full ${sig.color} shadow-md`}
                                     />
                                   </div>
-                                  <p className="text-[10px] text-slate-400 italic">{sig.desc}</p>
+                                  <p className="text-xs text-slate-600">{sig.desc}</p>
                                 </div>
                               ))}
                             </div>
@@ -1123,19 +1117,18 @@ const Predict = () => {
                                   <Sparkles size={18} />
                                 </div>
                                 <div>
-                                  <h4 className="text-xs font-black text-white uppercase tracking-widest">Why this prediction?</h4>
-                                  <p className="text-[10px] text-slate-400 font-mono">Automated Multi-Modal Rationale</p>
+                                  <h3 className="text-sm font-bold text-white">In plain words</h3>
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
-                                <button
+                                <TechOnly><button
                                   onClick={() => handleExportCardFigure('card-explainer-rationale', 'Prediction_Rationale')}
                                   className="text-slate-400 hover:text-white p-1 transition-colors"
                                 >
                                   <Camera size={14} />
-                                </button>
+                                </button></TechOnly>
                                 <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${result.interaction_probability >= (result.threshold ?? (selectedModel === 'gat' ? 0.50 : 0.45)) ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'}`}>
-                                  {result.interaction_probability >= (result.threshold ?? (selectedModel === 'gat' ? 0.50 : 0.45)) ? 'Likely Interaction' : 'Unlikely Interaction'}
+                                  {result.interaction_probability >= (result.threshold ?? (selectedModel === 'gat' ? 0.50 : 0.45)) ? 'Likely to interact' : 'Unlikely to interact'}
                                 </span>
                               </div>
                             </div>
@@ -1143,30 +1136,30 @@ const Predict = () => {
                             <div className="space-y-4 text-slate-300 text-xs font-medium leading-relaxed">
                               <div className="p-3.5 bg-white/5 rounded-2xl border border-white/5 space-y-1">
                                 <p className="text-white font-bold flex items-center gap-2">
-                                  <Zap size={14} className="text-amber-400" /> Language Model Motif Rationale
+                                  <Zap size={14} className="text-amber-400" aria-hidden="true" /> From the sequences
                                 </p>
                                 <p className="text-slate-300 opacity-90 text-[11px]">
-                                  ESM-2 Transformer calculated a motif alignment score of <strong className="text-emerald-400">{(result.esm_probability * 100).toFixed(1)}%</strong> based on hydrophobic contact surface compatibility between target sequences.
+                                  Looking only at the two amino-acid sequences, the sequence model estimates a <strong className="text-emerald-300">{(result.esm_probability * 100).toFixed(1)}%</strong> chance that they interact.
                                 </p>
                               </div>
 
                               <div className="p-3.5 bg-white/5 rounded-2xl border border-white/5 space-y-1">
                                 <p className="text-white font-bold flex items-center gap-2">
-                                  <Database size={14} className="text-indigo-400" /> Graph Network Topology
+                                  <Database size={14} className="text-indigo-300" aria-hidden="true" /> From the network
                                 </p>
                                 <p className="text-slate-300 opacity-90 text-[11px]">
-                                  The {(result.active_model ?? selectedModel) === 'graphsage' ? 'GraphSAGE' : 'Standard GAT'} graph model scored interaction-graph neighborhood proximity at <strong className="text-indigo-400">{(result.gat_probability * 100).toFixed(1)}%</strong>, capturing functional sub-graphs in STRING DB topology.
+                                  Looking at which proteins each one already interacts with in the STRING network, the {(result.active_model ?? selectedModel) === 'graphsage' ? 'GraphSAGE' : 'GAT'} graph model estimates <strong className="text-indigo-300">{(result.gat_probability * 100).toFixed(1)}%</strong>.
                                 </p>
                               </div>
                             </div>
 
                             <div className="flex items-center gap-4 text-[10px] text-slate-400 border-t border-white/10 pt-4 mt-4 font-mono">
-                              <span>Actionable Next Step:</span>
+                              <span>Next:</span>
                               <Link 
                                 to={`/mutation?p1=${protein1}&p2=${protein2}`}
                                 className="text-emerald-400 hover:text-emerald-300 font-bold flex items-center gap-1 transition-colors"
                               >
-                                Run In-Silico Mutation Scan to pinpoint binding hotspots <ArrowRight size={12} />
+                                Test how mutations change this result <ArrowRight size={12} aria-hidden="true" />
                               </Link>
                             </div>
                           </div>
@@ -1174,6 +1167,7 @@ const Predict = () => {
                         </div>
 
                         {/* SHAP Explanation Section (PART 8) */}
+                        {expertMode ? (
                         <div className="bg-white p-7 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-4">
                           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
                             <div className="flex items-center gap-2.5">
@@ -1181,7 +1175,7 @@ const Predict = () => {
                                 <BarChart3 size={18} />
                               </div>
                               <div>
-                                <h4 className="text-sm font-black text-slate-800 tracking-tight">SHAP Meta-Feature Attribution</h4>
+                                <h3 className="text-sm font-bold text-slate-900">What pushed the result up or down {expertMode && '(SHAP)'}</h3>
                                 <p className="text-[10px] text-slate-400 font-medium">SHAP is used to interpret the contribution of the XGBoost meta-features to the final prediction.</p>
                               </div>
                             </div>
@@ -1225,12 +1219,18 @@ const Predict = () => {
                             * Note: SHAP values interpret the attribution of XGBoost meta-features within the decision ensemble and do not claim to prove direct biological causation.
                           </p>
                         </div>
+                        ) : (
+                          <p className="text-sm text-slate-700 bg-white border border-slate-200 rounded-2xl p-4">
+                            Want the exact numbers behind this decision? Turn on <strong>Technical details</strong> at the top to see the
+                            SHAP breakdown of every factor the final model used.
+                          </p>
+                        )}
 
                         {/* MODEL COMPARISON TABLE (PART 15) */}
                         <div className="bg-white p-7 rounded-[2.5rem] border border-slate-100 shadow-sm space-y-4">
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
                             <div>
-                              <h4 className="text-sm font-black text-slate-800 tracking-tight">System Architecture Comparison: GraphSAGE vs Standard GAT</h4>
+                              <h3 className="text-sm font-bold text-slate-900">Main model vs comparison model (test results)</h3>
                               <p className="text-[10px] text-slate-400 font-medium">Evaluated under identical ESM-2 sequence embeddings and XGBoost stacking on the untouched 20,172-pair test set</p>
                             </div>
                             <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 rounded-lg text-[10px] font-bold self-start sm:self-auto border border-indigo-100">
@@ -1245,11 +1245,11 @@ const Predict = () => {
                                   <th className="py-3 px-5">Evaluation Metric</th>
                                   <th className="py-3 px-5 text-emerald-800 bg-emerald-50/70">
                                     GraphSAGE Ensemble<br />
-                                    <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest">Primary Final Model</span>
+                                    <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest">Main model</span>
                                   </th>
                                   <th className="py-3 px-5 text-amber-800 bg-amber-50/70">
                                     Standard GAT Ensemble<br />
-                                    <span className="text-[9px] font-bold text-amber-600 uppercase tracking-widest">Controlled Experimental Comparison</span>
+                                    <span className="text-[9px] font-bold text-amber-600 uppercase tracking-widest">Comparison model</span>
                                   </th>
                                 </tr>
                               </thead>
@@ -1311,24 +1311,24 @@ const Predict = () => {
                       >
                         <div className="flex justify-between items-center bg-white p-5 px-7 rounded-[2rem] border border-slate-100 shadow-sm">
                           <div>
-                            <span className="text-[10px] font-black uppercase tracking-widest text-amber-500">Page 3 of 3</span>
-                            <h3 className="text-xl font-black text-slate-800 tracking-tight">Downstream Biological Discovery Hub</h3>
+                            <h2 className="text-xl font-black text-slate-900 tracking-tight">What you can do next</h2>
                             <p className="text-xs text-slate-400 font-mono mt-0.5">Automated Multi-Engine Pipelines for {protein1} ↔ {protein2}</p>
                           </div>
-                          <button
+                          <TechOnly><button
                             onClick={() => handleExportCardFigure('page-3-container', 'Downstream_Discovery_Hub')}
                             className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs flex items-center gap-2 transition-all cursor-pointer"
                           >
                             <Camera size={14} className="text-amber-600" /> Export Figure
-                          </button>
+                          </button></TechOnly>
                         </div>
 
                         {!expertMode && (
                           <div className="bg-amber-50/80 border border-amber-200/80 p-4 px-6 rounded-2xl flex items-start gap-3 text-slate-700 text-xs leading-relaxed shadow-sm">
                             <Sparkles size={18} className="text-amber-500 shrink-0 mt-0.5" />
                             <div>
-                              <span className="font-bold text-amber-900 block mb-0.5">Explorer Summary (What happens after predicting?):</span>
-                              Interaction prediction is only the first step. TransGraph-PPI provides an end-to-end biological workbench: inspect atomic 3D structures, mutate binding interfaces in silico, evaluate therapeutic druggability in ChEMBL, and trace topological signaling cascades.
+                              <span className="font-bold text-amber-900 block mb-0.5">In short:</span>
+                              A prediction is only the first step. From here you can look at the proteins' 3D shapes, test how
+                              mutations change the result, check whether they are known drug targets, and see where they sit in the network.
                             </div>
                           </div>
                         )}
@@ -1344,7 +1344,7 @@ const Predict = () => {
                                 </div>
                                 <span className="px-3 py-1 bg-cyan-50 text-cyan-700 border border-cyan-200 text-[10px] font-black uppercase rounded-lg">AlphaFold CIF</span>
                               </div>
-                              <h4 className="text-base font-black text-slate-800 mb-1">AlphaFold 3D Molecular Studio</h4>
+                              <h3 className="text-base font-black text-slate-900 mb-1">3D protein viewer</h3>
                               <p className="text-xs text-slate-500 mb-4 leading-relaxed">
                                 Inspect full atomic 3D tertiary conformations in the interactive PDBe Mol* viewer with secondary structure highlights and residue coordinate inspection.
                               </p>
@@ -1356,7 +1356,7 @@ const Predict = () => {
                             <div className="flex gap-2">
                               <Link
                                 to={`/structure?protein=${protein1}`}
-                                className="flex-1 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-center text-xs font-bold transition-all shadow-sm shadow-cyan-200 flex items-center justify-center gap-1.5"
+                                className="flex-1 py-2.5 bg-cyan-800 hover:bg-cyan-700 text-white rounded-xl text-center text-xs font-bold transition-all shadow-sm shadow-cyan-200 flex items-center justify-center gap-1.5"
                               >
                                 View {protein1.slice(0, 8)} <ExternalLink size={12} />
                               </Link>
@@ -1376,11 +1376,11 @@ const Predict = () => {
                                 <div className="p-3 bg-teal-50 rounded-2xl text-teal-600">
                                   <Dna size={22} />
                                 </div>
-                                <span className="px-3 py-1 bg-teal-50 text-teal-700 border border-teal-200 text-[10px] font-black uppercase rounded-lg">Affinity Shift</span>
+                                <span className="px-3 py-1 bg-teal-50 text-teal-800 border border-teal-200 text-xs font-bold rounded-lg">Interaction change</span>
                               </div>
-                              <h4 className="text-base font-black text-slate-800 mb-1">In-Silico Mutation Scanner</h4>
+                              <h3 className="text-base font-black text-slate-900 mb-1">Test mutations</h3>
                               <p className="text-xs text-slate-500 mb-4 leading-relaxed">
-                                Introduce single or multiple point mutations along the amino acid sequence to determine whether binding affinity is preserved, enhanced, or disrupted.
+                                Change one or more amino acids and see whether the predicted interaction gets stronger or weaker.
                               </p>
                               <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-[11px] text-slate-600 font-mono space-y-1 mb-4">
                                 <p><span className="text-slate-400">Wild-Type Prob:</span> <strong>{((result.interaction_probability || 0) * 100).toFixed(1)}%</strong></p>
@@ -1389,7 +1389,7 @@ const Predict = () => {
                             </div>
                             <Link
                               to={`/mutation?p1=${protein1}&p2=${protein2}`}
-                              className="w-full py-2.5 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-center text-xs font-bold transition-all shadow-sm shadow-teal-200 flex items-center justify-center gap-1.5"
+                              className="w-full py-2.5 bg-teal-800 hover:bg-teal-700 text-white rounded-xl text-center text-xs font-bold transition-all shadow-sm shadow-teal-200 flex items-center justify-center gap-1.5"
                             >
                               Launch Mutagenesis Scanner <ArrowRight size={14} />
                             </Link>
@@ -1404,7 +1404,7 @@ const Predict = () => {
                                 </div>
                                 <span className="px-3 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-black uppercase rounded-lg">ChEMBL 34</span>
                               </div>
-                              <h4 className="text-base font-black text-slate-800 mb-1">Therapeutic Target Profiler</h4>
+                              <h3 className="text-base font-black text-slate-900 mb-1">Drug target check</h3>
                               <p className="text-xs text-slate-500 mb-4 leading-relaxed">
                                 Cross-reference the EMBL-EBI ChEMBL database to retrieve FDA-approved drug indications, clinical phase candidates, and bioactivity assays for this target.
                               </p>
@@ -1415,7 +1415,7 @@ const Predict = () => {
                             </div>
                             <Link
                               to={`/drug-targets?q=${protein1}`}
-                              className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-center text-xs font-bold transition-all shadow-sm shadow-indigo-200 flex items-center justify-center gap-1.5"
+                              className="w-full py-2.5 bg-indigo-800 hover:bg-indigo-700 text-white rounded-xl text-center text-xs font-bold transition-all shadow-sm shadow-indigo-200 flex items-center justify-center gap-1.5"
                             >
                               Explore Drug Candidates <ArrowRight size={14} />
                             </Link>
@@ -1430,7 +1430,7 @@ const Predict = () => {
                                 </div>
                                 <span className="px-3 py-1 bg-violet-50 text-violet-700 border border-violet-200 text-[10px] font-black uppercase rounded-lg">STRING v12</span>
                               </div>
-                              <h4 className="text-base font-black text-slate-800 mb-1">Interactome Network Topology</h4>
+                              <h3 className="text-base font-black text-slate-900 mb-1">Protein network</h3>
                               <p className="text-xs text-slate-500 mb-4 leading-relaxed">
                                 Trace the shortest biological pathway, identify shared hub interactors, and evaluate degree and betweenness centralities on the global interactome graph.
                               </p>
@@ -1442,7 +1442,7 @@ const Predict = () => {
                             <div className="flex gap-2">
                               <Link
                                 to={`/network?start=${protein1}&end=${protein2}`}
-                                className="flex-1 py-2.5 bg-violet-600 hover:bg-violet-500 text-white rounded-xl text-center text-xs font-bold transition-all shadow-sm shadow-violet-200 flex items-center justify-center gap-1"
+                                className="flex-1 py-2.5 bg-violet-800 hover:bg-violet-700 text-white rounded-xl text-center text-xs font-bold transition-all shadow-sm shadow-violet-200 flex items-center justify-center gap-1"
                               >
                                 2D Subnetwork <ArrowRight size={12} />
                               </Link>
@@ -1464,7 +1464,7 @@ const Predict = () => {
                                 </div>
                                 <span className="px-3 py-1 bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-black uppercase rounded-lg">Side-by-Side</span>
                               </div>
-                              <h4 className="text-base font-black text-slate-800 mb-1">WT vs Mutant Comparator</h4>
+                              <h3 className="text-base font-black text-slate-900 mb-1">Normal vs mutant</h3>
                               <p className="text-xs text-slate-500 mb-4 leading-relaxed">
                                 Perform rigorous side-by-side benchmarking of the native wild-type protein complex versus mutated variants to observe exact probability delta shifts.
                               </p>
@@ -1475,7 +1475,7 @@ const Predict = () => {
                             </div>
                             <Link
                               to={`/compare?p1=${protein1}&p2=${protein2}`}
-                              className="w-full py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl text-center text-xs font-bold transition-all shadow-sm shadow-amber-200 flex items-center justify-center gap-1.5"
+                              className="w-full py-2.5 bg-amber-800 hover:bg-amber-700 text-white rounded-xl text-center text-xs font-bold transition-all shadow-sm shadow-amber-200 flex items-center justify-center gap-1.5"
                             >
                               Open Comparative Matrix <ArrowRight size={14} />
                             </Link>
@@ -1490,7 +1490,7 @@ const Predict = () => {
                                 </div>
                                 <span className="px-3 py-1 bg-rose-50 text-rose-700 border border-rose-200 text-[10px] font-black uppercase rounded-lg">Bio-LLM</span>
                               </div>
-                              <h4 className="text-base font-black text-slate-800 mb-1">TransGraph Bio-Copilot</h4>
+                              <h3 className="text-base font-black text-slate-900 mb-1">AI assistant</h3>
                               <p className="text-xs text-slate-500 mb-4 leading-relaxed">
                                 Launch an AI consultation with our domain-specialized biological reasoning engine to synthesize disease etiology, clinical pathways, and functional context.
                               </p>
@@ -1501,7 +1501,7 @@ const Predict = () => {
                             </div>
                             <Link
                               to={`/assistant?q=${encodeURIComponent(`Explain the molecular mechanism and biological significance of the interaction between ${protein1} and ${protein2}`)}`}
-                              className="w-full py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-center text-xs font-bold transition-all shadow-sm shadow-rose-200 flex items-center justify-center gap-1.5"
+                              className="w-full py-2.5 bg-rose-800 hover:bg-rose-700 text-white rounded-xl text-center text-xs font-bold transition-all shadow-sm shadow-rose-200 flex items-center justify-center gap-1.5"
                             >
                               Consult AI Copilot <ArrowRight size={14} />
                             </Link>
@@ -1518,7 +1518,7 @@ const Predict = () => {
               </motion.div>
             )}
           </AnimatePresence>
-        </main>
+        </section>
       </div>
 
       {/* ── BATCH RESULTS TABLE ── */}
@@ -1591,9 +1591,9 @@ const Predict = () => {
                     <td className="px-4 py-3 text-center text-slate-600 font-mono">{r.confidence_score != null ? (r.confidence_score * 100).toFixed(1) + '%' : '—'}</td>
                     <td className="px-4 py-3 text-center">
                       <span className={`px-2.5 py-1 rounded-full font-black text-[9px] uppercase tracking-wider ${
-                        r.interaction_probability > 0.5 ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-500'
+                        r.interaction_probability >= (r.threshold ?? 0.45) ? 'bg-emerald-700 text-white' : 'bg-slate-200 text-slate-700'
                       }`}>
-                        {r.interaction_probability > 0.5 ? '✓ YES' : '✕ NO'}
+                        {r.interaction_probability >= (r.threshold ?? 0.45) ? 'Likely' : 'Unlikely'}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-center">
@@ -1642,7 +1642,7 @@ const Predict = () => {
 
           {/* PAGE 1 PDF SECTION */}
           <div className="space-y-4">
-            <h2 className="text-sm font-black uppercase tracking-wider text-emerald-700 border-b pb-1">1. Consensus Interaction Probability</h2>
+            <h2 className="text-sm font-black uppercase tracking-wider text-emerald-700 border-b pb-1">1. Result</h2>
             <div className="bg-emerald-50/50 p-6 rounded-2xl border border-emerald-200 flex items-center justify-between">
               <div>
                 <span className="text-4xl font-black text-emerald-600">{(result.interaction_probability * 100).toFixed(1)}%</span>
@@ -1658,13 +1658,13 @@ const Predict = () => {
 
           {/* PAGE 2 PDF SECTION */}
           <div className="space-y-4 pt-4" style={{ pageBreakBefore: 'always' }}>
-            <h2 className="text-sm font-black uppercase tracking-wider text-indigo-700 border-b pb-1">2. Evidence Weightage & Multi-Modal Explainer</h2>
+            <h2 className="text-sm font-black uppercase tracking-wider text-indigo-700 border-b pb-1">2. Why the model decided this</h2>
             
             <div className="grid grid-cols-2 gap-4 text-xs">
               <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
                 <h3 className="font-bold text-slate-800">Sequence Embedding (ESM-2)</h3>
                 <p className="text-slate-600 text-[11px] leading-relaxed">
-                  Evaluates physical-chemical complementarity of hydrophobic surfaces across amino acid sequences.
+                  Estimates the chance of interaction from the two amino-acid sequences, using ESM-2 embeddings and a neural network.
                 </p>
               </div>
 
@@ -1679,7 +1679,7 @@ const Predict = () => {
             <div className="p-4 bg-slate-900 text-white rounded-xl space-y-2 text-xs">
               <h3 className="font-bold text-emerald-400 uppercase tracking-widest text-[10px]">Automated Rationale Summary</h3>
               <p className="text-slate-300 text-[11px] leading-relaxed">
-                The prediction model concluded a {result.interaction_probability > 0.5 ? 'POSITIVE binding' : 'NON-INTERACTING'} classification with {(result.confidence_score * 100).toFixed(1)}% agreement between sequence representations and topological network signals.
+                The final model predicts that the two proteins are {result.interaction_probability >= (result.threshold ?? (selectedModel === 'gat' ? 0.50 : 0.45)) ? 'likely' : 'unlikely'} to interact ({(result.interaction_probability * 100).toFixed(1)}% chance; confidence {(result.confidence_score * 100).toFixed(1)}%). It combines the sequence estimate ({(result.esm_probability * 100).toFixed(1)}%) and the network estimate ({(result.gat_probability * 100).toFixed(1)}%).
               </p>
             </div>
           </div>

@@ -107,7 +107,7 @@ const NetworkExplorer3D = () => {
             <div className="p-2 bg-emerald-500/10 rounded-xl text-emerald-600">
               <Globe size={20} />
             </div>
-            <h2 className="text-xl font-black text-slate-800 tracking-tight">Interactome 3D</h2>
+            <h1 className="text-xl font-black text-slate-800 tracking-tight">3D protein network</h1>
           </div>
           <p className="text-[9px] text-slate-400 font-black uppercase tracking-[0.2em] mb-6">Training-set positive interactions</p>
           

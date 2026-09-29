@@ -2,9 +2,9 @@
 @import "tailwindcss";
 
 @theme {
-  --color-scientific-primary: #059669; /* Rich Emerald */
+  --color-scientific-primary: #047857; /* Emerald 700: 5.5:1 with white text (WCAG AA) */
   --color-scientific-secondary: #4f46e5; /* Indigo */
-  --color-scientific-accent: #f59e0b; /* Amber */
+  --color-scientific-accent: #b45309; /* Amber 700: 5:1 with white text (WCAG AA) */
   --color-scientific-background: #f8fafc; /* Clean Slate 50 */
   --color-scientific-card: rgba(255, 255, 255, 0.8);
   --color-scientific-border: rgba(0, 0, 0, 0.05);
@@ -109,6 +109,31 @@
 
 .font-mono {
   font-family: var(--font-mono);
+}
+
+/* ---- Readability (WCAG AA contrast, minimum text size) -------------------------------------------
+   Light-grey text is darkened on light surfaces; inside dark cards it keeps its original light grey.
+   In the utilities layer and after Tailwind's own utilities, so hover/focus variants still win. */
+@layer utilities {
+  :where(main, .bg-white, .bg-slate-50, .glass-card) .text-slate-400 { color: var(--color-slate-600); }
+  :where(main, .bg-white, .bg-slate-50, .glass-card) .text-slate-300 { color: var(--color-slate-500); }
+  :where(main, .bg-white, .bg-slate-50, .glass-card) :is(.bg-slate-100, .bg-slate-200).text-slate-500 { color: var(--color-slate-700); }
+  :where(.bg-slate-800, .bg-slate-900, .bg-slate-950, [class*="from-slate-9"]) .text-slate-400 { color: var(--color-slate-400); }
+  :where(.bg-slate-800, .bg-slate-900, .bg-slate-950, [class*="from-slate-9"]) .text-slate-300 { color: var(--color-slate-300); }
+
+  /* coloured small text on light surfaces: use the darker shade of the same hue */
+  :where(main, .bg-white, .bg-slate-50, .glass-card) :is(.text-emerald-500, .text-emerald-600) { color: var(--color-emerald-700); }
+  :where(main, .bg-white, .bg-slate-50, .glass-card) :is(.text-teal-400, .text-teal-500, .text-teal-600) { color: var(--color-teal-800); }
+  :where(main, .bg-white, .bg-slate-50, .glass-card) :is(.text-amber-500, .text-amber-600) { color: var(--color-amber-800); }
+  :where(main, .bg-white, .bg-slate-50, .glass-card) :is(.text-orange-500, .text-orange-600) { color: var(--color-orange-800); }
+  :where(main, .bg-white, .bg-slate-50, .glass-card) :is(.text-indigo-400, .text-indigo-500) { color: var(--color-indigo-700); }
+  :where(main, .bg-white, .bg-slate-50, .glass-card) :is(.text-cyan-500, .text-cyan-600) { color: var(--color-cyan-800); }
+  :where(.bg-slate-800, .bg-slate-900, .bg-slate-950, [class*="from-slate-9"]) :is(.text-emerald-500, .text-emerald-600, .text-teal-400, .text-teal-500, .text-teal-600,
+    .text-amber-500, .text-amber-600, .text-orange-500, .text-orange-600, .text-indigo-400, .text-indigo-500, .text-cyan-500, .text-cyan-600) { color: revert-layer; }
+
+  /* nothing smaller than 11px */
+  .text-\[8px\], .text-\[9px\] { font-size: 11px; }
+  .text-\[10px\] { font-size: 12px; }
 }
 
 @keyframes fadeIn {

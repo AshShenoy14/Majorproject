@@ -245,12 +245,12 @@ const NetworkExplorer = () => {
           <div className="px-4 py-2 bg-white/90 backdrop-blur shadow-sm border border-slate-200 rounded-xl flex items-center gap-3">
             <div className="p-1.5 bg-teal-50 rounded-lg text-teal-600"><Share2 size={18} /></div>
             <div>
-              <h2 className="text-sm font-bold text-slate-800">Topological Explorer</h2>
-              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Interactive PPI Schema</p>
+              <h1 className="text-base font-bold text-slate-900">Protein network</h1>
+              <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Interactive PPI Schema</p>
             </div>
           </div>
           {/* Legend */}
-          <div className="px-3 py-2 bg-white/90 backdrop-blur shadow-sm border border-slate-200 rounded-xl flex items-center gap-3 text-[10px] font-bold">
+          <div className="px-3 py-2 bg-white/90 backdrop-blur shadow-sm border border-slate-200 rounded-xl flex items-center gap-3 text-xs font-bold">
             <span className="flex items-center gap-1"><Circle size={8} className="fill-violet-500 text-violet-500" /> Hub</span>
             <span className="flex items-center gap-1"><Circle size={8} className="fill-teal-500 text-teal-500" /> Protein</span>
             <span className="flex items-center gap-1"><Circle size={8} className="fill-amber-400 text-amber-400" /> Selected</span>
@@ -289,7 +289,7 @@ const NetworkExplorer = () => {
       <div className="w-80 space-y-4 flex flex-col overflow-y-auto pr-1 scrollbar-thin">
         {/* Search */}
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 space-y-3">
-          <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><Search size={11} /> Search Protein</h3>
+          <h2 className="text-sm font-bold text-slate-800 flex items-center gap-1.5"><Search size={11} /> Search Protein</h2>
           <div className="flex gap-2">
             <input value={searchQ} onChange={e => setSearchQ(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleSearch()}
@@ -297,7 +297,7 @@ const NetworkExplorer = () => {
               className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-teal-200 outline-none"
             />
             <button onClick={handleSearch}
-              className="px-3 py-2 bg-teal-500 text-white rounded-xl text-xs font-bold hover:bg-teal-600 transition-all">
+              className="px-3 py-2 bg-teal-700 text-white rounded-xl text-xs font-bold hover:bg-teal-800 transition-all">
               Go
             </button>
           </div>
@@ -305,25 +305,25 @@ const NetworkExplorer = () => {
 
         {/* Filters */}
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 space-y-4">
-          <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><SlidersHorizontal size={11} /> Filters</h3>
+          <h2 className="text-sm font-bold text-slate-800 flex items-center gap-1.5"><SlidersHorizontal size={11} /> Filters</h2>
 
           {/* Confidence slider */}
           <div>
             <div className="flex justify-between items-center mb-1.5">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Min Confidence</span>
-              <span className="text-[10px] font-black text-teal-600">{confidenceMin.toFixed(1)}</span>
+              <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Min Confidence</span>
+              <span className="text-xs font-black text-teal-800">{confidenceMin.toFixed(1)}</span>
             </div>
-            <input type="range" min="0" max="1" step="0.05" value={confidenceMin}
+            <input type="range" aria-label="Minimum confidence" min="0" max="1" step="0.05" value={confidenceMin}
               onChange={e => applyConfidenceFilter(parseFloat(e.target.value))}
               className="w-full accent-teal-500" />
           </div>
 
           {/* Hub proteins toggle */}
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
               <Star size={11} /> Hub Proteins Only
             </span>
-            <button onClick={() => setShowHubsOnly(v => !v)}
+            <button type="button" role="switch" aria-checked={showHubsOnly} aria-label="Hub proteins only" onClick={() => setShowHubsOnly(v => !v)}
               className={`relative w-10 h-5 rounded-full transition-colors ${showHubsOnly ? 'bg-violet-500' : 'bg-slate-200'}`}>
               <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${showHubsOnly ? 'left-5' : 'left-0.5'}`} />
             </button>
@@ -332,7 +332,7 @@ const NetworkExplorer = () => {
 
         {/* Shortest Path */}
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 space-y-3">
-          <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><Navigation size={11} /> Shortest Path</h3>
+          <h2 className="text-sm font-bold text-slate-800 flex items-center gap-1.5"><Navigation size={11} /> Shortest Path</h2>
           <input value={pathStart} onChange={e => setPathStart(e.target.value)}
             placeholder="Start node ID"
             className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-rose-200 outline-none"
@@ -342,16 +342,16 @@ const NetworkExplorer = () => {
             className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-rose-200 outline-none"
           />
           <button onClick={findPath}
-            className="w-full py-2 bg-rose-500 hover:bg-rose-600 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5">
+            className="w-full py-2 bg-rose-700 hover:bg-rose-800 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5">
             <GitMerge size={13} /> Find Path
           </button>
           {pathResult.length > 0 && (
             <div className="mt-2 p-3 bg-rose-50 rounded-xl border border-rose-100">
-              <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-2">Path ({pathResult.length} hops)</p>
+              <p className="text-xs font-black text-rose-600 uppercase tracking-widest mb-2">Path ({pathResult.length} hops)</p>
               <div className="flex flex-wrap gap-1">
                 {pathResult.map((id, i) => (
                   <Fragment key={i}>
-                    <span className="text-[9px] bg-white border border-rose-200 px-1.5 py-0.5 rounded font-bold text-slate-700">{id.slice(0,10)}</span>
+                    <span className="text-[11px] bg-white border border-rose-200 px-1.5 py-0.5 rounded font-bold text-slate-700">{id.slice(0,10)}</span>
                     {i < pathResult.length - 1 && <span className="text-rose-400 text-xs">›</span>}
                   </Fragment>
                 ))}
@@ -359,7 +359,7 @@ const NetworkExplorer = () => {
             </div>
           )}
           {pathStart && pathEnd && pathResult.length === 0 && (
-            <p className="text-[10px] text-slate-400 text-center">No path found between nodes.</p>
+            <p className="text-xs text-slate-600 text-center">No path found between nodes.</p>
           )}
         </div>
 
@@ -371,10 +371,10 @@ const NetworkExplorer = () => {
               className="bg-white rounded-2xl border-l-4 border-teal-400 border border-slate-100 shadow-sm p-5">
               <div className="flex items-center gap-2 mb-3 text-teal-600">
                 <Database size={14} />
-                <span className="text-[10px] font-black uppercase tracking-widest">Protein Metadata</span>
+                <span className="text-xs font-black uppercase tracking-widest">Protein Metadata</span>
               </div>
               <h3 className="text-lg font-black text-slate-800 mb-1">{selectedNode.label}</h3>
-              <p className="text-[10px] text-slate-400 font-medium mb-4 font-mono">{selectedNode.id}</p>
+              <p className="text-xs text-slate-600 font-medium mb-4 font-mono">{selectedNode.id}</p>
 
               {/* Centrality metrics from API */}
               {(() => {
@@ -388,7 +388,7 @@ const NetworkExplorer = () => {
                       ['PageRank', m.pagerank?.toFixed(5)],
                     ].map(([k, v]) => v != null && (
                       <div key={k} className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
-                        <p className="text-[9px] font-black text-slate-400 uppercase mb-0.5">{k}</p>
+                        <p className="text-[11px] font-black text-slate-600 uppercase mb-0.5">{k}</p>
                         <p className="text-sm font-black text-slate-700">{v}</p>
                       </div>
                     ))}
@@ -396,7 +396,7 @@ const NetworkExplorer = () => {
                 ) : (
                   <div className="grid grid-cols-2 gap-2 mb-4">
                     <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
-                      <p className="text-[9px] font-black text-slate-400 uppercase mb-0.5">Degree</p>
+                      <p className="text-[11px] font-black text-slate-600 uppercase mb-0.5">Degree</p>
                       <p className="text-sm font-black text-slate-700">
                         {cyRef.current?.getElementById(selectedNode.id)?.degree() ?? '—'}
                       </p>
@@ -416,7 +416,7 @@ const NetworkExplorer = () => {
               initial={{ opacity: 0 }} animate={{ opacity: 1 }}
               className="bg-white rounded-2xl border border-slate-100 shadow-sm p-8 flex flex-col items-center justify-center text-center">
               <Info size={28} className="text-slate-200 mb-3" />
-              <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Click a node to view properties</p>
+              <p className="text-xs font-bold text-slate-600 uppercase tracking-widest">Click a node to view properties</p>
             </motion.div>
           )}
         </AnimatePresence>
@@ -424,9 +424,9 @@ const NetworkExplorer = () => {
         {/* Network Hubs */}
         <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5 flex-1 min-h-0 flex flex-col">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-1.5"><Activity size={11} /> Hub Centrality</h3>
+            <h2 className="text-sm font-bold text-slate-800 flex items-center gap-1.5"><Activity size={11} /> Hub Centrality</h2>
           </div>
-          <div className="space-y-3 overflow-y-auto flex-1 pr-1 scrollbar-thin">
+          <div className="space-y-3 overflow-y-auto flex-1 pr-1 scrollbar-thin" tabIndex={0} aria-label="Hub proteins list">
             {metrics.slice(0, 10).map((m, i) => (
               <div key={i} onClick={() => setSelectedNode({ id: m.protein, label: m.protein })}
                 className="group p-3 hover:bg-slate-50 rounded-xl border border-transparent hover:border-slate-100 transition-all cursor-pointer">
@@ -442,7 +442,7 @@ const NetworkExplorer = () => {
                     className="h-full bg-gradient-to-r from-teal-400 to-cyan-500 rounded-full"
                   />
                 </div>
-                <div className="flex justify-between mt-1 text-[9px] font-bold text-slate-400 uppercase tracking-tight">
+                <div className="flex justify-between mt-1 text-[11px] font-bold text-slate-600 uppercase tracking-tight">
                   <span>Degree: {m.degree}</span>
                   <span>BC: {m.betweenness?.toFixed(3) || '—'}</span>
                 </div>

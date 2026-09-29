@@ -92,12 +92,13 @@ export const ProteinInfoButton = ({ proteinId, label = "Protein" }) => {
   const info = KNOWN_PROTEINS[cleanId] || {
     uniprot: cleanId || 'Unknown',
     gene: cleanId || 'Protein Target',
-    name: `Protein Identifier: ${cleanId || 'Selected Pair'}`,
+    name: `Protein ${cleanId || ''}`.trim(),
     organism: 'Homo sapiens (Human)',
-    function: 'Key regulator in protein interactome network. Participates in cellular signaling, structural formation, or enzymatic binding.',
-    length: '350-500 aa (Estimated)',
-    location: 'Cytoplasm / Nucleus',
-    diseases: 'Correlated with metabolic & signaling pathway alterations'
+    function: 'No description is stored in this app for this protein. Use the UniProt link below for its function.',
+    length: 'Not available here',
+    location: 'Not available here',
+    diseases: 'Not available here',
+    unknown: true
   };
 
   return (
@@ -142,7 +143,7 @@ export const ProteinInfoButton = ({ proteinId, label = "Protein" }) => {
                 </div>
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                  className="p-1.5 rounded-full text-slate-600 hover:text-slate-700 hover:bg-slate-100 transition-colors"
                 >
                   <X size={18} />
                 </button>
@@ -151,26 +152,26 @@ export const ProteinInfoButton = ({ proteinId, label = "Protein" }) => {
               {/* Grid Metadata Cards */}
               <div className="grid grid-cols-2 gap-3 mb-4 text-xs">
                 <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Organism</span>
+                  <span className="text-xs font-black text-slate-600 uppercase tracking-wider block mb-1">Organism</span>
                   <span className="font-bold text-slate-700">{info.organism}</span>
                 </div>
                 <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Sequence Length</span>
+                  <span className="text-xs font-black text-slate-600 uppercase tracking-wider block mb-1">Sequence Length</span>
                   <span className="font-bold text-slate-700">{info.length}</span>
                 </div>
                 <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Subcellular Location</span>
+                  <span className="text-xs font-black text-slate-600 uppercase tracking-wider block mb-1">Subcellular Location</span>
                   <span className="font-bold text-slate-700">{info.location}</span>
                 </div>
                 <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block mb-1">Database ID</span>
+                  <span className="text-xs font-black text-slate-600 uppercase tracking-wider block mb-1">Database ID</span>
                   <span className="font-mono font-bold text-emerald-600">{info.uniprot}</span>
                 </div>
               </div>
 
               {/* Biological Function */}
               <div className="mb-4 p-3.5 bg-emerald-50/60 rounded-2xl border border-emerald-100 text-xs">
-                <span className="text-[10px] font-black text-emerald-800 uppercase tracking-wider flex items-center gap-1.5 mb-1">
+                <span className="text-xs font-black text-emerald-800 uppercase tracking-wider flex items-center gap-1.5 mb-1">
                   <Activity size={12} className="text-emerald-600" /> Biological Function
                 </span>
                 <p className="text-slate-700 leading-relaxed font-medium">{info.function}</p>
@@ -178,11 +179,12 @@ export const ProteinInfoButton = ({ proteinId, label = "Protein" }) => {
 
               {/* Functional Domains Breakdown */}
               <div className="mb-4 p-3.5 bg-indigo-50/60 rounded-2xl border border-indigo-100 text-xs">
-                <span className="text-[10px] font-black text-indigo-800 uppercase tracking-wider flex items-center gap-1.5 mb-1">
+                <span className="text-xs font-black text-indigo-800 uppercase tracking-wider flex items-center gap-1.5 mb-1">
                   <Dna size={12} className="text-indigo-600" /> Functional Domains & Motifs
                 </span>
                 <div className="flex flex-wrap gap-1.5 mt-1.5">
-                  {(info.domains || ['Core Binding Domain (1-100)', 'Catalytic Interface Motif (101-250)', 'Regulatory C-Terminal (251-390)']).map((domain, i) => (
+                  {!info.domains && <span className="text-slate-700">Not available here</span>}
+                  {(info.domains || []).map((domain, i) => (
                     <span key={i} className="px-2 py-0.5 bg-indigo-100/80 text-indigo-700 font-semibold rounded-md text-[11px] border border-indigo-200">
                       {domain}
                     </span>
@@ -192,7 +194,7 @@ export const ProteinInfoButton = ({ proteinId, label = "Protein" }) => {
 
               {/* Disease Associations */}
               <div className="mb-5 p-3.5 bg-rose-50/60 rounded-2xl border border-rose-100 text-xs">
-                <span className="text-[10px] font-black text-rose-800 uppercase tracking-wider flex items-center gap-1.5 mb-1">
+                <span className="text-xs font-black text-rose-800 uppercase tracking-wider flex items-center gap-1.5 mb-1">
                   <ShieldAlert size={12} className="text-rose-600" /> Disease Associations
                 </span>
                 <p className="text-slate-700 leading-relaxed font-medium">{info.diseases}</p>
@@ -202,23 +204,26 @@ export const ProteinInfoButton = ({ proteinId, label = "Protein" }) => {
               <div className="flex flex-wrap justify-between items-center pt-2 border-t border-slate-100 text-xs gap-2">
                 <div className="flex items-center gap-3">
                   <a
-                    href={`https://www.uniprot.org/uniprotkb/${info.uniprot}/entry`}
+                    href={info.unknown
+                      ? `https://www.uniprot.org/uniprotkb?query=${encodeURIComponent(cleanId)}`
+                      : `https://www.uniprot.org/uniprotkb/${info.uniprot}/entry`}
                     target="_blank"
                     rel="noreferrer"
                     className="text-emerald-600 hover:text-emerald-700 font-bold inline-flex items-center gap-1 text-[11px]"
                   >
-                    View UniProt <ExternalLink size={12} />
+                    {info.unknown ? 'Search UniProt' : 'View UniProt'} <ExternalLink size={12} aria-hidden="true" />
                   </a>
-                  <a
+                  {!info.unknown && <a
                     href={`https://alphafold.ebi.ac.uk/entry/${info.uniprot}`}
                     target="_blank"
                     rel="noreferrer"
                     className="text-indigo-600 hover:text-indigo-700 font-bold inline-flex items-center gap-1 text-[11px] bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-200"
                   >
                     <span>AlphaFold 3D</span> <ExternalLink size={12} />
-                  </a>
+                  </a>}
                 </div>
                 <button
+                  type="button"
                   onClick={() => setIsOpen(false)}
                   className="px-4 py-1.5 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-xl text-xs transition-colors"
                 >

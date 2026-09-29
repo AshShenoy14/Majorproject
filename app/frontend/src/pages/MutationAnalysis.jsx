@@ -95,16 +95,20 @@ const MutationAnalysis = () => {
   return (
     <div className="max-w-6xl mx-auto space-y-8 pb-12">
       <div className="glass-card p-8">
-        <div className="flex items-center gap-3 mb-6">
+        <div className="flex items-center gap-3 mb-2">
           <div className="p-2 bg-scientific-accent/10 rounded-lg text-scientific-accent">
-            <Dna size={24} />
+            <Dna size={24} aria-hidden="true" />
           </div>
-          <h2 className="text-2xl font-bold text-slate-800">Mutation Impact Scan</h2>
+          <h1 className="text-2xl font-bold text-slate-900">Mutations</h1>
         </div>
+        <p className="text-slate-700 mb-6 max-w-3xl">
+          A mutation changes one amino acid (one letter) in a protein. Enter the change below to see whether the
+          predicted interaction between the two proteins gets stronger or weaker.
+        </p>
 
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl flex items-center gap-3 text-red-600 text-sm">
-            <AlertTriangle size={18} />
+          <div role="alert" className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3 text-red-700 text-sm">
+            <AlertTriangle size={18} aria-hidden="true" />
             {error}
           </div>
         )}
@@ -112,92 +116,104 @@ const MutationAnalysis = () => {
         <form onSubmit={handleAnalysis} className="space-y-8">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Protein A ID</label>
-              <input 
-                type="text" 
+              <label htmlFor="mut-protein1" className="text-sm font-bold text-slate-800">Protein 1</label>
+              <input
+                id="mut-protein1"
+                type="text"
                 value={protein1}
                 onChange={(e) => setProtein1(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-scientific-accent outline-none"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-scientific-accent outline-none font-mono"
               />
             </div>
             <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Protein B ID</label>
-              <input 
-                type="text" 
+              <label htmlFor="mut-protein2" className="text-sm font-bold text-slate-800">Protein 2</label>
+              <input
+                id="mut-protein2"
+                type="text"
                 value={protein2}
                 onChange={(e) => setProtein2(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-scientific-accent outline-none"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-scientific-accent outline-none font-mono"
               />
             </div>
           </div>
 
-          <div className="space-y-4">
+          <fieldset className="space-y-3">
             <div className="flex justify-between items-center">
-              <h3 className="text-sm font-bold text-slate-600 uppercase tracking-widest">Mutation Batch</h3>
-              <button 
-                type="button" 
+              <legend className="text-base font-bold text-slate-900">Changes to test</legend>
+              <button
+                type="button"
                 onClick={addMutation}
-                className="text-xs font-bold text-scientific-accent flex items-center gap-1 hover:underline"
+                className="text-sm font-bold text-scientific-accent flex items-center gap-1 hover:underline"
               >
-                <Plus size={14} /> ADD RESIDUE
+                <Plus size={16} aria-hidden="true" /> Add another change
               </button>
             </div>
+            <p className="text-sm text-slate-600">Example: protein 1, position 45, original letter K, new letter A means "replace the K at position 45 with an A".</p>
 
+            <div className="hidden sm:grid grid-cols-4 gap-3 pr-12 text-xs font-bold text-slate-700" aria-hidden="true">
+              <span>Which protein</span><span>Position</span><span>Original letter</span><span>New letter</span>
+            </div>
             <div className="grid gap-3">
               {mutations.map((m, i) => (
-                <div key={i} className="flex gap-4 items-center animate-in fade-in slide-in-from-left-2 transition-all">
-                  <div className="flex-1 grid grid-cols-4 gap-3">
+                <div key={i} className="flex gap-4 items-center">
+                  <div className="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <select
+                      aria-label={`Change ${i + 1}: which protein`}
                       value={m.protein}
                       onChange={(e) => updateMutation(i, 'protein', e.target.value)}
-                      className="px-3 py-2 bg-white border border-slate-200 rounded-lg outline-none text-xs font-bold"
+                      className="px-3 py-2 bg-white border border-slate-300 rounded-lg outline-none text-sm font-bold"
                     >
-                      <option value={1}>Protein A</option>
-                      <option value={2}>Protein B</option>
+                      <option value={1}>Protein 1</option>
+                      <option value={2}>Protein 2</option>
                     </select>
-                    <input 
-                      type="number" 
-                      placeholder="Pos" 
-                      value={m.pos} 
+                    <input
+                      type="number"
+                      aria-label={`Change ${i + 1}: position`}
+                      placeholder="Position"
+                      value={m.pos}
                       onChange={(e) => updateMutation(i, 'pos', e.target.value)}
-                      className="px-3 py-2 bg-white border border-slate-200 rounded-lg outline-none" 
+                      className="px-3 py-2 bg-white border border-slate-300 rounded-lg outline-none"
                     />
-                    <input 
-                      type="text" 
-                      placeholder="Orig" 
-                      value={m.orig} 
+                    <input
+                      type="text"
+                      aria-label={`Change ${i + 1}: original letter`}
+                      placeholder="e.g. K"
+                      value={m.orig}
                       maxLength={1}
                       onChange={(e) => updateMutation(i, 'orig', e.target.value)}
-                      className="px-3 py-2 bg-white border border-slate-200 rounded-lg outline-none" 
+                      className="px-3 py-2 bg-white border border-slate-300 rounded-lg outline-none"
                     />
-                    <input 
-                      type="text" 
-                      placeholder="Mut" 
-                      value={m.mut} 
+                    <input
+                      type="text"
+                      aria-label={`Change ${i + 1}: new letter`}
+                      placeholder="e.g. A"
+                      value={m.mut}
                       maxLength={1}
                       onChange={(e) => updateMutation(i, 'mut', e.target.value)}
-                      className="px-3 py-2 bg-white border border-slate-200 rounded-lg outline-none" 
+                      className="px-3 py-2 bg-white border border-slate-300 rounded-lg outline-none"
                     />
                   </div>
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     onClick={() => removeMutation(i)}
-                    className="p-2 text-red-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                    aria-label={`Remove change ${i + 1}`}
+                    title="Remove this change"
+                    className="p-2 text-red-700 hover:bg-red-50 rounded-lg transition-colors"
                   >
-                    <Trash2 size={18} />
+                    <Trash2 size={18} aria-hidden="true" />
                   </button>
                 </div>
               ))}
             </div>
-          </div>
+          </fieldset>
 
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             disabled={loading}
-            className="w-full py-4 bg-scientific-accent text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-purple-700 transition-all shadow-lg shadow-purple-200 disabled:opacity-50"
+            className="w-full py-4 bg-scientific-accent text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:brightness-95 transition-all shadow-lg disabled:opacity-50 text-base"
           >
-            {loading ? <Loader2 className="animate-spin" size={20} /> : <Activity size={20} />}
-            RUN IN-SILICO SCAN
+            {loading ? <Loader2 className="animate-spin" size={20} aria-hidden="true" /> : <Activity size={20} aria-hidden="true" />}
+            {loading ? 'Testing…' : 'Test these changes'}
           </button>
         </form>
       </div>
@@ -216,13 +232,13 @@ const MutationAnalysis = () => {
         >
           {/* Result Cards for all mutations */}
           <div className="lg:col-span-1 space-y-6">
-            <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest text-center">Batch Mutation Results</h3>
+            <h2 className="text-base font-bold text-slate-900 text-center">Results</h2>
             {result.mutation_results.map((res, idx) => {
               if (res.error) {
                 return (
                   <div key={idx} className="glass-card p-6 space-y-2 border border-amber-200">
                     <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">
-                      Protein {res.protein === 2 ? 'B' : 'A'} (P{res.pos} {res.orig}→{res.mut})
+                      Protein {res.protein === 2 ? '2' : '1'}: position {res.pos}, {res.orig} → {res.mut}
                     </span>
                     <p className="text-xs text-amber-700 flex items-start gap-2">
                       <AlertTriangle size={14} className="shrink-0 mt-0.5" /> Not evaluated: {res.error}
@@ -237,15 +253,15 @@ const MutationAnalysis = () => {
                 <div key={idx} className="glass-card p-6 flex flex-col items-center space-y-4">
                   <div className="flex items-center justify-between w-full gap-2">
                     <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">
-                      Protein {res.protein === 2 ? 'B' : 'A'} (P{res.pos} {res.orig}→{res.mut})
+                      Protein {res.protein === 2 ? '2' : '1'}: position {res.pos}, {res.orig} → {res.mut}
                     </span>
                   </div>
 
                   <div className="p-4 bg-slate-50 rounded-2xl w-full text-center space-y-3 border border-slate-100">
                      <div className="flex justify-between items-center text-xs text-slate-500">
-                        <span>Wild-type: <b>{(Number(res.base_score || 0) * 100).toFixed(1)}%</b></span>
-                        <ArrowRight size={14} className="text-slate-300" />
-                        <span>Mutant: <b className="text-scientific-accent">{(Number(res.mutated_score || 0) * 100).toFixed(1)}%</b></span>
+                        <span>Original: <b>{(Number(res.base_score || 0) * 100).toFixed(1)}%</b></span>
+                        <ArrowRight size={14} className="text-slate-500" />
+                        <span>After change: <b className="text-scientific-accent">{(Number(res.mutated_score || 0) * 100).toFixed(1)}%</b></span>
                      </div>
                   </div>
 
@@ -269,13 +285,13 @@ const MutationAnalysis = () => {
                           {(Number(res.impact_delta || 0) * 100).toFixed(1)}% Δ
                         </span>
                     </div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-white/80">
-                      {isIncrease ? 'Stabilizing' : isDecrease ? 'Disruptive' : 'Neutral'}
+                    <span className="text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-white/80">
+                      {isIncrease ? 'Stronger' : isDecrease ? 'Weaker' : 'Little effect'}
                     </span>
                   </div>
 
                   <div className="p-3 bg-slate-50 rounded-xl w-full">
-                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1 text-center">AI Interpretation</p>
+                     <p className="text-[11px] font-bold text-slate-600 mb-1 text-center">Model's reading</p>
                      <p className="text-xs text-slate-600 italic leading-relaxed text-center">
                        "{res.interpretation}"
                      </p>
@@ -289,7 +305,7 @@ const MutationAnalysis = () => {
           <div className="lg:col-span-2 glass-card p-8">
             <div className="flex items-center gap-3 mb-8">
               <Activity className="text-scientific-accent" size={20} />
-              <h4 className="text-lg font-bold text-slate-800">ΔProbability (Mutant − Wild-type)</h4>
+              <h2 className="text-lg font-bold text-slate-900">Change in predicted chance (after change minus original)</h2>
             </div>
             
             <div className="h-64 mb-6">
@@ -320,7 +336,7 @@ const MutationAnalysis = () => {
                             }`}>
                               {isIncrease ? '+' : ''}{(val * 100).toFixed(2)}% Δ
                             </p>
-                            <p className="text-[10px] uppercase font-bold tracking-wider opacity-80">
+                            <p className="text-xs uppercase font-bold tracking-wider opacity-80">
                               {isIncrease ? 'Green = Increase' : isDecrease ? 'Red = Decrease' : 'Neutral'}
                             </p>
                           </div>
@@ -346,21 +362,21 @@ const MutationAnalysis = () => {
             <div className="flex items-center justify-center gap-6 mb-6 text-xs font-bold">
                <div className="flex items-center gap-2 text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200">
                   <div className="w-3 h-3 rounded-full bg-emerald-500" />
-                  <span>Green = Increase (Mutant &gt; Wild-type)</span>
+                  <span>Green = stronger after the change</span>
                </div>
                <div className="flex items-center gap-2 text-rose-700 bg-rose-50 px-3 py-1.5 rounded-lg border border-rose-200">
                   <div className="w-3 h-3 rounded-full bg-rose-500" />
-                  <span>Red = Decrease (Mutant &lt; Wild-type)</span>
+                  <span>Red = weaker after the change</span>
                </div>
             </div>
 
             <div className="p-4 bg-orange-50 rounded-xl flex gap-3 border border-orange-100">
                <AlertTriangle className="text-orange-500 shrink-0" size={20} />
                <div>
-                  <p className="text-xs font-bold text-orange-700 uppercase tracking-widest mb-1">Biological Context</p>
+                  <p className="text-xs font-bold text-orange-700 mb-1">Please note</p>
                   <p className="text-xs text-orange-600 leading-relaxed">
-                    Mutations in high-affinity regions (hotspots) often lead to significant disruption of binding interfaces. 
-                    Monitor the graph-model (GraphSAGE) signal if the delta is significant.
+                    These numbers come from the sequence model only: they show how a change in the amino-acid sequence moves its
+                    estimate. They are predictions, not measured binding strengths.
                   </p>
                </div>
             </div>

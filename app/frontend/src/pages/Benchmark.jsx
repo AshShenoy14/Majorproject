@@ -34,6 +34,13 @@ const METRIC_COLUMNS = [
   { key: 'pr_auc', label: 'PR-AUC' },
 ];
 
+const PLAIN_MODEL_NAMES = {
+  'Full Ensemble (XGBoost)': 'Final model (both opinions combined)',
+  'Graph-Only (GraphSAGE)': 'Network only',
+  'Sequence-Only (ESM-MLP)': 'Sequence only',
+  'Random Forest Baseline': 'Simple baseline (random forest)',
+};
+
 const Benchmark = () => {
   const [evaluation, setEvaluation] = useState(null);
   const [benchmarks, setBenchmarks] = useState(null);
@@ -86,13 +93,11 @@ const Benchmark = () => {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-3xl font-black text-slate-800 tracking-tight">Empirical Benchmarks</h1>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">
-                Verified Run
-              </span>
+              <h1 className="text-3xl font-black text-slate-900 tracking-tight">Model results</h1>
             </div>
-            <p className="text-sm text-slate-400 font-medium">
-              In-domain test set, 2,000-resample Bootstrap CIs, inductive cold-start, and external screening benchmarks
+            <p className="text-base text-slate-700">
+              How often the model is right, how it compares with simpler models, and where it still struggles.
+              Every number is loaded from the project's saved result files.
             </p>
           </div>
         </div>
@@ -113,10 +118,10 @@ const Benchmark = () => {
           <div className="absolute top-0 right-0 p-3 text-indigo-500/10">
             <TrendingUp size={64} />
           </div>
-          <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Ensemble Accuracy</span>
+          <span className="text-xs font-black uppercase tracking-widest text-slate-600">Ensemble Accuracy</span>
           <div className="flex items-baseline gap-2 mt-1">
             <span className="text-3xl font-black text-slate-800 tracking-tight">{ens ? `${(ens.accuracy * 100).toFixed(2)}%` : '—'}</span>
-            <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">Held-out test</span>
+            <span className="text-xs font-bold text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded">Held-out test</span>
           </div>
           {bs?.accuracy && (
             <div className="mt-2 text-[11px] font-mono text-slate-500 bg-slate-50 px-2 py-1 rounded-lg border border-slate-100 inline-block">
@@ -129,7 +134,7 @@ const Benchmark = () => {
           <div className="absolute top-0 right-0 p-3 text-emerald-500/10">
             <ShieldCheck size={64} />
           </div>
-          <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Ensemble ROC-AUC</span>
+          <span className="text-xs font-black uppercase tracking-widest text-slate-600">Ensemble ROC-AUC</span>
           <div className="flex items-baseline gap-2 mt-1">
             <span className="text-3xl font-black text-slate-800 tracking-tight">{ens ? ens.roc_auc.toFixed(4) : '—'}</span>
             <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">PR-AUC {ens ? ens.pr_auc.toFixed(4) : '—'}</span>
@@ -145,28 +150,28 @@ const Benchmark = () => {
           <div className="absolute top-0 right-0 p-3 text-cyan-500/10">
             <Activity size={64} />
           </div>
-          <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Cold-Start Accuracy</span>
+          <span className="text-xs font-black uppercase tracking-widest text-slate-600">Cold-Start Accuracy</span>
           <div className="flex items-baseline gap-2 mt-1">
             <span className="text-3xl font-black text-slate-800 tracking-tight">
               {cs ? `${(cs.cold_start_novel_protein_via_knn?.accuracy * 100).toFixed(1)}%` : '—'}
             </span>
             <span className="text-xs font-bold text-cyan-700 bg-cyan-50 px-1.5 py-0.5 rounded">KNN Inductive</span>
           </div>
-          <p className="mt-2 text-[11px] text-slate-400 font-medium">Unseen proteins without prior edges</p>
+          <p className="mt-2 text-[11px] text-slate-600 font-medium">Unseen proteins without prior edges</p>
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden">
           <div className="absolute top-0 right-0 p-3 text-amber-500/10">
             <Sparkles size={64} />
           </div>
-          <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">External Transfer (SHS27k)</span>
+          <span className="text-xs font-black uppercase tracking-widest text-slate-600">External Transfer (SHS27k)</span>
           <div className="flex items-baseline gap-2 mt-1">
             <span className="text-3xl font-black text-slate-800 tracking-tight">
               {shs ? shs.overall?.roc_auc.toFixed(4) : '—'}
             </span>
             <span className="text-xs font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">ROC-AUC</span>
           </div>
-          <p className="mt-2 text-[11px] text-slate-400 font-medium">15,248 pairs scored on external snapshot</p>
+          <p className="mt-2 text-[11px] text-slate-600 font-medium">15,248 pairs scored on external snapshot</p>
         </div>
       </div>
 
@@ -196,10 +201,10 @@ const Benchmark = () => {
       {/* Tabs Navigation */}
       <div className="flex items-center gap-2 border-b border-slate-200/80 pb-3">
         {[
-          { id: 'models', label: '1. Model Comparison (In-Domain)', icon: Layers },
-          { id: 'bootstrap', label: '2. Bootstrap 95% Confidence Intervals', icon: ShieldCheck },
-          { id: 'cold_start', label: '3. Cold-Start (Novel Proteins)', icon: Activity },
-          { id: 'external', label: '4. External Benchmarks (SHS27k & HuRI)', icon: ArrowUpRight }
+          { id: 'models', label: '1. Which model is best?', icon: Layers },
+          { id: 'bootstrap', label: '2. How certain are these numbers?', icon: ShieldCheck },
+          { id: 'cold_start', label: '3. Proteins missing from the network', icon: Activity },
+          { id: 'external', label: '4. Other datasets', icon: ArrowUpRight }
         ].map(tab => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -207,13 +212,14 @@ const Benchmark = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all ${
+              aria-pressed={isActive}
+              className={`px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 transition-all ${
                 isActive 
                   ? 'bg-slate-900 text-white shadow-sm' 
                   : 'bg-white text-slate-600 hover:bg-slate-100/70 border border-slate-200/60'
               }`}
             >
-              <Icon size={14} className={isActive ? 'text-emerald-400' : 'text-slate-400'} />
+              <Icon size={14} aria-hidden="true" className={isActive ? 'text-emerald-400' : 'text-slate-500'} />
               {tab.label}
             </button>
           );
@@ -223,30 +229,48 @@ const Benchmark = () => {
       {/* Tab 1: In-Domain Models */}
       {activeTab === 'models' && evaluation && (
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+          <p className="text-base text-slate-700">
+            All models were tested on the same <strong>20,172 protein pairs</strong> that none of them saw during training.
+            Combining both opinions gives the best result on every measure.
+          </p>
+          <details className="bg-white rounded-2xl border border-slate-200 p-4">
+            <summary className="font-bold text-slate-900 cursor-pointer">What do these measures mean?</summary>
+            <dl className="mt-3 grid sm:grid-cols-2 gap-3 text-sm text-slate-700">
+              <div><dt className="font-bold text-slate-900">Accuracy</dt><dd>Share of all predictions that were correct.</dd></div>
+              <div><dt className="font-bold text-slate-900">Precision</dt><dd>Of the pairs predicted to interact, how many really do.</dd></div>
+              <div><dt className="font-bold text-slate-900">Recall</dt><dd>Of the pairs that really interact, how many the model found.</dd></div>
+              <div><dt className="font-bold text-slate-900">F1</dt><dd>A single score balancing precision and recall.</dd></div>
+              <div><dt className="font-bold text-slate-900">ROC-AUC and PR-AUC</dt><dd>How well the model ranks interacting pairs above non-interacting ones (100% = perfect ranking).</dd></div>
+              <div><dt className="font-bold text-slate-900">Threshold</dt><dd>The probability above which a pair counts as "interacting", chosen on separate validation data.</dd></div>
+            </dl>
+          </details>
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-100">
-                  <th className="px-5 py-4">Model Architecture</th>
+                <tr className="text-left text-xs font-bold text-slate-700 border-b border-slate-200">
+                  <th scope="col" className="px-5 py-4">Model</th>
                   {METRIC_COLUMNS.map(c => (
-                    <th key={c.key} className="px-4 py-4 text-right">{c.label}</th>
+                    <th scope="col" key={c.key} className="px-4 py-4 text-right">{c.label}</th>
                   ))}
-                  <th className="px-4 py-4 text-right">Val Threshold</th>
+                  <th scope="col" className="px-4 py-4 text-right">Threshold</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map(([name, m]) => (
                   <tr key={name} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50">
                     <td className="px-5 py-3 font-bold text-slate-800 flex items-center gap-2">
-                      {name.includes('Ensemble') && <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse"></span>}
-                      {name}
+                      {name.includes('Ensemble') && <span className="w-2 h-2 rounded-full bg-indigo-600" aria-hidden="true"></span>}
+                      <span>
+                        <span className="block">{PLAIN_MODEL_NAMES[name] ?? name}</span>
+                        {PLAIN_MODEL_NAMES[name] && <span className="block text-xs font-normal text-slate-600">{name}</span>}
+                      </span>
                     </td>
                     {METRIC_COLUMNS.map(c => (
-                      <td key={c.key} className={`px-4 py-3 text-right font-mono text-sm ${name.includes('Ensemble') ? 'font-black text-indigo-700' : 'text-slate-600'}`}>
+                      <td key={c.key} className={`px-4 py-3 text-right font-mono text-sm ${name.includes('Ensemble') ? 'font-black text-indigo-800' : 'text-slate-700'}`}>
                         {(m[c.key] * 100).toFixed(2)}%
                       </td>
                     ))}
-                    <td className="px-4 py-3 text-right font-mono text-slate-400">{m.val_selected_threshold.toFixed(2)}</td>
+                    <td className="px-4 py-3 text-right font-mono text-slate-700">{m.val_selected_threshold.toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -254,7 +278,7 @@ const Benchmark = () => {
           </div>
 
           <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
-            <h3 className="text-sm font-black text-slate-700 uppercase tracking-widest mb-6">ROC-AUC, PR-AUC and F1 Comparison (%)</h3>
+            <h2 className="text-base font-bold text-slate-900 mb-6">Side-by-side comparison (higher is better)</h2>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
@@ -277,11 +301,11 @@ const Benchmark = () => {
           <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
             <div className="flex items-center gap-2 mb-4">
               <ShieldCheck className="text-indigo-600" size={20} />
-              <h3 className="text-base font-black text-slate-800">2,000-Resample Empirical Bootstrap (95% CI)</h3>
+              <h2 className="text-lg font-bold text-slate-900">How certain are these numbers?</h2>
             </div>
             <p className="text-sm text-slate-600 mb-6 leading-relaxed">
-              Standard academic practice requires reporting confidence intervals rather than isolated point estimates.
-              We performed 2,000 empirical bootstrap resamples across the 20,172 held-out test predictions to obtain rigorous 95% confidence bounds.
+              A score measured on one test set could be a little lucky or unlucky. We re-sampled the 20,172 test results
+              2,000 times (a "bootstrap") to see how much the scores move. The true score is very likely (95%) inside the range shown.
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -291,10 +315,10 @@ const Benchmark = () => {
                 { name: 'F1 Score', mean: bs?.f1?.mean, lo: bs?.f1?.ci_lo, hi: bs?.f1?.ci_hi }
               ].map(item => (
                 <div key={item.name} className="p-4 rounded-xl bg-slate-50 border border-slate-100">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">{item.name}</span>
+                  <span className="text-sm font-bold text-slate-700">{item.name}</span>
                   <div className="text-2xl font-black text-slate-800 mt-1">{item.mean != null ? `${(item.mean * 100).toFixed(2)}%` : '—'}</div>
                   <div className="mt-2 text-xs font-mono font-bold text-indigo-600 bg-white px-2.5 py-1 rounded border border-slate-200/60 inline-block">
-                    95% CI: {item.lo != null ? `[${(item.lo * 100).toFixed(2)}%, ${(item.hi * 100).toFixed(2)}%]` : 'not available'}
+                    Likely range: {item.lo != null ? `[${(item.lo * 100).toFixed(2)}%, ${(item.hi * 100).toFixed(2)}%]` : 'not available'}
                   </div>
                 </div>
               ))}
@@ -309,16 +333,16 @@ const Benchmark = () => {
           <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
             <div className="flex items-center gap-2 mb-4">
               <Activity className="text-cyan-600" size={20} />
-              <h3 className="text-base font-black text-slate-800">Inductive Link Prediction: Warm vs. Cold-Start Novel Proteins</h3>
+              <h2 className="text-lg font-bold text-slate-900">What about proteins missing from the network?</h2>
             </div>
             <p className="text-sm text-slate-600 mb-6 leading-relaxed">
-              When a completely novel protein sequence is queried without existing graph topology, TransGraph-PPI executes a real-time KNN latent projection. 
-              Below is the empirical test comparing proteins physically removed from the trained graph vs their warm equivalents.
+              If a protein is not in the network, the app borrows the network position of the most similar proteins it does know.
+              To test this, we removed 400 proteins from the network and predicted their pairs again, then compared with the normal result.
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="p-5 rounded-2xl bg-cyan-50/60 border border-cyan-100">
-                <span className="text-xs font-black uppercase tracking-wider text-cyan-800">Cold-Start Reconstruction (KNN Path)</span>
+                <span className="text-sm font-bold text-cyan-900">Protein removed from the network</span>
                 <div className="text-3xl font-black text-slate-800 mt-2">
                   {cs ? `${(cs.cold_start_novel_protein_via_knn?.accuracy * 100).toFixed(2)}%` : '—'}
                 </div>
@@ -330,7 +354,7 @@ const Benchmark = () => {
               </div>
 
               <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200">
-                <span className="text-xs font-black uppercase tracking-wider text-slate-700">Warm Baseline (Full Known Graph)</span>
+                <span className="text-sm font-bold text-slate-800">Same pairs, protein in the network</span>
                 <div className="text-3xl font-black text-slate-800 mt-2">
                   {cs ? `${(cs.warm_baseline_same_pairs_full_graph?.accuracy * 100).toFixed(2)}%` : '—'}
                 </div>
@@ -356,28 +380,28 @@ const Benchmark = () => {
                   <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200">
                     Same Source, Alternate Curation
                   </span>
-                  <span className="text-xs font-mono text-slate-400">{shs?.overall?.n != null ? `${shs.overall.n.toLocaleString()} pairs` : ''}</span>
+                  <span className="text-xs font-mono text-slate-600">{shs?.overall?.n != null ? `${shs.overall.n.toLocaleString()} pairs` : ''}</span>
                 </div>
-                <h4 className="text-lg font-black text-slate-800">SHS27k Benchmark (Chen et al.)</h4>
+                <h3 className="text-lg font-bold text-slate-900">SHS27k (from the same STRING database)</h3>
                 <p className="text-xs text-slate-500 mt-2 leading-relaxed">
-                  Curated from STRING high-confidence interactions with sequence length filters. Demonstrates how the model generalizes to a differently filtered snapshot of the same underlying database.
+                  A different selection of interactions taken from the same database the model learned from. It shows how the model does on similar, but not identical, data.
                 </p>
 
                 <div className="grid grid-cols-3 gap-2 mt-5">
                   <div className="p-3 bg-slate-50 rounded-xl text-center">
-                    <span className="text-[10px] uppercase font-bold text-slate-400">Accuracy</span>
+                    <span className="text-xs font-bold text-slate-700">Accuracy</span>
                     <div className="text-base font-black text-slate-800 mt-0.5">
                       {shs ? `${(shs.overall?.accuracy * 100).toFixed(1)}%` : '—'}
                     </div>
                   </div>
                   <div className="p-3 bg-slate-50 rounded-xl text-center">
-                    <span className="text-[10px] uppercase font-bold text-slate-400">ROC-AUC</span>
+                    <span className="text-xs font-bold text-slate-700">ROC-AUC</span>
                     <div className="text-base font-black text-amber-700 mt-0.5">
                       {shs ? shs.overall?.roc_auc.toFixed(4) : '—'}
                     </div>
                   </div>
                   <div className="p-3 bg-slate-50 rounded-xl text-center">
-                    <span className="text-[10px] uppercase font-bold text-slate-400">F1 Score</span>
+                    <span className="text-xs font-bold text-slate-700">F1</span>
                     <div className="text-base font-black text-slate-800 mt-0.5">
                       {shs ? shs.overall?.f1.toFixed(4) : '—'}
                     </div>
@@ -385,8 +409,10 @@ const Benchmark = () => {
                 </div>
               </div>
 
-              <div className="mt-4 p-3 bg-amber-50/50 rounded-xl text-[11px] text-amber-900 border border-amber-100">
-                ✓ Novel protein subset retains <strong>0.7900 ROC-AUC</strong>, verifying inductive cold-start transfer.
+              <div className="mt-4 p-3 bg-slate-50 rounded-xl text-sm text-slate-800 border border-slate-200">
+                Pairs with at least one protein the model never trained on: ROC-AUC{' '}
+                <strong>{shs?.at_least_one_novel_protein_subset?.roc_auc != null ? shs.at_least_one_novel_protein_subset.roc_auc.toFixed(4) : '—'}</strong>
+                {' '}(accuracy {shs?.at_least_one_novel_protein_subset?.accuracy != null ? `${(shs.at_least_one_novel_protein_subset.accuracy * 100).toFixed(1)}%` : '—'}).
               </div>
             </div>
 
@@ -397,28 +423,28 @@ const Benchmark = () => {
                   <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-violet-50 text-violet-800 border border-violet-200">
                     Independent Source (Yeast-2-Hybrid)
                   </span>
-                  <span className="text-xs font-mono text-slate-400">{huri?.overall?.n != null ? `${huri.overall.n.toLocaleString()} pairs` : ''}</span>
+                  <span className="text-xs font-mono text-slate-600">{huri?.overall?.n != null ? `${huri.overall.n.toLocaleString()} pairs` : ''}</span>
                 </div>
-                <h4 className="text-lg font-black text-slate-800">HuRI / HI-union (Luck et al. Nature 2020)</h4>
+                <h3 className="text-lg font-bold text-slate-900">HuRI (independent laboratory screen)</h3>
                 <p className="text-xs text-slate-500 mt-2 leading-relaxed">
-                  A genuinely independent-source physical screen (systematic yeast-two-hybrid) not derived from STRING. Tests cross-assay distribution shift.
+                  Interactions measured in a separate, large laboratory experiment (yeast two-hybrid, Luck et al. 2020), not taken from STRING. The hardest test.
                 </p>
 
                 <div className="grid grid-cols-3 gap-2 mt-5">
                   <div className="p-3 bg-slate-50 rounded-xl text-center">
-                    <span className="text-[10px] uppercase font-bold text-slate-400">Accuracy</span>
+                    <span className="text-xs font-bold text-slate-700">Accuracy</span>
                     <div className="text-base font-black text-slate-800 mt-0.5">
                       {huri ? `${(huri.overall?.accuracy * 100).toFixed(1)}%` : '—'}
                     </div>
                   </div>
                   <div className="p-3 bg-slate-50 rounded-xl text-center">
-                    <span className="text-[10px] uppercase font-bold text-slate-400">ROC-AUC</span>
+                    <span className="text-xs font-bold text-slate-700">ROC-AUC</span>
                     <div className="text-base font-black text-violet-700 mt-0.5">
                       {huri ? huri.overall?.roc_auc.toFixed(4) : '—'}
                     </div>
                   </div>
                   <div className="p-3 bg-slate-50 rounded-xl text-center">
-                    <span className="text-[10px] uppercase font-bold text-slate-400">Seen in Train</span>
+                    <span className="text-xs font-bold text-slate-700">Both proteins known</span>
                     <div className="text-base font-black text-slate-800 mt-0.5">
                       {huri ? `${(huri.both_proteins_seen_in_training_subset?.accuracy * 100).toFixed(1)}%` : '—'}
                     </div>
@@ -426,8 +452,10 @@ const Benchmark = () => {
                 </div>
               </div>
 
-              <div className="mt-4 p-3 bg-violet-50/50 rounded-xl text-[11px] text-violet-900 border border-violet-100">
-                ✓ Beats coin-flip (&gt;0.50 AUC) despite biophysical screen vs. co-expression/text-mining assay shift.
+              <div className="mt-4 p-3 bg-amber-50 rounded-xl text-sm text-amber-900 border border-amber-200">
+                Close to guessing: the model called only{' '}
+                <strong>{huri?.overall?.predicted_positive_rate != null ? `${(huri.overall.predicted_positive_rate * 100).toFixed(1)}%` : '—'}</strong>
+                {' '}of these pairs interacting, while half of them really do. It does not yet work well on interactions found by this different lab method.
               </div>
             </div>
           </div>
@@ -438,8 +466,8 @@ const Benchmark = () => {
       {evaluation && (
         <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm space-y-3">
           <div className="flex items-center gap-2">
-            <Database size={16} className="text-slate-400" />
-            <h3 className="text-sm font-black text-slate-700 uppercase tracking-widest">Dataset Provenance & Verification</h3>
+            <Database size={16} className="text-slate-600" />
+            <h2 className="text-base font-bold text-slate-900">Where these numbers come from</h2>
           </div>
           {counts && (
             <p className="text-sm text-slate-600">
@@ -450,7 +478,7 @@ const Benchmark = () => {
           {evaluation.split_design && <p className="text-sm text-slate-600">Split: {evaluation.split_design}</p>}
           {evaluation.protocol && <p className="text-sm text-slate-600">Protocol: {evaluation.protocol}</p>}
           {evaluation.checkpoints && (
-            <p className="text-xs text-slate-400 font-mono break-all">
+            <p className="text-xs text-slate-600 font-mono break-all">
               Verified Checkpoints (sha256):{' '}
               {Object.entries(evaluation.checkpoints)
                 .filter(([, c]) => c)

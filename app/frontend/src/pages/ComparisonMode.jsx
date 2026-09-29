@@ -101,8 +101,8 @@ const ComparisonMode = () => {
           <GitCompare size={28} className="text-white" />
         </div>
         <div>
-          <h1 className="text-3xl font-black text-slate-800 tracking-tight">Comparison Mode</h1>
-          <p className="text-sm text-slate-400 font-medium">Wild Type vs Single-Point Mutant — side-by-side interaction analysis</p>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Normal vs mutant</h1>
+          <p className="text-sm text-slate-600 font-medium">Wild Type vs Single-Point Mutant — side-by-side interaction analysis</p>
         </div>
       </div>
 
@@ -111,14 +111,14 @@ const ComparisonMode = () => {
         <h2 className="text-sm font-black text-slate-600 uppercase tracking-widest mb-6">Configure Comparison</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
           <div>
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Protein A (ENSP ID)</label>
+            <label className="text-xs font-black text-slate-600 uppercase tracking-widest block mb-2">Protein A (ENSP ID)</label>
             <input value={protein1} onChange={e => setProtein1(e.target.value)}
               placeholder="e.g. ENSP00000327694"
               className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-teal-300 outline-none"
             />
           </div>
           <div>
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Protein B (ENSP ID)</label>
+            <label className="text-xs font-black text-slate-600 uppercase tracking-widest block mb-2">Protein B (ENSP ID)</label>
             <input value={protein2} onChange={e => setProtein2(e.target.value)}
               placeholder="e.g. ENSP00000373627"
               className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-teal-300 outline-none"
@@ -132,29 +132,29 @@ const ComparisonMode = () => {
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1.5">Which Protein</label>
-              <select value={mutProtein} onChange={e => setMutProtein(e.target.value)}
+              <label className="text-xs font-black text-slate-500 uppercase tracking-widest block mb-1.5">Which Protein</label>
+              <select aria-label="Choose a protein" value={mutProtein} onChange={e => setMutProtein(e.target.value)}
                 className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-amber-300 outline-none">
                 <option value="1">Protein A</option>
                 <option value="2">Protein B</option>
               </select>
             </div>
             <div>
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1.5">Position</label>
+              <label className="text-xs font-black text-slate-500 uppercase tracking-widest block mb-1.5">Position</label>
               <input type="number" min="1" value={mutPos} onChange={e => setMutPos(e.target.value)}
                 placeholder="e.g. 152"
                 className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-amber-300 outline-none"
               />
             </div>
             <div>
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1.5">Original AA</label>
+              <label className="text-xs font-black text-slate-500 uppercase tracking-widest block mb-1.5">Original AA</label>
               <input maxLength={1} value={mutOrig} onChange={e => setMutOrig(e.target.value)}
                 placeholder="e.g. A"
                 className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold uppercase focus:ring-2 focus:ring-amber-300 outline-none"
               />
             </div>
             <div>
-              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block mb-1.5">Mutant AA</label>
+              <label className="text-xs font-black text-slate-500 uppercase tracking-widest block mb-1.5">Mutant AA</label>
               <input maxLength={1} value={mutAlt} onChange={e => setMutAlt(e.target.value)}
                 placeholder="e.g. V"
                 className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold uppercase focus:ring-2 focus:ring-amber-300 outline-none"
@@ -201,7 +201,7 @@ const ComparisonMode = () => {
                     <CheckCircle size={18} className="text-teal-500" />
                   </div>
                   <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Wild Type</p>
+                    <p className="text-xs font-black text-slate-600 uppercase tracking-widest">Wild Type</p>
                     <p className="text-xl font-black text-teal-600">{wtProb != null ? `${(wtProb*100).toFixed(1)}%` : '—'}</p>
                   </div>
                 </div>
@@ -210,7 +210,7 @@ const ComparisonMode = () => {
                     {delta < 0 ? <TrendingDown size={18} className="text-rose-500" /> : <TrendingUp size={18} className="text-amber-500" />}
                   </div>
                   <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Mutant ({mutOrig}{mutPos}{mutAlt})</p>
+                    <p className="text-xs font-black text-slate-600 uppercase tracking-widest">Mutant ({mutOrig}{mutPos}{mutAlt})</p>
                     <p className={`text-xl font-black ${delta < 0 ? 'text-rose-600' : 'text-amber-600'}`}>
                       {mutProb != null ? `${(mutProb*100).toFixed(1)}%` : '—'}
                     </p>
@@ -221,11 +221,11 @@ const ComparisonMode = () => {
               <div className="flex-1 min-w-[180px]">
                 {delta != null && (
                   <div className={`rounded-2xl p-5 text-center ${delta < -0.05 ? 'bg-rose-50 border border-rose-100' : delta > 0.05 ? 'bg-emerald-50 border border-emerald-100' : 'bg-slate-50 border border-slate-200'}`}>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Δ Impact</p>
+                    <p className="text-xs font-black uppercase tracking-widest text-slate-600 mb-1">Δ Impact</p>
                     <p className={`text-3xl font-black ${delta < 0 ? 'text-rose-600' : delta > 0 ? 'text-emerald-600' : 'text-slate-600'}`}>
                       {delta > 0 ? '+' : ''}{(delta * 100).toFixed(1)}%
                     </p>
-                    <p className="text-[10px] font-bold text-slate-500 mt-1">
+                    <p className="text-xs font-bold text-slate-500 mt-1">
                       {Math.abs(delta) < 0.05 ? '🟡 Neutral' : delta < 0 ? '🔴 Disruptive' : '🟢 Stabilizing'}
                     </p>
                   </div>
@@ -242,7 +242,7 @@ const ComparisonMode = () => {
                 <p className="text-sm text-slate-600">
                   {Math.abs(delta) >= 0.05
                     ? `⚠️ Position ${mutPos} mutation (${mutOrig}→${mutAlt}) shows a significant impact on interaction probability (${delta > 0 ? '+' : ''}${(delta * 100).toFixed(1)}% Δ).`
-                    : `ℹ️ Position ${mutPos} mutation (${mutOrig}→${mutAlt}) shows minimal effect on overall binding affinity (${delta > 0 ? '+' : ''}${(delta * 100).toFixed(1)}% Δ).`}
+                    : `ℹ️ Position ${mutPos} mutation (${mutOrig}→${mutAlt}) shows minimal effect on the predicted interaction (${delta > 0 ? '+' : ''}${(delta * 100).toFixed(1)}% Δ).`}
                 </p>
                 {mutResult.interpretation && (
                   <p className="text-xs text-slate-500 mt-2 italic">Model Interpretation: {mutResult.interpretation}</p>

@@ -6,8 +6,6 @@ import {
   Search, 
   Database, 
   Info, 
-  Download, 
-  Maximize2, 
   ChevronRight, 
   Activity, 
   MapPin, 
@@ -179,10 +177,11 @@ const StructureViewer = () => {
         {/* Left Side: Controls & Meta */}
         <div className="lg:col-span-1 space-y-6">
           <div className="glass-card p-6">
-            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Structure Query</h3>
+            <h1 className="text-xl font-bold text-slate-900 mb-1">3D protein viewer</h1>
+            <p className="text-sm text-slate-700 mb-4">Enter a protein to see its predicted 3D shape (from the AlphaFold database).</p>
             <form onSubmit={handleSearch} className="space-y-4">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={16} />
                 <input 
                   type="text" 
                   value={proteinId}
@@ -221,12 +220,12 @@ const StructureViewer = () => {
                 >
                   <div>
                     <div className="flex items-center justify-between mb-2">
-                      <h4 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                        <Tag size={16} className="text-scientific-primary" />
-                        Identified Target
-                      </h4>
+                      <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                        <Tag size={16} className="text-scientific-primary" aria-hidden="true" />
+                        Protein found
+                      </h2>
                       {metadata.uniprot_id && (
-                        <span className="text-[10px] font-mono px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded font-semibold">
+                        <span className="text-xs font-mono px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded font-semibold">
                           UniProt: {metadata.uniprot_id}
                         </span>
                       )}
@@ -245,7 +244,7 @@ const StructureViewer = () => {
                     <div className="p-3 bg-teal-50 rounded-xl border border-teal-100">
                       <div className="flex items-center gap-2 text-scientific-primary mb-1">
                         <MapPin size={14} />
-                        <span className="text-[10px] font-bold uppercase">Localization</span>
+                        <span className="text-xs font-bold uppercase">Localization</span>
                       </div>
                       <p className="text-xs font-semibold text-slate-700 leading-snug">
                         {metadata.localization || metadata.subcellular_location || "Unknown"}
@@ -255,7 +254,7 @@ const StructureViewer = () => {
                     <div className="p-3 bg-purple-50 rounded-xl border border-purple-100">
                       <div className="flex items-center gap-2 text-scientific-accent mb-1">
                         <Activity size={14} />
-                        <span className="text-[10px] font-bold uppercase">Pathways & Processes</span>
+                        <span className="text-xs font-bold uppercase">Pathways & Processes</span>
                       </div>
                       <p className="text-xs font-semibold text-slate-700 leading-snug">
                         {metadata.pathways || metadata.biological_process || "Cellular Signaling / Unclassified"}
@@ -263,7 +262,7 @@ const StructureViewer = () => {
                     </div>
                   </div>
 
-                  <div className="pt-4 border-t border-slate-100 flex justify-between items-center text-[10px] font-bold text-slate-400">
+                  <div className="pt-4 border-t border-slate-100 flex justify-between items-center text-xs font-bold text-slate-600">
                      <span>SOURCE: ALPHAFOLD DB</span>
                      {metadata.uniprot_id && (
                        <a 
@@ -290,15 +289,6 @@ const StructureViewer = () => {
                   3D INTERACTIVE RENDER
                </div>
             </div>
-            
-            <div className="absolute top-6 right-6 z-20 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-               <button className="p-2 bg-white shadow-sm border border-slate-200 rounded-lg text-slate-600 hover:text-scientific-primary">
-                  <Maximize2 size={18} />
-               </button>
-               <button className="p-2 bg-white shadow-sm border border-slate-200 rounded-lg text-slate-600 hover:text-scientific-primary">
-                  <Download size={18} />
-               </button>
-            </div>
 
             <div 
               ref={viewerContainerRef} 
@@ -306,7 +296,7 @@ const StructureViewer = () => {
               style={{ position: 'relative' }}
             />
             {viewerLoading && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-xs font-bold text-slate-400" role="status">
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none text-xs font-bold text-slate-600" role="status">
                 Loading 3D viewer…
               </div>
             )}
@@ -314,7 +304,7 @@ const StructureViewer = () => {
             {!metadata && !loading && (
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                  <Database size={48} className="text-slate-100 mb-4" />
-                 <p className="text-slate-300 font-bold uppercase tracking-widest text-sm">Waiting for selection</p>
+                 <p className="text-slate-500 font-bold uppercase tracking-widest text-sm">Waiting for selection</p>
               </div>
             )}
           </div>
@@ -323,7 +313,7 @@ const StructureViewer = () => {
              {['Rotate', 'Zoom', 'Pan', 'Highlight'].map(action => (
                 <div key={action} className="glass-card p-4 flex items-center justify-between group cursor-default">
                    <span className="text-xs font-bold text-slate-500 uppercase tracking-tighter">{action}</span>
-                   <div className="w-8 h-8 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 group-hover:text-scientific-primary transition-colors">
+                   <div className="w-8 h-8 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-600 group-hover:text-scientific-primary transition-colors">
                       <Info size={14} />
                    </div>
                 </div>

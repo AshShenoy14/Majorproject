@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import {
   Filter,
   Search,
@@ -10,8 +9,7 @@ import {
   AlertCircle,
   Loader2,
   Award,
-  Info,
-  Sparkles
+  Info
 } from 'lucide-react';
 import {
   BarChart,
@@ -21,6 +19,7 @@ import {
   Cell
 } from 'recharts';
 import { ppiService } from '../services/api';
+import { TechOnly } from '../components/TechDetails';
 
 const DrugInsights = () => {
   const [searchParams] = useSearchParams();
@@ -97,91 +96,66 @@ const DrugInsights = () => {
         </div>
       )}
 
-      {/* Explanatory Guide Banner */}
-      <div className="bg-slate-900 border border-emerald-500/30 text-slate-200 p-6 rounded-[2rem] flex items-start gap-4 shadow-xl">
-        <div className="p-3 bg-emerald-500/20 rounded-2xl text-emerald-400 font-black text-xs uppercase tracking-widest shrink-0 flex items-center gap-1.5">
-          <Sparkles size={16} />
-          TTPS Scoring
-        </div>
-        <div className="space-y-2 text-xs leading-relaxed flex-1">
-          <h4 className="font-bold text-white text-sm">Computational Therapeutic Target Priority Score (TTPS)</h4>
-          <p className="text-slate-300">
-            TransGraph prioritizes disease targets by integrating topological hubness with verified drug evidence:
-            <code className="bg-slate-800 text-emerald-300 px-2 py-0.5 rounded text-[11px] font-mono ml-2">
-              TTPS = 0.40 × NormDegree + 0.35 × NormBetweenness + 0.25 × ChEMBL_Target
-            </code>
-          </p>
-          <div className="flex flex-wrap gap-4 text-[11px] text-slate-400 pt-1">
-            <span><strong className="text-emerald-400">NormDegree (0.40):</strong> Direct interactome connections</span>
-            <span><strong className="text-teal-400">NormBetweenness (0.35):</strong> Bottleneck traffic control</span>
-            <span><strong className="text-purple-400">ChEMBL Target (0.25):</strong> Existing drug evidence</span>
-          </div>
+      <header className="space-y-2">
+        <h1 className="text-3xl font-black text-slate-900">Drug targets</h1>
+        <p className="text-lg text-slate-700 max-w-3xl">
+          Which proteins could be good targets for medicines? Proteins that sit at the centre of the protein network
+          often matter most to the cell, so we rank them by how central they are and whether a medicine already targets them.
+        </p>
+      </header>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <section aria-labelledby="ranking-heading" className="lg:col-span-2 glass-card p-8 bg-white space-y-4">
+          <h2 id="ranking-heading" className="text-xl font-bold text-slate-900 flex items-center gap-2">
+            <Award size={22} className="text-emerald-700" aria-hidden="true" /> How the ranking works
+          </h2>
+          <p className="text-slate-700">Each protein gets a <strong>priority score from 0 to 1</strong>, built from three clues:</p>
+          <ul className="grid sm:grid-cols-3 gap-3 text-sm">
+            <li className="p-3 rounded-xl bg-emerald-50 border border-emerald-200"><strong className="block text-emerald-900">40% · Connections</strong><span className="text-slate-700">How many partners it has in the network.</span></li>
+            <li className="p-3 rounded-xl bg-teal-50 border border-teal-200"><strong className="block text-teal-900">35% · Bridge role</strong><span className="text-slate-700">How often it links other proteins together.</span></li>
+            <li className="p-3 rounded-xl bg-purple-50 border border-purple-200"><strong className="block text-purple-900">25% · Drug record</strong><span className="text-slate-700">Whether the ChEMBL drug database lists it as a target.</span></li>
+          </ul>
           {networkStats && (
-            <div className="text-[11px] text-slate-300 border-t border-slate-800 pt-2">
+            <p className="text-sm text-slate-700">
               {networkStats.network === 'predicted' ? (
-                <span>
-                  <strong className="text-sky-300">Predicted network:</strong>{' '}
-                  {networkStats.known_edges?.toLocaleString()} known interactions +{' '}
-                  {networkStats.predicted_edges?.toLocaleString()} interactions predicted by the ensemble on held-out pairs
-                  ({networkStats.predicted_edges_confirmed_by_string?.toLocaleString()} confirmed by STRING,{' '}
-                  {networkStats.predicted_edges_not_in_string?.toLocaleString()} candidate new interactions)
-                  across {networkStats.num_nodes?.toLocaleString()} proteins.
-                </span>
+                <>Network used: the <strong>{networkStats.known_edges?.toLocaleString()}</strong> known interactions plus <strong>{networkStats.predicted_edges?.toLocaleString()}</strong> new ones predicted by our model ({networkStats.num_nodes?.toLocaleString()} proteins).</>
               ) : (
-                <span>
-                  <strong className="text-sky-300">Known network:</strong>{' '}
-                  {networkStats.num_edges?.toLocaleString()} training interactions across {networkStats.num_nodes?.toLocaleString()} proteins.
-                  {network === 'predicted' && !networkStats.predicted_network_available && ' (Predicted network not built yet: run scripts/build_predicted_network.py.)'}
-                </span>
+                <>Network used: the <strong>{networkStats.num_edges?.toLocaleString()}</strong> known interactions only ({networkStats.num_nodes?.toLocaleString()} proteins).
+                  {network === 'predicted' && !networkStats.predicted_network_available && ' (Predicted network not built yet: run scripts/build_predicted_network.py.)'}</>
+              )}
+            </p>
+          )}
+          <TechOnly>
+            <div className="text-sm text-slate-800 bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-1">
+              <p><strong>Technical:</strong> Therapeutic Target Priority Score <code className="font-mono">TTPS = 0.40 × NormDegree + 0.35 × NormBetweenness + 0.25 × ChEMBL</code> (min-max normalized degree and betweenness centrality).</p>
+              {networkStats?.network === 'predicted' && (
+                <p>Predicted network = training positives + held-out pairs the ensemble scores above the validation threshold; {networkStats.predicted_edges_confirmed_by_string?.toLocaleString()} of the predicted edges are STRING interactions and {networkStats.predicted_edges_not_in_string?.toLocaleString()} are not.</p>
               )}
             </div>
-          )}
-          <div className="mt-2 text-[10px] text-amber-300/90 font-medium flex items-center gap-1.5 border-t border-slate-800 pt-2">
-            <Info size={12} className="shrink-0" />
-            <span>Note: TTPS is a computational prioritization metric derived from graph topology and biological database cross-referencing to guide candidate selection. Downstream experimental validation is required.</span>
+          </TechOnly>
+          <p className="text-sm text-amber-900 bg-amber-50 border border-amber-200 rounded-xl p-3 flex gap-2">
+            <Info size={16} className="shrink-0 mt-0.5" aria-hidden="true" />
+            A high score means "worth studying first". It does not prove a protein is a good drug target; that needs laboratory work.
+          </p>
+          <div className="flex gap-4 pt-1">
+            <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 min-w-[140px]">
+              <p className="text-3xl font-black text-emerald-900">{loading ? '…' : verifiedCount}</p>
+              <p className="text-sm font-semibold text-emerald-900">have a drug record</p>
+            </div>
+            <div className="p-4 rounded-2xl bg-purple-50 border border-purple-200 min-w-[140px]">
+              <p className="text-3xl font-black text-purple-900">{loading ? '…' : novelCount}</p>
+              <p className="text-sm font-semibold text-purple-900">high score, no drug record yet</p>
+            </div>
           </div>
-        </div>
-      </div>
-
-      {/* Header & Summary Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 glass-card p-10 bg-scientific-gradient text-white flex justify-between items-center relative overflow-hidden shadow-2xl shadow-emerald-200">
-           <div className="relative z-10 space-y-4">
-              <div className="flex items-center gap-4">
-                 <div className="p-3 bg-white/20 backdrop-blur-md rounded-2xl">
-                    <Award size={28} />
-                 </div>
-                 <div>
-                    <h2 className="text-3xl font-black tracking-tight leading-none">Therapeutic <span className="font-cursive text-emerald-100">Prioritization</span></h2>
-                    <p className="text-[10px] font-black uppercase tracking-[0.4em] text-emerald-200/60 mt-1">Computational Target Ranking</p>
-                 </div>
-              </div>
-              <p className="text-emerald-50/90 max-w-md text-sm font-medium leading-relaxed">
-                 Identify high-priority target candidates combining topological centrality in the PPI interactome with ChEMBL drug cross-referencing.
-              </p>
-           </div>
-           <div className="relative z-10 flex gap-4">
-              <div className="text-center p-5 bg-white/10 backdrop-blur-xl rounded-[2rem] border border-white/20 min-w-[110px] shadow-xl">
-                 <p className="text-3xl font-black">{loading ? '...' : verifiedCount}</p>
-                 <p className="text-[9px] font-black uppercase tracking-widest text-emerald-200">Verified Targets</p>
-              </div>
-              <div className="text-center p-5 bg-emerald-400/30 backdrop-blur-xl rounded-[2rem] border border-white/20 min-w-[110px] shadow-xl">
-                 <p className="text-3xl font-black">{loading ? '...' : novelCount}</p>
-                 <p className="text-[9px] font-black uppercase tracking-widest text-emerald-200">Novel Leads</p>
-              </div>
-           </div>
-           {/* Decorative elements */}
-           <div className="absolute -right-16 -top-16 w-64 h-64 rounded-full bg-white/10 blur-3xl" />
-           <div className="absolute -right-8 -bottom-8 w-32 h-32 rounded-full bg-emerald-400/10 blur-2xl" />
-        </div>
+        </section>
 
         <div className="glass-card p-6 flex flex-col justify-center">
            <div className="flex items-center justify-between mb-4 text-slate-800">
               <div className="flex items-center gap-2">
-                 <TrendingUp size={20} className="text-scientific-primary" />
-                 <h3 className="text-sm font-bold uppercase tracking-widest">Top TTPS Targets</h3>
+                 <TrendingUp size={20} className="text-emerald-700" aria-hidden="true" />
+                 <h2 className="text-base font-bold">Top 8 scores</h2>
               </div>
-              <span className="text-[10px] font-black text-slate-400">Mean: {avgTtps}</span>
+              <span className="text-xs font-semibold text-slate-600">Average: {avgTtps}</span>
            </div>
            <div className="h-40">
               {loading ? (
@@ -202,8 +176,8 @@ const DrugInsights = () => {
                           return (
                              <div className="bg-slate-900 text-white p-2 rounded text-xs shadow-lg border border-slate-700">
                                 <p className="font-bold">{d.name}</p>
-                                <p className="text-emerald-400">TTPS Score: {d.score}%</p>
-                                <p className="text-slate-400 text-[10px]">{d.isVerified ? 'ChEMBL Verified' : 'Novel Lead Candidate'}</p>
+                                <p className="text-emerald-300">Score: {d.score}%</p>
+                                <p className="text-slate-300 text-xs">{d.isVerified ? 'Has a drug record' : 'No drug record yet'}</p>
                              </div>
                           );
                        }} />
@@ -211,9 +185,9 @@ const DrugInsights = () => {
                  </ResponsiveContainer>
               )}
            </div>
-           <div className="mt-4 flex items-center justify-between text-[10px] text-slate-400 font-medium">
-              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 bg-teal-600 rounded-sm inline-block" /> Verified</span>
-              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 bg-purple-600 rounded-sm inline-block" /> Novel Lead</span>
+           <div className="mt-4 flex items-center justify-between text-xs text-slate-700 font-medium">
+              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 bg-teal-600 rounded-sm inline-block" aria-hidden="true" /> Has drug record</span>
+              <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 bg-purple-600 rounded-sm inline-block" aria-hidden="true" /> No drug record yet</span>
            </div>
         </div>
       </div>
@@ -221,10 +195,11 @@ const DrugInsights = () => {
       {/* Filter & Search Bar */}
       <div className="glass-card p-4 flex flex-col md:flex-row gap-4 items-center justify-between">
         <div className="flex items-center gap-2 w-full md:w-96 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-          <input 
-            type="text" 
-            placeholder="Search Protein ID, UniProt, ChEMBL..." 
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} aria-hidden="true" />
+          <input
+            type="text"
+            aria-label="Search proteins"
+            placeholder="Search by name, protein ID or UniProt ID"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-scientific-primary outline-none transition-all text-sm"
@@ -233,14 +208,14 @@ const DrugInsights = () => {
 
         <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl shrink-0" role="group" aria-label="Interaction network">
           {[
-            { id: 'predicted', label: 'Predicted Network' },
-            { id: 'known', label: 'Known Network' },
+            { id: 'predicted', label: 'Include predicted interactions' },
+            { id: 'known', label: 'Known interactions only' },
           ].map(n => (
             <button
               key={n.id}
               onClick={() => setNetwork(n.id)}
               aria-pressed={network === n.id}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${network === n.id ? 'bg-white text-scientific-primary shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${network === n.id ? 'bg-white text-emerald-800 shadow-sm' : 'text-slate-700 hover:text-slate-900'}`}
             >
               {n.label}
             </button>
@@ -248,17 +223,18 @@ const DrugInsights = () => {
         </div>
 
         <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0">
-           <Filter size={18} className="text-slate-400 mr-2" />
+           <Filter size={18} className="text-slate-500 mr-2" aria-hidden="true" />
            {[
-             { id: 'all', label: 'All Candidates' },
-             { id: 'verified', label: 'ChEMBL Verified' },
-             { id: 'novel', label: 'Novel Candidates' },
-             { id: 'high_priority', label: 'High Priority (TTPS ≥ 0.40)' }
+             { id: 'all', label: 'All' },
+             { id: 'verified', label: 'Has drug record' },
+             { id: 'novel', label: 'No drug record yet' },
+             { id: 'high_priority', label: 'High priority (score ≥ 0.40)' }
            ].map(f => (
              <button
                key={f.id}
                onClick={() => setFilter(f.id)}
-               className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${filter === f.id ? 'bg-scientific-primary text-white shadow-md' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+               aria-pressed={filter === f.id}
+               className={`px-4 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${filter === f.id ? 'bg-emerald-700 text-white shadow-md' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
              >
                {f.label}
              </button>
@@ -272,15 +248,15 @@ const DrugInsights = () => {
           <table className="w-full text-left">
             <thead>
               <tr className="bg-slate-50 border-b border-slate-100">
-                <th className="px-6 py-5 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Rank & ID</th>
-                <th className="px-6 py-5 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">TTPS Priority Score</th>
-                <th className="px-6 py-5 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Degree (Norm)</th>
-                <th className="px-6 py-5 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Betweenness (Norm)</th>
+                <th scope="col" className="px-6 py-4 text-xs font-bold text-slate-700">Protein</th>
+                <th scope="col" className="px-6 py-4 text-xs font-bold text-slate-700">Priority score</th>
+                <th scope="col" className="px-6 py-4 text-xs font-bold text-slate-700">Connections</th>
+                <th scope="col" className="px-6 py-4 text-xs font-bold text-slate-700">Bridge role</th>
                 {network === 'predicted' && (
-                  <th className="px-6 py-5 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]" title="Interactions of this protein predicted by the ensemble on held-out pairs">Predicted Edges</th>
+                  <th scope="col" className="px-6 py-4 text-xs font-bold text-slate-700" title="Interactions of this protein that our model predicted">New predicted partners</th>
                 )}
-                <th className="px-6 py-5 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">ChEMBL Status</th>
-                <th className="px-6 py-5 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Action</th>
+                <th scope="col" className="px-6 py-4 text-xs font-bold text-slate-700">Drug record</th>
+                <th scope="col" className="px-6 py-4 text-xs font-bold text-slate-700">Link</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -289,15 +265,12 @@ const DrugInsights = () => {
                   <td colSpan={network === 'predicted' ? 7 : 6} className="px-6 py-12 text-center">
                     <div className="flex flex-col items-center gap-3">
                        <Loader2 className="animate-spin text-scientific-primary" size={32} />
-                       <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Computing Target Priority Scores...</p>
+                       <p className="text-sm font-semibold text-slate-700">Calculating scores… this can take up to half a minute the first time.</p>
                     </div>
                   </td>
                 </tr>
-              ) : filteredData.map((item, i) => (
-                <motion.tr 
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: i * 0.03 }}
+              ) : filteredData.map((item) => (
+                <tr
                   key={item.protein_id} 
                   className="hover:bg-slate-50/50 transition-colors group"
                 >
@@ -307,8 +280,9 @@ const DrugInsights = () => {
                           #{item.rank}
                        </span>
                        <div className="flex flex-col">
-                          <span className="text-sm font-bold text-slate-700">{item.protein_id}</span>
-                          <span className="text-[10px] text-slate-400 font-medium">UniProt: {item.uniprot_id || 'N/A'}</span>
+                          {item.target_name && <span className="text-sm font-bold text-slate-900">{item.target_name}</span>}
+                          <span className="text-xs font-mono text-slate-700">{item.protein_id}</span>
+                          <span className="text-xs text-slate-600">UniProt: {item.uniprot_id || 'N/A'}</span>
                        </div>
                     </div>
                   </td>
@@ -336,7 +310,7 @@ const DrugInsights = () => {
                       <div className="flex flex-col">
                         <span className="text-xs font-semibold text-slate-600 font-mono">{item.predicted_interactions ?? 0}</span>
                         {(item.novel_predicted_interactions ?? 0) > 0 && (
-                          <span className="text-[10px] text-sky-600 font-medium">{item.novel_predicted_interactions} not in STRING</span>
+                          <span className="text-xs text-sky-800 font-medium">{item.novel_predicted_interactions} new (not in STRING)</span>
                         )}
                       </div>
                     </td>
@@ -345,7 +319,7 @@ const DrugInsights = () => {
                     {item.is_chembl_target ? (
                       <div className="flex flex-col gap-1">
                         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-green-50 text-green-700 text-[10px] font-bold border border-green-200 shrink-0 w-fit">
-                          <CheckCircle2 size={11} /> VERIFIED TARGET
+                          <CheckCircle2 size={11} aria-hidden="true" /> Has drug record
                         </span>
                         {item.chembl_id && (
                           <span className="text-[10px] text-slate-400 font-mono">{item.chembl_id}</span>
@@ -353,7 +327,7 @@ const DrugInsights = () => {
                       </div>
                     ) : (
                       <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-purple-50 text-purple-700 text-[10px] font-bold border border-purple-200 shrink-0 w-fit">
-                        <AlertCircle size={11} /> NOVEL CANDIDATE
+                        <AlertCircle size={11} aria-hidden="true" /> No drug record yet
                       </span>
                     )}
                   </td>
@@ -364,7 +338,7 @@ const DrugInsights = () => {
                         target="_blank" 
                         rel="noopener noreferrer"
                         className="p-2 text-slate-400 hover:text-scientific-primary hover:bg-scientific-primary/10 rounded-lg transition-all inline-block"
-                        title="View on ChEMBL"
+                        title="View on ChEMBL" aria-label={`View ${item.chembl_id} on ChEMBL`}
                       >
                          <ExternalLink size={16} />
                       </a>
@@ -372,7 +346,7 @@ const DrugInsights = () => {
                       <span className="text-xs text-slate-300">—</span>
                     )}
                   </td>
-                </motion.tr>
+                </tr>
               ))}
             </tbody>
           </table>
@@ -380,9 +354,9 @@ const DrugInsights = () => {
         {!loading && filteredData.length === 0 && (
           <div className="p-12 text-center space-y-4">
              <Search size={48} className="text-slate-200 mx-auto" />
-             <p className="text-slate-400 font-bold uppercase tracking-widest">No target matches found</p>
+             <p className="text-slate-700 font-semibold">No protein matches your search.</p>
              <button onClick={() => {setSearchQuery(''); setFilter('all');}} className="text-scientific-primary text-xs font-bold hover:underline">
-                RESET ALL FILTERS
+                Clear search and filters
              </button>
           </div>
         )}

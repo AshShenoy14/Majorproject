@@ -102,7 +102,7 @@ const FloatingGuide = () => {
                       <Dna size={16} /> 2. Mutation Analysis
                     </div>
                     <p className="text-xs text-slate-500 leading-normal">
-                      Simulate single-point amino acid mutations in silico to evaluate binding affinity gains or disruptions.
+                      Change single amino acids and see whether the predicted interaction gets stronger or weaker.
                     </p>
                     <Link
                       to="/mutation"

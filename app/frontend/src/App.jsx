@@ -1,7 +1,9 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { MotionConfig } from 'framer-motion';
 import Layout from './components/Layout';
 import ProteinPreloader from './components/ProteinPreloader';
+import { TechDetailsProvider } from './components/TechDetails';
 
 // Primary pages loaded eagerly for instant navigation
 import Home from './pages/Home';
@@ -18,6 +20,7 @@ const About = lazy(() => import('./pages/About'));
 const Benchmark = lazy(() => import('./pages/Benchmark'));
 const ComparisonMode = lazy(() => import('./pages/ComparisonMode'));
 const CrossSpeciesTesting = lazy(() => import('./pages/CrossSpeciesTesting'));
+const HowItWorks = lazy(() => import('./pages/HowItWorks'));
 
 function App() {
     const [loading, setLoading] = useState(() => {
@@ -60,12 +63,14 @@ function App() {
             
             {!loading && (
                 <div className="content-fade-in">
+                    <MotionConfig reducedMotion="user">
+                    <TechDetailsProvider>
                     <Router>
                         <Layout>
                             <Suspense fallback={
                                 <div className="flex flex-col items-center justify-center min-h-[350px] text-slate-500">
                                     <div className="w-8 h-8 rounded-full border-2 border-cyan-500 border-t-transparent animate-spin mb-3" />
-                                    <span className="text-xs font-semibold tracking-wide uppercase text-slate-400">Loading module...</span>
+                                    <span className="text-sm font-semibold text-slate-600">Loading page...</span>
                                 </div>
                             }>
                                 <Routes>
@@ -78,6 +83,7 @@ function App() {
                                     <Route path="/drug-targets" element={<DrugInsights />} />
                                     <Route path="/assistant" element={<Assistant />} />
                                     <Route path="/about" element={<About />} />
+                                    <Route path="/how-it-works" element={<HowItWorks />} />
                                     <Route path="/zero-shot" element={<CrossSpeciesTesting />} />
                                     <Route path="/benchmark" element={<Benchmark />} />
                                     <Route path="/compare" element={<ComparisonMode />} />
@@ -85,6 +91,8 @@ function App() {
                             </Suspense>
                         </Layout>
                     </Router>
+                    </TechDetailsProvider>
+                    </MotionConfig>
                 </div>
             )}
         </>

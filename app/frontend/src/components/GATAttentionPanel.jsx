@@ -19,11 +19,11 @@ const StarDiagram = ({ title, info, entries, sharedIds, uniformWeight }) => {
   return (
     <div className="flex-1 min-w-[260px] bg-slate-50 border border-slate-100 rounded-2xl p-4">
       <div className="flex items-baseline justify-between gap-2 mb-1">
-        <h5 className="text-sm font-black text-slate-800">{title}</h5>
-        <span className="text-[10px] font-mono text-slate-400">{info.num_neighbors} neighbours</span>
+        <h4 className="text-sm font-black text-slate-800">{title}</h4>
+        <span className="text-xs font-mono text-slate-600">{info.num_neighbors} neighbours</span>
       </div>
       {info.surrogate && (
-        <p className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1 mb-2">
+        <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1 mb-2">
           Not in the training graph: shown via its most similar graph protein ({info.uniprot_id}).
         </p>
       )}
@@ -43,7 +43,7 @@ const StarDiagram = ({ title, info, entries, sharedIds, uniformWeight }) => {
               <line x1={CENTER} y1={CENTER} x2={x} y2={y} className={stroke}
                 strokeWidth={1 + 9 * (e.weight / maxW)} strokeOpacity={0.35 + 0.6 * (e.weight / maxW)} strokeLinecap="round" />
               <circle cx={x} cy={y} r={11} className={fill} />
-              <text x={x} y={y + (y > CENTER ? 24 : -16)} textAnchor="middle" className="fill-slate-600 text-[9px] font-mono">
+              <text x={x} y={y + (y > CENTER ? 24 : -16)} textAnchor="middle" className="fill-slate-600 text-[11px] font-mono">
                 {short(e.uniprot_id)}
               </text>
             </g>
@@ -56,7 +56,7 @@ const StarDiagram = ({ title, info, entries, sharedIds, uniformWeight }) => {
       </svg>
       <table className="w-full text-[11px] mt-2">
         <thead>
-          <tr className="text-slate-400 text-left">
+          <tr className="text-slate-600 text-left">
             <th className="font-bold py-1">Neighbour</th>
             <th className="font-bold py-1 text-right">Weight</th>
             <th className="font-bold py-1 text-right" title="Weight relative to an even split over all neighbours">Lift</th>
@@ -67,8 +67,8 @@ const StarDiagram = ({ title, info, entries, sharedIds, uniformWeight }) => {
             <tr key={e.protein_id} className="border-t border-slate-100">
               <td className="py-1 font-mono text-slate-700">
                 {e.uniprot_id}
-                {e.is_partner && <span className="ml-1 text-[9px] font-bold text-amber-600">PARTNER</span>}
-                {!e.is_partner && sharedIds.has(e.protein_id) && <span className="ml-1 text-[9px] font-bold text-violet-600">SHARED</span>}
+                {e.is_partner && <span className="ml-1 text-[11px] font-bold text-amber-600">PARTNER</span>}
+                {!e.is_partner && sharedIds.has(e.protein_id) && <span className="ml-1 text-[11px] font-bold text-violet-600">SHARED</span>}
               </td>
               <td className="py-1 text-right font-mono text-slate-700">{(e.weight * 100).toFixed(1)}%</td>
               <td className="py-1 text-right font-mono text-slate-500">{e.lift.toFixed(1)}×</td>
@@ -76,7 +76,7 @@ const StarDiagram = ({ title, info, entries, sharedIds, uniformWeight }) => {
           ))}
         </tbody>
       </table>
-      <p className="text-[10px] text-slate-400 mt-2">
+      <p className="text-xs text-slate-600 mt-2">
         Self-attention: {self ? `${(self.weight * 100).toFixed(1)}%` : 'n/a'} · even split: {(uniformWeight * 100).toFixed(1)}%
       </p>
     </div>
@@ -92,9 +92,9 @@ const GATAttentionPanel = ({ attention }) => {
     <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h4 className="text-base font-black text-slate-800 flex items-center gap-2">
+          <h3 className="text-base font-black text-slate-800 flex items-center gap-2">
             <Eye size={18} className="text-violet-600" /> GAT Attention: where the graph model looked
-          </h4>
+          </h3>
           <p className="text-xs text-slate-500 mt-1 max-w-2xl">
             Graph neighbours each protein's GAT encoding attended to most (averaged over 4 attention heads).
             Thicker spokes mean more attention.
@@ -103,7 +103,7 @@ const GATAttentionPanel = ({ attention }) => {
         <div className="flex items-center gap-1 p-1 bg-slate-100 rounded-xl" role="group" aria-label="GAT layer">
           {attention.layers.map((l, i) => (
             <button key={l.layer} onClick={() => setLayerIdx(i)} aria-pressed={i === layerIdx}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${i === layerIdx ? 'bg-white text-violet-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${i === layerIdx ? 'bg-white text-violet-700 shadow-sm' : 'text-slate-700 hover:text-slate-900'}`}>
               Layer {l.layer}
             </button>
           ))}
@@ -117,18 +117,18 @@ const GATAttentionPanel = ({ attention }) => {
           sharedIds={sharedIds} uniformWeight={layer.protein2_uniform_weight} />
       </div>
 
-      <div className="flex flex-wrap items-center gap-4 text-[10px] text-slate-500">
+      <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
         <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" /> Interaction partner</span>
         <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-violet-400 inline-block" /> Neighbour of both proteins</span>
         <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-teal-400 inline-block" /> Other neighbour</span>
       </div>
 
       <div>
-        <h5 className="text-xs font-black text-slate-700 uppercase tracking-widest mb-2">
+        <h4 className="text-sm font-bold text-slate-800 mb-2">
           Shared neighbours ({layer.num_shared})
-        </h5>
+        </h4>
         {layer.shared.length === 0 ? (
-          <p className="text-xs text-slate-400">The two proteins have no graph neighbours in common.</p>
+          <p className="text-xs text-slate-600">The two proteins have no graph neighbours in common.</p>
         ) : (
           <div className="flex flex-wrap gap-2">
             {layer.shared.map(s => (
@@ -141,7 +141,7 @@ const GATAttentionPanel = ({ attention }) => {
         )}
       </div>
 
-      <p className="text-[10px] text-slate-400 flex items-start gap-1.5 border-t border-slate-100 pt-3">
+      <p className="text-xs text-slate-600 flex items-start gap-1.5 border-t border-slate-100 pt-3">
         <Info size={12} className="shrink-0 mt-0.5" />
         {attention.method} Attention shows what the graph encoder weighted, not a causal explanation of the final ensemble score (see SHAP above).
       </p>

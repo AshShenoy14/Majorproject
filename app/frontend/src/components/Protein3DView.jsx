@@ -72,9 +72,15 @@ const Protein3DView = ({ pdbId, label, selectedResidue, interactionRegion, fallb
     };
 
     const container = viewerContainerRef.current;
+    // Mol* injects an unlabelled logo link; give it an accessible name
+    const observer = container ? new MutationObserver(() => {
+      container.querySelectorAll('a.msp-logo:not([aria-label])').forEach(el => el.setAttribute('aria-label', 'Mol* viewer website'));
+    }) : null;
+    observer?.observe(container, { childList: true, subtree: true });
     loadViewer();
 
     return () => {
+      observer?.disconnect();
       isMounted = false;
       if (container) {
         container.innerHTML = '';

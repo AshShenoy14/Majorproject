@@ -247,18 +247,18 @@ const Assistant = () => {
             <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-400 rounded-full border-2 border-white" />
           </div>
           <div>
-            <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+            <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
               Protein Discovery Assistant
               <Sparkles size={16} className="text-amber-400" />
-            </h2>
-            <p className="text-xs text-slate-400 font-medium">
+            </h1>
+            <p className="text-xs text-slate-600 font-medium">
               Ask about proteins, diseases, drug targets & biology
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 rounded-full border border-emerald-100">
           <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
-          <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Online</span>
+          <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider">Online</span>
         </div>
       </div>
 
@@ -271,21 +271,21 @@ const Assistant = () => {
         >
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1">
-              <p className="text-[10px] font-black text-teal-600 uppercase tracking-widest mb-1.5">
+              <p className="text-xs font-black text-teal-600 uppercase tracking-widest mb-1.5">
                 🔬 Prediction Context Loaded
               </p>
               <p className="text-xs text-teal-800 font-medium">
                 <span className="font-mono">{predictionContext.p1}</span>
                 <span className="mx-2 text-teal-400">↔</span>
                 <span className="font-mono">{predictionContext.p2}</span>
-                <span className="ml-3 px-2 py-0.5 bg-teal-100 text-teal-700 rounded-full text-[9px] font-black">
+                <span className="ml-3 px-2 py-0.5 bg-teal-100 text-teal-700 rounded-full text-[11px] font-black">
                   {(predictionContext.prob * 100).toFixed(1)}% interaction
                 </span>
               </p>
             </div>
             <button
               onClick={() => { setPredictionContext(null); localStorage.removeItem('transgraph_last_prediction'); }}
-              className="text-teal-400 hover:text-teal-600 text-[10px] font-bold uppercase tracking-wider"
+              className="text-teal-400 hover:text-teal-600 text-xs font-bold uppercase tracking-wider"
             >
               Clear
             </button>
@@ -298,7 +298,7 @@ const Assistant = () => {
               `Explain the biological significance of this pair.`
             ].map((s, i) => (
               <button key={i} onClick={() => handleSend(s)}
-                className="px-2.5 py-1 bg-teal-100 hover:bg-teal-200 text-teal-700 rounded-lg text-[9px] font-bold transition-all cursor-pointer">
+                className="px-2.5 py-1 bg-teal-100 hover:bg-teal-200 text-teal-700 rounded-lg text-[11px] font-bold transition-all cursor-pointer">
                 {s}
               </button>
             ))}
@@ -345,9 +345,9 @@ const Assistant = () => {
                 {/* Sources */}
                 {msg.sources && msg.sources.length > 0 && (
                   <div className="flex items-center gap-2 mt-2 ml-2 flex-wrap">
-                    <BookOpen size={10} className="text-slate-300" />
+                    <BookOpen size={10} className="text-slate-500" />
                     {msg.sources.map((src, i) => (
-                      <span key={i} className="text-[9px] font-medium text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100">
+                      <span key={i} className="text-[11px] font-medium text-slate-600 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100">
                         {src}
                       </span>
                     ))}
@@ -355,7 +355,7 @@ const Assistant = () => {
                 )}
 
                 {/* Timestamp */}
-                <p className={`text-[9px] mt-1.5 font-medium ${msg.type === 'user' ? 'text-right text-slate-400' : 'text-slate-300 ml-2'}`}>
+                <p className={`text-[11px] mt-1.5 font-medium ${msg.type === 'user' ? 'text-right text-slate-600' : 'text-slate-500 ml-2'}`}>
                   {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </p>
               </div>
@@ -384,7 +384,7 @@ const Assistant = () => {
             <div className="bg-white border border-slate-100 shadow-sm rounded-2xl px-5 py-4">
               <div className="flex items-center gap-2">
                 <Loader2 size={14} className="animate-spin text-violet-500" />
-                <span className="text-xs text-slate-400 font-medium">Searching knowledge base...</span>
+                <span className="text-xs text-slate-600 font-medium">Searching knowledge base...</span>
               </div>
             </div>
           </motion.div>
@@ -413,7 +413,7 @@ const Assistant = () => {
               >
                 {getTopicIcon(s)}
                 <span>{s}</span>
-                <ChevronRight size={12} className="text-slate-300 group-hover:text-violet-400 group-hover:translate-x-0.5 transition-all" />
+                <ChevronRight size={12} className="text-slate-500 group-hover:text-violet-400 group-hover:translate-x-0.5 transition-all" />
               </motion.button>
             ))}
           </motion.div>
@@ -430,11 +430,11 @@ const Assistant = () => {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Ask about any protein, disease, or biology concept..."
-            className="w-full pl-4 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-300 focus:border-violet-300 outline-none transition-all text-sm placeholder:text-slate-300"
+            className="w-full pl-4 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-violet-300 focus:border-violet-300 outline-none transition-all text-sm placeholder:text-slate-500"
             disabled={loading}
           />
         </div>
-        <button
+        <button aria-label="Send message" title="Send message"
           onClick={() => handleSend()}
           disabled={loading || !input.trim()}
           className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-violet-500 to-indigo-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-violet-200 hover:shadow-xl hover:scale-105 active:scale-95 transition-all duration-200 disabled:opacity-40 disabled:shadow-none disabled:hover:scale-100 cursor-pointer"

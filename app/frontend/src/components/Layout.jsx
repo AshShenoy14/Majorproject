@@ -1,8 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import {
   Search,
-  Command,
   Activity,
   Zap,
   Dna,
@@ -10,56 +9,72 @@ import {
   Pill,
   Bot,
   Home as HomeIcon,
-  PanelLeft,
-  Rows,
   BarChart3,
-  Network
+  Network,
+  Orbit,
+  GitCompare,
+  Lightbulb,
+  Info,
+  ChevronDown,
+  Menu,
+  X,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import FloatingGuide from './FloatingGuide';
+import { TechDetailsSwitch } from './TechDetails';
 
-const PAGE_META = {
-  '/':            { title: 'Dashboard',              subtitle: 'System Overview & Quick Actions' },
-  '/predict':     { title: 'Interaction Prediction',  subtitle: 'Predict Protein-Protein Interactions' },
-  '/structure':   { title: '3D Structure Studio',     subtitle: 'AlphaFold Mol* Visualization' },
-  '/mutation':    { title: 'Mutation Analysis',        subtitle: 'In-Silico Mutation Impact Scanner' },
-  '/compare':     { title: 'WT vs Mutant Comparator',  subtitle: 'Sensitivity & Probability Delta' },
-  '/network':     { title: 'Network Explorer',         subtitle: '2D Interactome Graph Analysis' },
-  '/network-3d':  { title: 'Interactome 3D',           subtitle: 'Global Interaction Topography' },
-  '/drug-targets':{ title: 'Drug Insights',            subtitle: 'Drug Target Discovery & ChEMBL Data' },
-  '/benchmark':   { title: 'Empirical Benchmarks',     subtitle: 'Statistical Rigor, 95% CIs & External Sets' },
-  '/zero-shot':   { title: 'Cross-Species Exploration',subtitle: 'Exploratory, Non-Validated Inference' },
-  '/assistant':   { title: 'Protein Assistant',        subtitle: 'AI-Powered Biological Query Engine' },
-  '/about':       { title: 'About & Technical Specs',  subtitle: 'Architecture, Ablations & Pipeline' },
-};
-
-const NAV_LINKS = [
+// Main menu: the pages that answer the project's questions.
+const MAIN_LINKS = [
   { path: '/', label: 'Home', icon: HomeIcon },
   { path: '/predict', label: 'Predict', icon: Zap },
-  { path: '/structure', label: '3D Studio', icon: Boxes },
-  { path: '/mutation', label: 'Mutation', icon: Dna },
-  { path: '/network', label: '2D Graph', icon: Network },
-  { path: '/drug-targets', label: 'Drugs', icon: Pill },
-  { path: '/benchmark', label: 'Benchmark', icon: BarChart3 },
-  { path: '/assistant', label: 'AI Copilot', icon: Bot },
+  { path: '/drug-targets', label: 'Drug Targets', icon: Pill },
+  { path: '/benchmark', label: 'Model Results', icon: BarChart3 },
+  { path: '/mutation', label: 'Mutations', icon: Dna },
 ];
+
+// Extra tools, under "More".
+const MORE_LINKS = [
+  { path: '/how-it-works', label: 'How it works', description: 'The project explained in 5 simple steps', icon: Lightbulb },
+  { path: '/assistant', label: 'AI Assistant', description: 'Ask questions about proteins in plain English', icon: Bot },
+  { path: '/structure', label: '3D Protein Viewer', description: 'See the 3D shape of a protein', icon: Boxes },
+  { path: '/network', label: 'Protein Network', description: 'Explore which proteins are connected', icon: Network },
+  { path: '/network-3d', label: '3D Network', description: 'The same network in 3D', icon: Orbit },
+  { path: '/compare', label: 'Normal vs Mutant', description: 'Compare a protein before and after a change', icon: GitCompare },
+  { path: '/about', label: 'About the project', description: 'Team, architecture and technical specs', icon: Info },
+];
+
+// Titles used by the search box (plain language first).
+const PAGE_META = {
+  '/': { title: 'Home', subtitle: 'What this app does and where to start' },
+  '/predict': { title: 'Predict', subtitle: 'Check whether two proteins are likely to interact' },
+  '/drug-targets': { title: 'Drug Targets', subtitle: 'Proteins that could be good targets for medicines' },
+  '/benchmark': { title: 'Model Results', subtitle: 'How accurate the model is, and where it falls short' },
+  '/mutation': { title: 'Mutations', subtitle: 'See how changing one amino acid affects an interaction' },
+  '/how-it-works': { title: 'How it works', subtitle: 'The project explained in 5 simple steps' },
+  '/assistant': { title: 'AI Assistant', subtitle: 'Ask questions about proteins' },
+  '/structure': { title: '3D Protein Viewer', subtitle: 'See the 3D shape of a protein' },
+  '/network': { title: 'Protein Network', subtitle: 'Explore which proteins are connected' },
+  '/network-3d': { title: '3D Network', subtitle: 'The protein network in 3D' },
+  '/compare': { title: 'Normal vs Mutant', subtitle: 'Compare a protein before and after a change' },
+  '/about': { title: 'About the project', subtitle: 'Team, architecture and technical specs' },
+};
 
 const Layout = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [navOrientation, setNavOrientation] = useState(() => {
-    return localStorage.getItem('transgraph_nav_orientation') || 'horizontal';
-  });
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const moreRef = useRef(null);
 
-  const toggleOrientation = () => {
-    const nextMode = navOrientation === 'horizontal' ? 'vertical' : 'horizontal';
-    setNavOrientation(nextMode);
-    localStorage.setItem('transgraph_nav_orientation', nextMode);
-  };
+  // Close menus when the page changes
+  useEffect(() => {
+    setMoreOpen(false);
+    setMobileOpen(false);
+  }, [location.pathname]);
 
-  // Handle keyboard shortcut Ctrl+K / Cmd+K
+  // Ctrl+K / Cmd+K opens search, Escape closes any open menu
   useEffect(() => {
     const handleKeyDown = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -68,192 +83,186 @@ const Layout = ({ children }) => {
       }
       if (e.key === 'Escape') {
         setIsSearchOpen(false);
+        setMoreOpen(false);
+        setMobileOpen(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const filteredPages = Object.entries(PAGE_META).filter(([, data]) => 
-    data.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+  // Close "More" when clicking elsewhere
+  useEffect(() => {
+    if (!moreOpen) return;
+    const onClick = (e) => {
+      if (moreRef.current && !moreRef.current.contains(e.target)) setMoreOpen(false);
+    };
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, [moreOpen]);
+
+  const filteredPages = Object.entries(PAGE_META).filter(([, data]) =>
+    data.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     data.subtitle.toLowerCase().includes(searchQuery.toLowerCase())
   );
+  const moreActive = MORE_LINKS.some(l => l.path === location.pathname);
 
-  const isVertical = navOrientation === 'vertical';
+  const linkClass = (active) =>
+    `px-3 py-1.5 rounded-full text-sm font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600 ${
+      active
+        ? 'text-emerald-800 bg-emerald-50 border border-emerald-200'
+        : 'text-slate-700 hover:text-slate-900 hover:bg-slate-100'
+    }`;
 
   return (
     <div className="min-h-screen bg-slate-50 relative overflow-x-hidden font-inter text-slate-800 pb-16">
-      
-      {/* ========================================== */}
-      {/* NAVIGATION BAR (HORIZONTAL OR VERTICAL) */}
-      {/* ========================================== */}
-      {isVertical ? (
-        /* VERTICAL SIDEBAR LAYOUT */
-        <motion.aside
-          initial={{ x: -50, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          className="fixed top-0 left-0 bottom-0 w-64 bg-white/95 backdrop-blur-xl z-50 border-r border-slate-200/80 p-5 flex flex-col justify-between shadow-2xl shadow-slate-900/10"
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[200] focus:bg-white focus:px-4 focus:py-2 focus:rounded-lg focus:shadow">
+        Skip to content
+      </a>
+
+      <header className="fixed top-4 left-0 right-0 z-50 px-4 md:px-8 max-w-7xl mx-auto flex items-center justify-between gap-3 pointer-events-none">
+        <motion.nav
+          aria-label="Main"
+          initial={{ y: -20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          className="pointer-events-auto flex items-center gap-1 bg-white/95 backdrop-blur-xl px-3 py-1.5 rounded-full shadow-lg shadow-slate-900/5 border border-slate-200"
         >
-          <div className="space-y-6">
-            {/* Logo */}
-            <Link to="/" className="flex items-center gap-2.5 pb-4 border-b border-slate-100 group">
-              <div className="w-9 h-9 bg-gradient-to-tr from-emerald-600 to-teal-500 rounded-full flex items-center justify-center text-white shadow-md shadow-emerald-500/20 group-hover:scale-105 transition-transform">
-                <Activity size={18} className="animate-pulse" />
-              </div>
-              <span className="font-cursive text-xl tracking-wide font-bold" style={{ fontFamily: "'Dancing Script', cursive" }}>
-                Trans<span className="text-emerald-600">Graph</span>
-              </span>
-            </Link>
-
-            {/* Quick Search */}
-            <button 
-              onClick={() => setIsSearchOpen(true)}
-              className="w-full flex items-center justify-between bg-slate-100/80 hover:bg-slate-200/60 px-3.5 py-2 rounded-2xl text-slate-500 transition-colors text-xs font-medium"
-              title="Search Platform (Ctrl + K)"
-            >
-              <div className="flex items-center gap-2">
-                <Search size={14} className="text-slate-400" />
-                <span className="text-[11px] font-semibold">Search...</span>
-              </div>
-              <kbd className="flex items-center gap-0.5 px-1.5 py-0.5 bg-white rounded text-[9px] font-black text-slate-400 border border-slate-200">
-                <Command size={10} />K
-              </kbd>
-            </button>
-
-            {/* Nav Links */}
-            <nav className="space-y-1 overflow-y-auto max-h-[calc(100vh-220px)] no-scrollbar pr-1">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-2 mb-2">Research Modules</p>
-              {NAV_LINKS.map((link) => {
-                const isActive = location.pathname === link.path;
-                const Icon = link.icon;
-                return (
-                  <Link
-                    key={link.path}
-                    to={link.path}
-                    className={`px-3.5 py-2 rounded-2xl text-xs font-semibold transition-all flex items-center justify-between ${
-                      isActive 
-                        ? 'text-emerald-700 bg-emerald-50 shadow-sm border border-emerald-200/60 font-bold' 
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <Icon size={15} className={isActive ? 'text-emerald-600' : 'text-slate-400'} />
-                      <span>{link.label}</span>
-                    </div>
-                    {link.badge && (
-                      <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded-md font-bold border border-emerald-200">
-                        {link.badge}
-                      </span>
-                    )}
-                  </Link>
-                );
-              })}
-            </nav>
-          </div>
-
-          {/* Footer Controls (Layout Switcher) */}
-          <div className="pt-4 border-t border-slate-100">
-            <button
-              onClick={toggleOrientation}
-              className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-xs font-bold transition-all"
-              title="Switch Navbar Layout"
-            >
-              <div className="flex items-center gap-2">
-                <Rows size={15} className="text-emerald-600" />
-                <span>Switch to Horizontal</span>
-              </div>
-              <span className="text-[10px] bg-white px-2 py-0.5 rounded-full text-slate-500 border border-slate-200 font-mono">Top</span>
-            </button>
-          </div>
-        </motion.aside>
-      ) : (
-        /* HORIZONTAL FLOATING NAVBAR LAYOUT */
-        <header className="fixed top-4 left-0 right-0 z-50 px-4 md:px-8 max-w-7xl mx-auto flex items-center justify-between gap-4 pointer-events-none">
-          
-          {/* PART 1: LEFT FLOATING PILL (Logo + Nav Links) */}
-          <motion.nav 
-            initial={{ y: -20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            className="pointer-events-auto flex items-center gap-1.5 md:gap-2 bg-white/95 backdrop-blur-xl px-3 py-1.5 rounded-full shadow-lg shadow-slate-900/5 border border-slate-200/80"
-          >
-            {/* Logo */}
-            <Link to="/" className="flex items-center gap-2 pr-2.5 border-r border-slate-200/80 group shrink-0">
-              <div className="w-8 h-8 bg-gradient-to-tr from-emerald-600 to-teal-500 rounded-full flex items-center justify-center text-white shadow-md shadow-emerald-500/20 group-hover:scale-105 transition-transform">
-                <Activity size={16} className="animate-pulse" />
-              </div>
-              <span className="font-cursive text-lg tracking-wide hidden sm:inline-block font-bold" style={{ fontFamily: "'Dancing Script', cursive" }}>
-                Trans<span className="text-emerald-600">Graph</span>
-              </span>
-            </Link>
-
-            {/* Links */}
-            <div className="flex items-center gap-0.5 md:gap-1">
-              {NAV_LINKS.map((link) => {
-                const isActive = location.pathname === link.path;
-                const Icon = link.icon;
-                return (
-                  <Link
-                    key={link.path}
-                    to={link.path}
-                    className={`relative px-2.5 py-1.5 rounded-full text-xs font-semibold transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap ${
-                      isActive 
-                        ? 'text-emerald-700 bg-emerald-50 shadow-sm border border-emerald-200/60 font-bold' 
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
-                    }`}
-                  >
-                    <Icon size={14} className={isActive ? 'text-emerald-600' : 'text-slate-400'} />
-                    <span className="hidden xl:inline-block">{link.label}</span>
-                  </Link>
-                );
-              })}
+          <Link to="/" className="flex items-center gap-2 pr-3 border-r border-slate-200 group shrink-0" aria-label="TransGraph home">
+            <div className="w-8 h-8 bg-gradient-to-tr from-emerald-600 to-teal-500 rounded-full flex items-center justify-center text-white shadow-md shadow-emerald-500/20">
+              <Activity size={16} aria-hidden="true" />
             </div>
-          </motion.nav>
+            <span className="text-lg tracking-wide hidden sm:inline-block font-bold" style={{ fontFamily: "'Dancing Script', cursive" }}>
+              Trans<span className="text-emerald-700">Graph</span>
+            </span>
+          </Link>
 
-          {/* PART 2: RIGHT FLOATING PILL (Search + Layout Toggle) */}
-          <motion.div 
-            initial={{ y: -20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.1 }}
-            className="pointer-events-auto flex items-center gap-2 bg-white/90 backdrop-blur-xl px-3 py-1.5 rounded-full shadow-lg shadow-slate-900/5 border border-slate-200/80"
+          {/* Desktop links */}
+          <div className="hidden md:flex items-center gap-0.5">
+            {MAIN_LINKS.map((link) => {
+              const active = location.pathname === link.path;
+              const Icon = link.icon;
+              return (
+                <Link key={link.path} to={link.path} className={linkClass(active)} aria-current={active ? 'page' : undefined}>
+                  <Icon size={15} aria-hidden="true" className={active ? 'text-emerald-700' : 'text-slate-500'} />
+                  <span>{link.label}</span>
+                </Link>
+              );
+            })}
+
+            <div className="relative" ref={moreRef}>
+              <button
+                type="button"
+                onClick={() => setMoreOpen(v => !v)}
+                aria-expanded={moreOpen}
+                aria-haspopup="true"
+                className={linkClass(moreActive)}
+              >
+                <span>More</span>
+                <ChevronDown size={15} aria-hidden="true" className={`transition-transform ${moreOpen ? 'rotate-180' : ''}`} />
+              </button>
+              <AnimatePresence>
+                {moreOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    className="absolute left-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-slate-200 p-2"
+                  >
+                    {MORE_LINKS.map((link) => {
+                      const Icon = link.icon;
+                      const active = location.pathname === link.path;
+                      return (
+                        <Link
+                          key={link.path}
+                          to={link.path}
+                          aria-current={active ? 'page' : undefined}
+                          className={`flex items-start gap-3 p-2.5 rounded-xl transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600 ${active ? 'bg-emerald-50' : 'hover:bg-slate-100'}`}
+                        >
+                          <Icon size={18} aria-hidden="true" className="text-emerald-700 mt-0.5 shrink-0" />
+                          <span>
+                            <span className="block text-sm font-bold text-slate-800">{link.label}</span>
+                            <span className="block text-xs text-slate-600">{link.description}</span>
+                          </span>
+                        </Link>
+                      );
+                    })}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+
+          {/* Mobile menu button */}
+          <button
+            type="button"
+            className="md:hidden p-2 rounded-full text-slate-700 hover:bg-slate-100"
+            onClick={() => setMobileOpen(v => !v)}
+            aria-expanded={mobileOpen}
+            aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
           >
-            {/* Quick Search Trigger */}
-            <button 
-              onClick={() => setIsSearchOpen(true)}
-              className="flex items-center gap-2 bg-slate-100/80 hover:bg-slate-200/60 px-3 py-1.5 rounded-full text-slate-500 transition-colors text-xs font-medium"
-              title="Search Platform (Ctrl + K)"
-            >
-              <Search size={14} className="text-slate-400" />
-              <span className="hidden sm:inline-block text-[11px] font-semibold">Search...</span>
-              <kbd className="hidden sm:flex items-center gap-0.5 px-1.5 py-0.5 bg-white rounded text-[9px] font-black text-slate-400 border border-slate-200">
-                <Command size={10} />K
-              </kbd>
-            </button>
+            {mobileOpen ? <X size={20} aria-hidden="true" /> : <Menu size={20} aria-hidden="true" />}
+          </button>
+        </motion.nav>
 
-            {/* Layout Toggle Button (Horizontal / Vertical Switcher) */}
-            <button
-              onClick={toggleOrientation}
-              className="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200/80 px-2.5 py-1.5 rounded-full text-slate-700 text-xs font-bold transition-all"
-              title="Switch Navbar to Vertical Sidebar"
-            >
-              <PanelLeft size={14} className="text-emerald-600" />
-              <span className="hidden md:inline-block text-[11px]">Vertical Nav</span>
-            </button>
-          </motion.div>
+        <motion.div
+          initial={{ y: -20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.1 }}
+          className="pointer-events-auto flex items-center gap-1 bg-white/95 backdrop-blur-xl px-2 py-1.5 rounded-full shadow-lg shadow-slate-900/5 border border-slate-200"
+        >
+          <TechDetailsSwitch />
+          <button
+            type="button"
+            onClick={() => setIsSearchOpen(true)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-full text-slate-700 hover:bg-slate-100 transition-colors text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-600"
+            aria-label="Search pages (Ctrl + K)"
+            title="Search pages (Ctrl + K)"
+          >
+            <Search size={15} aria-hidden="true" />
+            <span className="hidden lg:inline-block">Search</span>
+          </button>
+        </motion.div>
+      </header>
 
-        </header>
-      )}
+      {/* Mobile menu panel */}
+      <AnimatePresence>
+        {mobileOpen && (
+          <motion.nav
+            aria-label="Mobile"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="md:hidden fixed top-20 left-4 right-4 z-50 bg-white rounded-2xl shadow-xl border border-slate-200 p-3 space-y-1 max-h-[75vh] overflow-y-auto"
+          >
+            {[...MAIN_LINKS, ...MORE_LINKS].map((link) => {
+              const Icon = link.icon;
+              const active = location.pathname === link.path;
+              return (
+                <Link key={link.path} to={link.path} aria-current={active ? 'page' : undefined}
+                  className={`flex items-center gap-3 p-3 rounded-xl text-sm font-semibold ${active ? 'bg-emerald-50 text-emerald-800' : 'text-slate-700 hover:bg-slate-100'}`}>
+                  <Icon size={18} aria-hidden="true" className="text-emerald-700" />
+                  {link.label}
+                </Link>
+              );
+            })}
+          </motion.nav>
+        )}
+      </AnimatePresence>
 
-      {/* Global Search Modal Overlay */}
+      {/* Search dialog */}
       <AnimatePresence>
         {isSearchOpen && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-[100] bg-slate-900/40 backdrop-blur-md flex items-start justify-center pt-28 px-4"
             onClick={() => setIsSearchOpen(false)}
           >
-            <motion.div 
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Search pages"
               initial={{ scale: 0.95, opacity: 0, y: -20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: -20 }}
@@ -261,61 +270,45 @@ const Layout = ({ children }) => {
               onClick={e => e.stopPropagation()}
             >
               <div className="p-5 border-b border-slate-100 flex items-center gap-3">
-                <Search className="text-slate-400" size={20} />
-                <input 
+                <Search className="text-slate-500" size={20} aria-hidden="true" />
+                <input
                   autoFocus
-                  placeholder="Search interaction models, proteins, disease explorer..."
-                  className="flex-1 bg-transparent border-none outline-none text-lg font-medium text-slate-800 placeholder:text-slate-300"
+                  aria-label="Search pages"
+                  placeholder="Search pages, e.g. 'drug' or 'mutation'"
+                  className="flex-1 bg-transparent border-none outline-none text-lg font-medium text-slate-800 placeholder:text-slate-500"
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                 />
-                <div className="px-2 py-1 bg-slate-100 rounded-md text-[10px] font-black text-slate-400">
-                  ESC
-                </div>
+                <kbd className="px-2 py-1 bg-slate-100 rounded-md text-xs font-bold text-slate-600">Esc</kbd>
               </div>
-              <div className="max-h-[360px] overflow-y-auto p-3">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-3">Available Modules</p>
-                <div className="space-y-1">
-                  {filteredPages.map(([path, data]) => (
-                    <button
-                      key={path}
-                      onClick={() => {
-                        navigate(path);
-                        setIsSearchOpen(false);
-                      }}
-                      className="w-full text-left p-3 rounded-2xl hover:bg-emerald-50 transition-all group flex items-center justify-between"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400 group-hover:bg-white group-hover:text-emerald-600 transition-all shadow-sm">
-                          <Activity size={16} />
-                        </div>
-                        <div>
-                          <p className="text-sm font-bold text-slate-700 group-hover:text-emerald-700">{data.title}</p>
-                          <p className="text-[11px] text-slate-400 group-hover:text-emerald-600/70">{data.subtitle}</p>
-                        </div>
-                      </div>
-                      <Zap size={14} className="text-slate-200 group-hover:text-emerald-500 opacity-0 group-hover:opacity-100 transition-all" />
-                    </button>
-                  ))}
-                </div>
+              <div className="max-h-[360px] overflow-y-auto p-3 space-y-1">
+                {filteredPages.map(([path, data]) => (
+                  <button
+                    type="button"
+                    key={path}
+                    onClick={() => { navigate(path); setIsSearchOpen(false); }}
+                    className="w-full text-left p-3 rounded-2xl hover:bg-emerald-50 transition-all"
+                  >
+                    <p className="text-sm font-bold text-slate-800">{data.title}</p>
+                    <p className="text-xs text-slate-600">{data.subtitle}</p>
+                  </button>
+                ))}
+                {filteredPages.length === 0 && <p className="p-3 text-sm text-slate-600">No page matches "{searchQuery}".</p>}
               </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Main Content Area */}
-      <main className={`px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto transition-all ${isVertical ? 'md:pl-72 pt-6' : 'pt-24'}`}>
+      <main id="main-content" className="px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto pt-24">
         <div className="animate-in fade-in slide-in-from-bottom-3 duration-500">
           {children}
         </div>
       </main>
 
-      {/* Global Floating Guide Dot */}
       <FloatingGuide />
     </div>
   );
 };
 
 export default Layout;
-

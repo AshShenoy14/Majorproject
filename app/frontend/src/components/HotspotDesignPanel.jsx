@@ -54,7 +54,7 @@ const Progress = ({ job }) => {
       <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
         <div className="h-full bg-scientific-accent transition-all duration-500" style={{ width: `${pct}%` }} />
       </div>
-      <p className="text-[11px] text-slate-400">Runs in the background on the server; you can keep using other pages.</p>
+      <p className="text-[11px] text-slate-600">Runs in the background on the server; you can keep using other pages.</p>
     </div>
   );
 };
@@ -72,8 +72,8 @@ const HotspotChart = ({ label, impact }) => {
   return (
     <div className="space-y-2">
       <div className="flex justify-between items-baseline">
-        <h5 className="text-xs font-bold text-slate-600 uppercase tracking-wider">{label}</h5>
-        <span className="text-[11px] text-slate-400">max drop {(Math.max(0, ...impact) * 100).toFixed(2)} pts</span>
+        <h3 className="text-sm font-bold text-slate-800">{label}</h3>
+        <span className="text-[11px] text-slate-600">max drop {(Math.max(0, ...impact) * 100).toFixed(2)} pts</span>
       </div>
       <div className="h-40">
         <ResponsiveContainer width="100%" height="100%">
@@ -105,7 +105,7 @@ const HotspotDesignPanel = ({ protein1, protein2, onLoadMutations }) => {
   return (
     <div className="glass-card p-8 space-y-6">
       <div>
-        <h3 className="text-lg font-bold text-slate-800">Hotspot Map &amp; Mutation Design</h3>
+        <h2 className="text-lg font-bold text-slate-900">Hotspot map &amp; mutation design</h2>
         <p className="text-xs text-slate-500 mt-1 max-w-3xl">
           Hotspots: each 5-residue window is masked and the protein re-embedded with ESM-2; the drop in the sequence
           model's interaction score marks residues the prediction depends on. Design: the three strongest hotspots of
@@ -151,7 +151,7 @@ const HotspotDesignPanel = ({ protein1, protein2, onLoadMutations }) => {
             <div className="space-y-3">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-[10px] uppercase tracking-wider text-slate-400">
+                  <tr className="text-left text-xs uppercase tracking-wider text-slate-600">
                     <th className="py-1">Protein A mutation</th><th className="py-1 text-right">Score</th><th className="py-1 text-right">Δ</th>
                   </tr>
                 </thead>
@@ -172,7 +172,7 @@ const HotspotDesignPanel = ({ protein1, protein2, onLoadMutations }) => {
                 className="text-xs font-bold text-scientific-accent flex items-center gap-1 hover:underline">
                 Load into the mutation batch above <ArrowRight size={14} />
               </button>
-              <p className="text-[11px] text-slate-400 flex gap-1.5"><Info size={12} className="shrink-0 mt-0.5" />
+              <p className="text-[11px] text-slate-600 flex gap-1.5"><Info size={12} className="shrink-0 mt-0.5" />
                 Single substitutions usually move this model's score by well under one point; treat these as ranked candidates, not predicted binders.
               </p>
             </div>
